@@ -14,32 +14,20 @@ struct Navigation: View {
     
     var body: some View {
         NavigationView {
-            AlbumView(title: title, color: color)
-                .navigationBarTitleDisplayMode(.inline)
+            AlbumView()
                 .navigationTitle(title)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button { } label: {
-                            Image(systemName: "gearshape.fill")
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button { } label: {
-                            Image(systemName: "plus.rectangle.fill")
-                                .foregroundColor(.gray)
-                                .frame(width: 20)
-                        }
-                    }
-                }
+                .navigationBarTitleDisplayMode(.inline)
+                
         }
         .ignoresSafeArea(.all)
         .accentColor(.primary)
     }
 }
 
+
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         Navigation(title: "My Album", color: .orange)
+            .environmentObject(PhotoData())
     }
 }

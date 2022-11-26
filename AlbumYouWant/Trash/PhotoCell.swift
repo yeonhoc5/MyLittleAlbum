@@ -8,18 +8,20 @@
 import SwiftUI
 
 struct PhotoCell: View {
-    var color: Color
     
     var body: some View {
         let size = UIScreen.main.bounds.width / 5
-        color
-            .frame(width: size, height: size)
+        Image("sample")
+            .resizable()
+            .scaledToFill()
+//            .frame(width: size, height: size)
+            .clipped()
             
     }
 }
 
 struct PhotoCell_Previews: PreviewProvider {
     static var previews: some View {
-        PhotoCell(color: .orange)
+        PhotoCell()
     }
 }

@@ -8,47 +8,46 @@
 import SwiftUI
 
 enum Tabs {
-    case photo
-    case album
-    case collection
-    case passed
+    case photo, album, collection, passed
 }
 
 struct TabBarView: View {
+    @EnvironmentObject var photoData: PhotoData
     @State private var selection: Tabs = .album
+    @State var Alert: Bool = false
     
     var body: some View {
         TabView(selection: $selection) {
-            PhotoView(color: .orange)
-                .tabItem {
-                    Image(systemName: "photo")
-                    Text("앨범없는 사진")
-                }
+            PhotoView(allPhotos: photoData.allPhotos)
+                .tabItem(image: "photo", title: "앨범없는 사진")
                 .tag(Tabs.photo)
             Navigation(title: "My Album", color: .orange)
-                .tabItem {
-                    Image(systemName: "folder")
-                    Text("앨범")
-                }
+                .tabItem(image: "folder", title: "앨범")
                 .tag(Tabs.album)
             Navigation(title: "My Collection", color: .purple)
-                .tabItem {
-                    Image(systemName: "tray")
-                    Text("콜렉션")
-                }
+                .tabItem(image: "tray", title: "콜렉션")
                 .tag(Tabs.collection)
-            PhotoView(color: .purple)
-                .tabItem {
-                    Image(systemName: "shippingbox.fill")
-                    Text("창고")
-                }
+            PhotoView(allPhotos: photoData.allPhotos)
+                .tabItem(image: "shippingbox.fill", title: "창고")
                 .tag(Tabs.passed)
         }
     }
 }
 
+extension View {
+    func tabItem(image: String, title: String) -> some View {
+        self.tabItem {
+            Image(systemName: image)
+            Text(title)
+        }
+    }
+}
+
+
+
 struct TabBarView_Previews: PreviewProvider {
     static var previews: some View {
         TabBarView()
+            .environmentObject(PhotoData())
     }
 }

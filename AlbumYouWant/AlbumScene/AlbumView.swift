@@ -6,29 +6,60 @@
 //
 
 import SwiftUI
+import Photos
 
 struct AlbumView: View {
-    var title: String
-    var color: Color
+    @EnvironmentObject var photoData: PhotoData
+    @State var depthFoldAndAlbm: PHFetchResult<PHCollection>!
+    @State var depthFolders: [PHCollectionList]! = []
+    @State var depthAlbums: [PHAssetCollection]! = []
+    var isHome: Bool! = true
+    
+    
+    
+    var title: String! = ""
+    var color: Color! = .orange
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 0) {
-                CollectionLineView(color: color)
-                CollectionLineView(color: color)
-                CollectionLineView(color: color)
-                CollectionLineView(color: color)
-                CollectionLineView(color: color)
-                CollectionLineView(color: color)
-                CollectionLineView(color: color)
+            AlbumListView(depthAlbums: depthAlbums)
+            FolderListView(depthFolders: depthFolders)
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                editBarButton
             }
-            .animation(Animation.default)
+        }
+        .onAppear {
+            depthAlbums = []
+            depthFolders = []
+            if isHome {
+                depthFoldAndAlbm = photoData.topLevelCollection
+            }
+            (0..<depthFoldAndAlbm.count).forEach { index in
+                if depthFoldAndAlbm[index].isKind(of: PHAssetCollection.self) {
+                    depthAlbums.append(depthFoldAndAlbm[index] as! PHAssetCollection)
+                } else {
+                    depthFolders.append(depthFoldAndAlbm[index] as! PHCollectionList)
+                }
+            }
         }
     }
 }
 
+extension AlbumView {
+    var editBarButton: some View {
+        Button { } label: {
+            Image(systemName: "gearshape.fill")
+                .foregroundColor(.gray)
+        }
+    }
+}
+
+
 struct AlbumView_Previews: PreviewProvider {
     static var previews: some View {
-        AlbumView(title: "my Album", color: .orange)
+        AlbumView()
+            .environmentObject(PhotoData())
     }
 }

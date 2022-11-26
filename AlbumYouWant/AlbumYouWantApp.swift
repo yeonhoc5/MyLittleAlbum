@@ -12,6 +12,7 @@ struct AlbumYouWantApp: App {
     var body: some Scene {
         WindowGroup {
             TabBarView()
+                .environmentObject(PhotoData())
         }
     }
 }
