@@ -32,6 +32,51 @@ struct PhotosDetailView: View {
     @State var currentScale: CGFloat = 1
     @State var currentTime: Double = 0
     
+    
+//    var body: some View {
+//        TabView(selection: $indexToView) {
+//            ForEach(0..<assetArray.count, id: \.self) { index in
+//                switch index {
+//                case indexToView-3...indexToView+3:
+//                    ZStack {
+//                        Color.black
+//                        ImageDetailView(isExpanded: $isExpanded,
+//                                        asset: assetArray[index],
+//                                        navigationTitle: navigationTitle,
+//                                        variableScale: $variableScale,
+//                                        currentScale: $currentScale,
+//                                        offsetY: $offsetY)
+//                            .tag(index)
+////                            .matchedGeometryEffect(id: assetArray[index], in: animationID)
+//                            .id(assetArray[index].localIdentifier)
+//                            .scaleEffect(variableScale)
+////                            .simultaneousGesture(hideGesture)
+////                            .simultaneousGesture(zoomGestureByPinch)
+//                            .onTapGesture {
+//                                isExpanded = false
+//                            }
+//                    }
+//                default:
+//                    Color.clear
+//                        .tag(index)
+//                        .onTapGesture {
+//                            isExpanded = false
+//                        }
+//                }
+////                if (indexToView-1...indexToView+1).contains(assetArray.firstIndex(of: asset as! PHAsset)!) {
+////                    Color.yellow
+////                        .onTapGesture {
+////                            isExpanded = false
+////                        }
+////                } else {
+//
+////                }
+//            }
+//        }
+//        .tabViewStyle(.page(indexDisplayMode: .always))
+//    }
+    
+    
     var body: some View {
         let count = assetArray.count
         NavigationStack {
@@ -49,8 +94,7 @@ struct PhotosDetailView: View {
                         let asset = assetArray[pageIndex]
                         detailView(currentAsset: asset,
                                    offsetIndex: offsetIndex,
-                                   animationID: animationID,
-                                   pageIndex: pageIndex)
+                                   animationID: animationID)
                         .id(asset.localIdentifier)
                         .onAppear(perform: {
                             navigationTitle = timeFormmatter(asset: assetArray[indexToView])
@@ -58,6 +102,31 @@ struct PhotosDetailView: View {
                         .offset(x: 0, y: offsetY)
                         .onChange(of: offsetIndex) { newValue in
                             changeNavigationTitle(newValue, pageIndex: pageIndex)
+                            if (newValue == indexToView - 2 && indexToView - 2 >= 0) {
+                                let imageManager = PHCachingImageManager()
+                                let options = PHImageRequestOptions()
+                                options.deliveryMode = .opportunistic
+                                options.isSynchronous = true
+                                options.isNetworkAccessAllowed = true
+                                let width = screenSize.width * scale
+                                let size = CGSize(width: width, height: .infinity)
+                                imageManager.startCachingImages(for: [assetArray[indexToView - 2]],
+                                                                targetSize: size,
+                                                                contentMode: .aspectFit,
+                                                                options: options)
+                            } else if (newValue == indexToView + 2 && indexToView + 2 < assetArray.count) {
+                                let imageManager = PHCachingImageManager()
+                                let options = PHImageRequestOptions()
+                                options.deliveryMode = .opportunistic
+                                options.isSynchronous = true
+                                options.isNetworkAccessAllowed = true
+                                let width = screenSize.width * scale
+                                let size = CGSize(width: width, height: .infinity)
+                                imageManager.startCachingImages(for: [assetArray[indexToView + 2]],
+                                                                targetSize: size,
+                                                                contentMode: .aspectFit,
+                                                                options: options)
+                            }
                         }
                     }
                 }
@@ -113,7 +182,8 @@ extension PhotosDetailView {
     }
     
     @ViewBuilder
-    func detailView(currentAsset: PHAsset, offsetIndex: Int, animationID: Namespace.ID, pageIndex: Int) -> some View {
+    func detailView(currentAsset: PHAsset, offsetIndex: Int, animationID: Namespace.ID) -> some View {
+        
         if currentAsset.mediaType == .image {
             ImageDetailView(isExpanded: $isExpanded,
                             asset: currentAsset,
@@ -125,6 +195,7 @@ extension PhotosDetailView {
             .scaleEffect(variableScale)
             .simultaneousGesture(hideGesture)
             .simultaneousGesture(zoomGestureByPinch)
+            
         } else if currentAsset.mediaType == .video {
             VideoDetailView(isExpanded: $isExpanded,
                             offsetIndex: offsetIndex,

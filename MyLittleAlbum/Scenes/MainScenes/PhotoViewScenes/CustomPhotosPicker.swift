@@ -26,6 +26,7 @@ struct CustomPhotosPicker: View {
     
     @State var belongingType: BelongingType = .nonAlbum
     @State var filteringType: FilteringType = .all
+    @State var filteringTypeChanged: Bool = false
     @State var settingDone: Bool! = false
     
     var albumToEdit: Album
@@ -61,6 +62,7 @@ struct CustomPhotosPicker: View {
                                              album: album,
 //                                             filteringType: $filteringType,
                                              edgeToScroll: $edgeToScroll,
+                                             filteringTypeChanged: $filteringTypeChanged,
                                              isSelectMode: .constant(true),
                                              selectedItemsIndex: $selectedItemsIndex,
                                              isShowingPhotosPicker: .constant(false),
@@ -76,6 +78,7 @@ struct CustomPhotosPicker: View {
                                        settingDone: $settingDone,
                                        belongingType: $belongingType,
                                        filteringType: $filteringType,
+                                       filteringTypeChanged: $filteringTypeChanged,
                                        isSelectMode: .constant(true),
                                        selectedItemsIndex: .constant([]),
                                        edgeToScroll: $edgeToScroll,
@@ -156,8 +159,8 @@ struct CustomPhotosPicker: View {
         }
         selectedItemsIndex = []
         DispatchQueue.main.async {
-            albumToEdit.addAsset(assets: assets)
-            stateChangeObject.assetRemoving = true
+            albumToEdit.addAsset(assets: assets, stateObject: stateChangeObject)
+//            stateChangeObject.assetRemoving = true
         }
         
     }

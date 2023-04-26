@@ -31,14 +31,18 @@ struct VideoDetailView: View {
     
     var body: some View {
         if avPlayer == nil {
+//            Image(uiImage: (fetchingImage(asset: asset)))
             ProgressView()
                 .onAppear {
-                    let options = PHVideoRequestOptions()
-                    options.isNetworkAccessAllowed = true
-                    imageManager.requestAVAsset(forVideo: asset, options: options) { asset, audioMix, _ in
-                        let avAsset = asset as! AVURLAsset
-                        DispatchQueue.main.async {
-                            avPlayer = AVPlayer(url: avAsset.url)
+                    DispatchQueue.main.async {
+                        let options = PHVideoRequestOptions()
+                        options.isNetworkAccessAllowed = true
+                        options.progressHandler = { (progress, error, stop, info) in
+                        }
+                        imageManager.requestAVAsset(forVideo: asset, options: options) { asset, audioMix, _ in
+                            if let avAsset = asset as? AVURLAsset {
+                                avPlayer = AVPlayer(url: avAsset.url)
+                            }
                         }
                     }
                 }
@@ -52,8 +56,10 @@ struct VideoDetailView: View {
                         .simultaneousGesture(seekGesture(current: current))
                 }
                 .onAppear {
-                    avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 1), queue: .main) { _ in
-                        self.value = getSliderValue()
+                    DispatchQueue.main.async {
+                        avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: 1, preferredTimescale: 1), queue: .main) { _ in
+                            self.value = getSliderValue()
+                        }
                     }
                     if offsetIndex == 0 {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -124,16 +130,39 @@ struct VideoDetailView: View {
                 }
                 .onChange(of: value) { newValue in
                     if newValue == 1.0 {
-                        self.play = false
-                        self.avPlayer.seek(to: .zero)
+                        DispatchQueue.main.async {
+                            self.play = false
+                            self.avPlayer.seek(to: .zero)
+                        }
                     }
                 }
                 .onChange(of: getSeconds()) { newValue in
                     if !isSeeking {
-                        self.current = newValue
+                        DispatchQueue.main.async {
+                            self.current = newValue
+                        }
                     }
                 }
         }
+    }
+    
+    func fetchingImage(asset: PHAsset) -> UIImage {
+        var returnImage: UIImage!
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .opportunistic
+        options.isSynchronous = true
+        options.isNetworkAccessAllowed = true
+        let width = screenSize.width * scale
+        let size = CGSize(width: width, height: .infinity)
+        imageManager.requestImage(for: asset,
+                                  targetSize: size,
+                                  contentMode: .aspectFit,
+                                  options: options) { assetImage, _ in
+            if let image = assetImage {
+                returnImage = image
+            }
+        }
+        return returnImage
     }
     
     private var hideGesture: some Gesture {
@@ -314,6 +343,7 @@ extension VideoDetailView {
                 self.offsetY = 0
                 avPlayer?.pause()
                 if let item = avPlayer.currentItem {
+                    guard !(item.duration.seconds.isNaN || item.duration.seconds.isInfinite) else { return }
                     let sec = Int((newValue.translation.width / 180) * item.duration.seconds)
                     avPlayer?.seek(to: CMTime(seconds: Double(Int(current) + sec), preferredTimescale: 1))
                     playPosition = Double(Int(current) + sec)

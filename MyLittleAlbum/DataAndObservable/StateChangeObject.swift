@@ -41,7 +41,7 @@ class StateChangeObject: ObservableObject {
     
     // 콜렉션뷰 용 프라퍼티
     // 사진 추가/삭제시 / 필터 change시 전체 리로드
-    @Published var allPhotosChanged: Bool = false
+    @Published var filteringChanged: Bool = false
     @Published var isPhotosMoved: Bool = false
 //    @Published var photosFilterChanged: Bool = false
     

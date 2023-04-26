@@ -233,11 +233,7 @@ extension MoveAssetCategoryView {
         
         let albumToAdd = Album(album: albumToAddPhotos)
         DispatchQueue.main.async {
-            albumToAdd.addAsset(assets: assets)
-                if stateChangeObject.assetRemoving == false {
-                    stateChangeObject.assetRemoving = true
-                }
-
+            albumToAdd.addAsset(assets: assets, stateObject: stateChangeObject)
         }
     }
     

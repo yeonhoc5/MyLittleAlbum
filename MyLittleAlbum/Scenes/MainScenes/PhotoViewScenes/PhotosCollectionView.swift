@@ -20,11 +20,12 @@ struct PhotosCollectionView: UIViewRepresentable {
     // 스크롤 관리 프라퍼티
     @State var scrollAtFirst: Bool = true
     @Binding var edgeToScroll: EdgeToScroll
+    @Binding var filteringTypeChanged: Bool
     // 셀 셀렉트 모드 전환 프라퍼티
     @Binding var isSelectMode: Bool
     @Binding var selectedItemsIndex: [Int]
     @Binding var isShowingPhotosPicker: Bool
-
+    
     @Binding var indexToView: Int
     @Binding var isExpanded: Bool
     @State var selectedIndex: IndexPath!
@@ -64,12 +65,15 @@ struct PhotosCollectionView: UIViewRepresentable {
         // 2. (공통) 스크롤 위/아래 이동
         if edgeToScroll != .none {
             moveToEdge(collectionView: collectionView)
-            print("updated 2. scrolled to \(edgeToScroll) by Tab button")
         }
         // 3. 필터링 4 : (공통) 비디오 / 이미지 / 모두 보기 필터링
-        if stateChangeObject.allPhotosChanged {
-            reloadAllPhotos(collectionView: collectionView, caseNum: 3)
-            print("updated 3. photos Are Filtered by you want are changed")
+        if filteringTypeChanged {
+            reloadAllPhotos(collectionView: collectionView) { count in
+                DispatchQueue.main.async {
+                    self.filteringTypeChanged = false
+                    print("updated 3. photos Are Filtered by you want are changed")
+                }
+            }
         }
         // 4. 개별 셀 선택시 리로드는 각 셀에서 처리 / 취소 버튼에 의한 선택된 셀들의 리로드와 전체 선택 토글이 이루어지면 여기서 전체 셀 리로드는 여기서 처리
         if stateChangeObject.selectToggleAllPhotos {
@@ -80,7 +84,7 @@ struct PhotosCollectionView: UIViewRepresentable {
             print("updated 4-2. you pressed Cancel SelectMode at Selected some")
         }
         
-        // 6. detilaview 완료 후 indextoview 재로딩
+        // 5. detilaview 완료 후 indextoview 재로딩
         if stateChangeObject.isSlideShowEnded {
             collectionView.reloadItems(at: [IndexPath(item: indexToView, section: 0), selectedIndex])
             DispatchQueue.main.async {
@@ -90,23 +94,57 @@ struct PhotosCollectionView: UIViewRepresentable {
             print("updated 7. Detail View has Ended")
         }
         
-        // 7. 사진 추가/삭제 후 리로딩
-        if currentCount != album.count || stateChangeObject.assetRemoving {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                UIView.animate(withDuration: 1, animations: {
-                    print("추가/삭제 리로드 감지")
-                    if self.album.belongingType == .all || self.album.belongingType == .album {
-                        selectedItemsIndex = []
-                        self.isSelectMode = false
-                        stateChangeObject.assetRemoving = false
+        // 6. 사진 추가/삭제 후 리로딩
+        // 6-1. assetArray 카운트 변화 있음 : [마이포토] nonalbum (album,all은 가리기 삭제시에만) / [마이앨범] / [사진관리] 가린 사진
+        if currentCount != album.count {
+            DispatchQueue.main.async {
+                // step 1. 리로드 전 준비
+                self.isSelectMode = false
+                if albumType == .album {
+                    stateChangeObject.showPickerButton = false
+                }
+                self.currentCount = album.count
+                // step 2. 리로드
+                reloadAllPhotos(collectionView: collectionView) { count in
+                    if currentCount == count {
+                // step 3. progressView뷰 종료
+                        DispatchQueue.main.async {
+                            stateChangeObject.assetRemoving = false
+                        }
                     }
-                    reloadAllPhotos(collectionView: collectionView, caseNum: 7)
-                })
+                }
+                selectedItemsIndex = []
+                album.albumAssetsChanged = false
+                album.removedIndexPath = []
+                album.changedIndexPath = []
+                album.insertedIndexPath = []
+            }
+        // 6-2. 카운트 변화 없음: [마이포토] all / album에서 사진 추가
+        } else if stateChangeObject.assetRemoving
+                    && albumType == .home
+                    && album.belongingType != .nonAlbum
+                    && !album.albumAssetsChanged {
+            // step 1. 부분 리로딩 준비
+            let index = selectedItemsIndex.map({ IndexPath(row: $0, section: 0) })
+            DispatchQueue.main.async {
+                self.isSelectMode = false
+                self.currentCount = album.count
+            // step 2. 리로드
+                UIView.animate(withDuration: 0.35) {
+                    reloadAllPhotos(collectionView: collectionView, all: false, index: index) { count in
+                        if currentCount == count {
+            // step 3. progressView뷰 종료
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                stateChangeObject.assetRemoving = false
+                            }
+                        }
+                    }
+                }
+                selectedItemsIndex = []
             }
         }
         
-        
-//         5. 선택 모드 토글에 의 한 picker 버튼 노출
+//      7. 선택 모드 토글에 의 한 picker 버튼 노출
         if albumType == .album && stateChangeObject.showPickerButton {
             loadPickerButtonCell(collectionView: collectionView)
             DispatchQueue.main.async {
@@ -114,54 +152,6 @@ struct PhotosCollectionView: UIViewRepresentable {
             }
             print("update 5-2. picker button are come home")
         }
-
-        
-        
-//        if stateChangeObject.assetRemoving {
-//            collectionView.reloadItems(at: selectedItemsIndex.map{IndexPath(row: $0, section: 0)})
-//            print("step 1")
-//            print("\(selectedItemsIndex)")
-//            DispatchQueue.main.async {
-//                stateChangeObject.assetRemoving = false
-//                print("step 2")
-//            }
-//            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-//                reloadAllPhotos(collectionView: collectionView)
-//            }
-//
-//        }
-        
-        
-//        if currentCount !=
-        
-        // 앨범에 추가/삭제가 이뤄질 때마다 전체 리로드
-//        func reloadAll() {
-//        if currentCount != album.count {
-//            print("진입 체크 바람")
-//            DispatchQueue.main.async {
-//                self.currentCount = album.count
-////                let minIndex = selectedItemsIndex.sorted(by: {$0 < $1}).first!
-////                let lastCount = album.filteringType == .all ? album.count : (album.filteringType == .image ? album.countOfImage : album.countOfVidoe)
-////                let maxIndex = albumType == .album ? lastCount : lastCount - 1
-//                self.isSelectMode = false
-//                selectedItemsIndex = []
-//
-//                stateChangeObject.assetRemoving = false
-//                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-//                    UIView.animate(withDuration: 0.35, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.2) {
-//    //                    collectionView.reloadItems(at: (minIndex...maxIndex).map{IndexPath(row: $0, section: 0)})
-//                        reloadAllPhotos(collectionView: collectionView)
-//                    }
-//                }
-//                album.removedIndexPath = []
-//                album.changedIndexPath = []
-//                album.insertedIndexPath = []
-//            }
-//            print("진입 체크 완료")
-//        }
-
-        
-
 
         // 5. 콜렉션뷰 배치 업데이트 - (1) 삭제된 아이템
 //        if self.removedIndex.count > 0 {
@@ -247,42 +237,32 @@ struct PhotosCollectionView: UIViewRepresentable {
                 collectionView.scrollToItem(at: IndexPath(row: 0, section: 0), at: collecitonEdge, animated: true)
             }
         }
+        print("updated 2. scrolled to \(edgeToScroll) by Tab button")
         DispatchQueue.main.async {
             edgeToScroll = .none
         }
+        
     }
-    // -> (3) beloning filter
-    func reloadAllPhotos(collectionView: UICollectionView, caseNum: Int) {
-        UIView.animate(withDuration: 0.2) {
-            collectionView.reloadData()
-        }
-        if caseNum == 3 {
+    // -> (5) beloning filter
+    func reloadAllPhotos(collectionView: UICollectionView, all: Bool = true, index: [IndexPath] = [], completion: @escaping (Int) -> Void) {
+        if all {
             DispatchQueue.main.async {
-                stateChangeObject.allPhotosChanged = false
-            }
-        } else if caseNum == 7 {
-            DispatchQueue.main.async {
-                self.currentCount = album.count
-                if albumType == .album {
-                    stateChangeObject.showPickerButton = false
+                UIView.animate(withDuration: 0.2) {
+                    collectionView.reloadData()
                 }
-                selectedItemsIndex = []
-                self.isSelectMode = false
-                stateChangeObject.assetRemoving = false
-//                self.isSelectMode = false
-//                stateChangeObject.assetRemoving = false
-//                stateChangeObject.showPickerButton = false
-//                selectedItemsIndex = []
-                
-                album.removedIndexPath = []
-                album.changedIndexPath = []
-                album.insertedIndexPath = []
+            }
+        } else {
+            DispatchQueue.main.async {
+                UIView.animate(withDuration: 0.2) {
+                    collectionView.reloadItems(at: index)
+                }
             }
         }
         
+        completion(album.count)
     }
     
-    // -> (4) selectedCell change
+    // -> (6) selectedCell change
     func reloadSelectedPhotos(all: Bool, collectionView: UICollectionView) {
         if all {
             UIView.animate(withDuration: 0.1) {
@@ -315,7 +295,7 @@ struct PhotosCollectionView: UIViewRepresentable {
     }
     
     
-    // -> (5) load pickeButton Cell
+    // -> (6) load pickeButton Cell
     func loadPickerButtonCell(collectionView: UICollectionView) {
         DispatchQueue.main.async {
             var count: Int

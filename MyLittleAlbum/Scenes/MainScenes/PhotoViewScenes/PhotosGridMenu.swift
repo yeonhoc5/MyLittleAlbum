@@ -31,7 +31,7 @@ struct PhotosGridMenu: View {
     @Binding var settingDone: Bool!
     @Binding var belongingType: BelongingType
     @Binding var filteringType: FilteringType
-
+    @Binding var filteringTypeChanged: Bool
     
     @Binding var isSelectMode: Bool
     @Binding var selectedItemsIndex: [Int]
@@ -303,8 +303,10 @@ extension PhotosGridMenu {
     var filteringMenu: some View {
         VStack {
             Button {
-                changeFiltering(type: .all, albumChange: false)
-                print("전체로 바꾼다")
+                if filteringType != .all {
+                    changeFiltering(type: .all, albumChange: true)
+                    print("전체로 바꾼다")
+                }
             } label: {
                 if filteringType == .all {
                     ContextMenuItem(title: "모두 보기", image: "checkmark")
@@ -313,14 +315,18 @@ extension PhotosGridMenu {
                 }
             }
             Button {
-                changeFiltering(type: .image, albumChange: false)
-                print("사진으로 바꾼다")
+                if filteringType != .image {
+                    changeFiltering(type: .image, albumChange: true)
+                    print("사진으로 바꾼다")
+                }
             } label: {
                 ContextMenuItem(title: "사진만 보기", image: filteringType == .image ? "checkmark":"photo.fill")
             }
             Button {
-                changeFiltering(type: .video, albumChange: false)
-                print("비디오로 바꾼다")
+                if filteringType != . video {
+                    changeFiltering(type: .video, albumChange: true)
+                    print("비디오로 바꾼다")
+                }
             } label: {
                 ContextMenuItem(title: "비디오만 보기", image: filteringType == .video ? "checkmark":"video.fill")
             }
@@ -333,7 +339,6 @@ extension PhotosGridMenu {
             reArrangeMenu
         } label: {
             menuButton(btnSize: btnSize, type: .image, image: "arrow.up.arrow.down") {
-                
             }
         }
     }
@@ -344,7 +349,6 @@ extension PhotosGridMenu {
                 ContextMenuItem(title: "사용자 정의 순으로 보기(기본)")
             }
             Button {
-                
             } label: {
                 ContextMenuItem(title: "최신 항목부터 보기")
             }
@@ -413,16 +417,17 @@ extension PhotosGridMenu {
         }
     }
     
-    func changeFiltering(type: FilteringType, albumChange: Bool! = true) {
-        if self.filteringType != type {
-            DispatchQueue.main.async {
-                album.changeFiltering(type: type)
-                self.filteringType = type
-                if !albumChange {
-                    stateChangeObject.allPhotosChanged = true
-                }
-            }
+    func changeFiltering(type: FilteringType, albumChange: Bool! = false) {
+        album.changeFiltering(type: type)
+        self.filteringType = type
+        if albumChange {
+//            DispatchQueue.main.async {
+            self.filteringTypeChanged = true
+//                stateChangeObject.filteringChanged = true
+            print("check 1. filtering Change \(stateChangeObject.filteringChanged)")
+//            }
         }
+        print("check 2. filtering Change \(stateChangeObject.filteringChanged)")
     }
     
 }

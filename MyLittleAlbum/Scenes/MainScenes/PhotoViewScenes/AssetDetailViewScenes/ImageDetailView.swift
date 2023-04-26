@@ -22,7 +22,6 @@ struct ImageDetailView: View {
     
     var body: some View {
         if fetchtedImage == nil {
-//            ProgressView()
             Color.black
                 .onAppear {
                     if fetchtedImage == nil {

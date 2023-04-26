@@ -26,7 +26,7 @@ struct AllPhotosView: View {
     @State var belongingType: BelongingType = .nonAlbum
     // 필터링 2 : (전체탭) 미디어 타입 필터링
     @State var filteringType: FilteringType = .all
-    
+    @State var filteringTypeChanged: Bool = false
     // [smartAlbum]탭용 프라퍼티
     @State var isPrivacy: Bool! = false
     var smartAlbum: SmartAlbum = .none
@@ -81,6 +81,7 @@ struct AllPhotosView: View {
                                          albumType: albumType, album: album,
 //                                         filteringType: $filteringType,
                                          edgeToScroll: $edgeToScroll,
+                                         filteringTypeChanged: $filteringTypeChanged,
                                          isSelectMode: $isSelectMode,
                                          selectedItemsIndex: $selectedItemsIndex,
                                          isShowingPhotosPicker: $isShowingPhotosPicker,
@@ -100,6 +101,7 @@ struct AllPhotosView: View {
                                    settingDone: $settingDone,
                                    belongingType: $belongingType,
                                    filteringType: $filteringType,
+                                   filteringTypeChanged: $filteringTypeChanged,
                                    isSelectMode: $isSelectMode,
                                    selectedItemsIndex: $selectedItemsIndex,
                                    edgeToScroll: $edgeToScroll,
@@ -115,6 +117,8 @@ struct AllPhotosView: View {
         .onDisappear {
             if albumType != .home {
                 discardImageCaching()
+                self.filteringType = .all
+                album.filteringType = .all
             }
         }
         .onChange(of: self.belongingType, perform: { value in
@@ -244,14 +248,9 @@ extension AllPhotosView {
     
     func btnRomoveAssetFromAlbum() -> some View {
         Button("앨범에서 빼기") {
-        album.removeAssetFromAlbum(indexSet: selectedItemsIndex)
-        resetEditStatus()
-        stateChangeObject.assetRemoving = true
-//            DispatchQueue.main.async {
-//                stateChangeObject.allPhotosChanged = true
-//            }
-//            selectedItemsIndex = []
-            
+            album.removeAssetFromAlbum(indexSet: selectedItemsIndex)
+            resetEditStatus()
+            stateChangeObject.assetRemoving = true            
         }
     }
 }

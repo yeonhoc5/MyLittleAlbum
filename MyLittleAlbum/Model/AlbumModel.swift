@@ -185,12 +185,15 @@ extension Album {
     
     
     // 앨범에 asset 넣기
-    func addAsset(assets: [PHAsset]) {
+    func addAsset(assets: [PHAsset], stateObject: StateChangeObject) {
         DispatchQueue.main.async {
             PHPhotoLibrary.shared().performChanges {
                 PHAssetCollectionChangeRequest(for: self.album, assets: self.albumFetchResult)?.addAssets(assets as NSFastEnumeration)
             } completionHandler: { bool, _ in
                 if bool {
+                    DispatchQueue.main.async {
+                        stateObject.assetRemoving = true
+                    }
                     print("album [\(self.title)] Step 2. assets are INSERTED")
                 }
             }
@@ -236,6 +239,7 @@ extension Album {
                 if bool {
                     DispatchQueue.main.async {
                         stateObject.assetRemoving = true
+                        self.albumAssetsChanged = true
                     }
                 }
             }
@@ -261,6 +265,7 @@ extension Album {
             if bool {
                 DispatchQueue.main.async {
                     stateObject.assetRemoving = true
+                    self.albumAssetsChanged = true
                 }
             }
         }
@@ -375,7 +380,7 @@ extension Album: PHPhotoLibraryChangeObserver {
                     fetchOptions.includeHiddenAssets = false
                     fetchOptions.wantsIncrementalChangeDetails = true
                     let newFetchResult = PHAsset.fetchAssets(in: self.album, options: fetchOptions)
-                    print(self.albumFetchResult = newFetchResult)
+                    
                     self.albumFetchResult = newFetchResult
                     self.refreshAlbumModel(self.albumFetchResult)
                 }
@@ -390,7 +395,6 @@ extension Album: PHPhotoLibraryChangeObserver {
                     if let changed = changes.changedIndexes, changed.count > 0 {
                         self.changedIndexPath = changed.map { IndexPath(item: $0, section: 0) }
                     }
-                    self.albumAssetsChanged = true
 //                    print("\(self.insertedIndexPath.count) // \(self.removedIndexPath.count) // \(self.changedIndexPath.count)")
                 }
             }
