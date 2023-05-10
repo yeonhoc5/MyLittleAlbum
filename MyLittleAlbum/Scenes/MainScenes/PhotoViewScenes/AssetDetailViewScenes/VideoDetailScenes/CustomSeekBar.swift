@@ -50,14 +50,15 @@ struct CustomSeekBar: UIViewRepresentable {
         }
         
         @objc func changed(slider: UISlider) {
-            let sec = Int(slider.value * Float((parent.avPlayer.currentItem?.duration.seconds)!))
+            guard let item = parent.avPlayer.currentItem else { return }
+            let sec = Int(slider.value * Float((item.duration.seconds)))
             if slider.isTracking {
                 parent.avPlayer.pause()
-                parent.avPlayer?.seek(to: CMTime(seconds: Double(sec), preferredTimescale: 1))
+                parent.avPlayer.seek(to: CMTime(seconds: Double(sec), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
             } else {
-                parent.avPlayer?.seek(to: CMTime(seconds: Double(sec), preferredTimescale: 1))
+                parent.avPlayer?.seek(to: CMTime(seconds: Double(sec), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
                 if parent.play {
-                    parent.avPlayer?.play()
+                    parent.avPlayer.play()
                 }
                 parent.isSeeking = false
             }

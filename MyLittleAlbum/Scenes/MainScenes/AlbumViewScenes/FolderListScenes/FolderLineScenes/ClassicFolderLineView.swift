@@ -119,8 +119,8 @@ extension ClassicFolderLineView {
                 } label: {
                     ClassicCell(cellType: .folder,
                                 title: nextFolder.title,
-                                countAlbum: nextFolder.albumArray.count,
                                 countFolder: nextFolder.folderArray.count,
+                                countAlbum: nextFolder.albumArray.count,
                                 showingLine: showingLine)
                 }
                 .buttonStyle(ClickScaleEffect())
@@ -146,7 +146,7 @@ extension ClassicFolderLineView {
                 } label: {
                     ClassicCell(cellType: .miniAlbum,
                                 title: album.title,
-                                rprsttivePhoto1: album.rprsttivePhoto1,
+                                rprstPhoto1: album.rprsttivePhoto1,
                                 showingLine: showingLine)
                 }
                 .buttonStyle(ClickScaleEffect())

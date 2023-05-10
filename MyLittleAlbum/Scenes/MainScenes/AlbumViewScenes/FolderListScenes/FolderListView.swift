@@ -42,22 +42,9 @@ extension FolderListView {
                 let index = pageFolder.folderArray.firstIndex(of: phCollectionList)!
                 let nextFolder = Folder(folder: phCollectionList,
                                         colorIndex: (pageFolder.colorIndex + (index + 1) * 4))
-                if uiMode == .fancy {
-                    fancySecondaryFolderLineView(folder: nextFolder, animationID: namespace)
-                        .overlay(alignment: .topLeading) {
-                            Button {
-                                deleteFolderInDepth(folder: nextFolder.folder)
-                            } label: {
-                                RemoveButtonLabel(shapeType: .rectangle)
-                            }
-                            .opacity(isEditingMode ? 1:0)
-                            .scaleEffect(isEditingMode ? 1:0.1, anchor: .topLeading)
-                            .buttonStyle(ClickScaleEffect())
-                            .offset(CGSize(width: 10, height: 5))
-                        }
-                        .matchedGeometryEffect(id: nextFolder.identifier, in: namespace)
-                        .id(nextFolder.identifier)
-                } else {
+                
+                switch uiMode {
+                case .classic:
                     ClassicFolderLineView(stateChangeObject: stateChangeObject,
                                           pageFolder: nextFolder,
                                           randomNum1: randomNum1, randomNum2: randomNum2,
@@ -79,6 +66,36 @@ extension FolderListView {
                         }
                         .matchedGeometryEffect(id: nextFolder.identifier, in: namespace)
                         .id(nextFolder.identifier)
+                case .fancy:
+                    fancySecondaryFolderLineView(folder: nextFolder, animationID: namespace)
+                        .overlay(alignment: .topLeading) {
+                            Button {
+                                deleteFolderInDepth(folder: nextFolder.folder)
+                            } label: {
+                                RemoveButtonLabel(shapeType: .rectangle)
+                            }
+                            .opacity(isEditingMode ? 1:0)
+                            .scaleEffect(isEditingMode ? 1:0.1, anchor: .topLeading)
+                            .buttonStyle(ClickScaleEffect())
+                            .offset(CGSize(width: 10, height: 5))
+                        }
+                        .matchedGeometryEffect(id: nextFolder.identifier, in: namespace)
+                        .id(nextFolder.identifier)
+                case .modern:
+                    fancySecondaryFolderLineView(folder: nextFolder, animationID: namespace)
+                        .overlay(alignment: .topLeading) {
+                            Button {
+                                deleteFolderInDepth(folder: nextFolder.folder)
+                            } label: {
+                                RemoveButtonLabel(shapeType: .rectangle)
+                            }
+                            .opacity(isEditingMode ? 1:0)
+                            .scaleEffect(isEditingMode ? 1:0.1, anchor: .topLeading)
+                            .buttonStyle(ClickScaleEffect())
+                            .offset(CGSize(width: 10, height: 5))
+                        }
+                        .matchedGeometryEffect(id: nextFolder.identifier, in: namespace)
+                        .id(nextFolder.identifier)
                 }
             }
         }
@@ -88,6 +105,7 @@ extension FolderListView {
     func fancySecondaryFolderLineView(folder: Folder, animationID: Namespace.ID) -> some View {
         let thirdList = FancyFolderLineView(stateChangeObject: stateChangeObject,
                                             pageFolder: folder,
+                                            uiMode: uiMode,
                                             randomNum1: randomNum1, randomNum2: randomNum2,
                                             isShowingSheet: $isShowingSheet,
                                             isShowingPhotosPicker: $isShowingPhotosPicker,

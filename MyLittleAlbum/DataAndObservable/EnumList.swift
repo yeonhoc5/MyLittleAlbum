@@ -10,8 +10,10 @@ import Foundation
 
 // ui 체인지용
 enum UIMode: String, CaseIterable {
-    case classic
-    case fancy
+    case classic, modern, fancy
+}
+enum SampleCase {
+    case overTwo, one, none
 }
 
 // 탭바용
@@ -74,4 +76,9 @@ enum EdgeToScroll {
 
 enum NewToScroll {
     case currentAlbum, currenFolder, secondaryAlbum, secondaryFolder
+}
+
+
+enum SwipingSelectMode {
+    case add, subtract, none
 }

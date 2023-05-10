@@ -10,19 +10,19 @@ import AVKit
 
 struct AVPlayerController : UIViewControllerRepresentable {
     
-    let player: AVPlayer
-    let title: String
+    let player: AVPlayer!
 
     func makeUIViewController(context: Context) -> some UIViewController {
         let controller = AVPlayerViewController()
         controller.player = player
-        controller.player?.allowsExternalPlayback = true
+        controller.player?.allowsExternalPlayback = false
         controller.showsPlaybackControls = false
         controller.allowsVideoFrameAnalysis = false
         return controller
     }
     
     func updateUIViewController(_ uiViewController: UIViewControllerType, context: Context) {
+        
     }
- 
+    
 }

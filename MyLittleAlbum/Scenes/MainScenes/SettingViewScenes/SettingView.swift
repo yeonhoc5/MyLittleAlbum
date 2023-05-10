@@ -9,7 +9,7 @@ import SwiftUI
 
 struct SettingView: View {
     @EnvironmentObject var photoData: PhotoData
-    @State var uiMode: UIMode = .fancy
+    @State var uiMode: UIMode = .modern
     @State var uiModeChanged: Bool = false
     @Binding var isShowingSettingView: Bool
     
@@ -48,7 +48,8 @@ struct SettingView: View {
                 
                 // 3. 저장 시 프로그래스 뷰
                 if uiModeChanged {
-                    CustomProgressView(color: uiMode == .classic ? .orange : colorSet[0])
+                    CustomProgressView(stateChangeObject: StateChangeObject(),
+                                       color: uiMode == .classic ? .orange : colorSet[0])
                         .onAppear {
                             saveUIMode(uiMode: uiMode)
                         }
@@ -106,28 +107,40 @@ extension SettingView {
         VStack(spacing: 10) {
             if uiMode == .fancy {
                 HStack {
-                    FancyCell(cellType: .album, title: "앨범1", colorIndex: 0, rprstPhoto1: nil, rprstPhoto2: nil)
-                    FancyCell(cellType: .album, title: "앨범2", colorIndex: 1, rprstPhoto1: nil, rprstPhoto2: nil)
+                    FancyCell(cellType: .album, title: "앨범1", colorIndex: 0, rprstPhoto1: nil, rprstPhoto2: nil, sampleCase: .overTwo)
+                    FancyCell(cellType: .album, title: "앨범2", colorIndex: 1, rprstPhoto1: nil, rprstPhoto2: nil, sampleCase: .one)
+                    FancyCell(cellType: .album, title: "앨범2", colorIndex: 2, rprstPhoto1: nil, rprstPhoto2: nil)
                 }
                 HStack(alignment: .bottom) {
                     FancyCell(cellType: .folder, title: "폴더", colorIndex: 0, rprstPhoto1: nil, rprstPhoto2: nil)
                     Group {
-                        FancyCell(cellType: .miniAlbum, title: "미니앨범1", colorIndex: 2, rprstPhoto1: nil, rprstPhoto2: nil)
-                        FancyCell(cellType: .miniAlbum, title: "미니앨범2", colorIndex: 3, rprstPhoto1: nil, rprstPhoto2: nil)
+                        FancyCell(cellType: .miniAlbum, title: "미니앨범1", colorIndex: 4, rprstPhoto1: nil, rprstPhoto2: nil, sampleCase: .one)
+                        FancyCell(cellType: .miniAlbum, title: "미니앨범2", colorIndex: 8, rprstPhoto1: nil, rprstPhoto2: nil)
                     }
                     .frame(height: 100)
                 }
-            } else {
+            } else if uiMode == .modern {
                 HStack {
-                    ClassicCell(cellType: .album, width: 100, height: 100)
+                    ModernCell(cellType: .album, title: "앨범1", sampleCase: .one)
+                    ModernCell(cellType: .album, title: "앨범2")
+                }
+                HStack(alignment: .bottom) {
+                    ModernCell(cellType: .folder, title: "폴더")
+                    Group {
+                        ModernCell(cellType: .miniAlbum, title: "미니앨범1", sampleCase: .one)
+                        ModernCell(cellType: .miniAlbum, title: "미니앨범2")
+                    }
+                    
+                }
+            } else if uiMode == .classic {
+                HStack {
+                    ClassicCell(cellType: .album, width: 100, height: 100, sampleCase: .one)
                     ClassicCell(cellType: .album, width: 100, height: 100)
                 }
                 HStack {
                     ClassicCell(cellType: .folder)
-                    imageScaledFit(systemName: "photo", width: 75, height: 63)
-                        .foregroundColor(.white)
-                        .padding(.bottom, 15)
-                    ClassicCell(cellType: .album, width: 80, height: 65)
+                    ClassicCell(cellType: .album, width: 80, height: 60, sampleCase: .one)
+                    ClassicCell(cellType: .album, width: 80, height: 60)
                 }
             }
         }

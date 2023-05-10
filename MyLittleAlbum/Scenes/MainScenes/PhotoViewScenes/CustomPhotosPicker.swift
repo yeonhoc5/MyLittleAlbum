@@ -31,7 +31,6 @@ struct CustomPhotosPicker: View {
     
     var albumToEdit: Album
 
-    
     var body: some View {
         NavigationView {
             VStack {
@@ -71,7 +70,8 @@ struct CustomPhotosPicker: View {
                                              insertedIndex: [],
                                              removedIndex: [],
                                              changedIndex: [],
-                                             currentCount: album.count)
+                                             currentCount: album.count,
+                                             isSelectingBySwipe: .constant(false))
                         PhotosGridMenu(stateChangeObject: stateChangeObject,
                                        albumType: .picker,
                                        album: album,
@@ -138,6 +138,7 @@ struct CustomPhotosPicker: View {
     
     func dismissPickerView() {
         self.isShowingPhotosPicker = false
+        stateChangeObject.photosPickerCanceled = true
         selectedItemsIndex.removeAll()
     }
     

@@ -44,7 +44,7 @@ struct RepeatedPageView<Content: View>: View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
-                .zIndex(0.2)
+                .zIndex(0.49)
             if (0..<count).contains(calcPageIndex(offsetIndex - 1, indexToView)) {
                 contentFrame(offsetIndex: calcOffsetIndex(offsetIndex - 1),
                              pageIndex: calcPageIndex(offsetIndex - 1, indexToView),
@@ -150,24 +150,24 @@ extension RepeatedPageView {
                         if (1..<count).contains(pageIndex)
                             && max(value.predictedEndTranslation.width, value.translation.width)
                             > 150 {
-                                withAnimation(.easeOut(duration: 0.3)) {
+                                withAnimation(.easeOut(duration: 0.25)) {
                                     self.offsetIndex += 1
                                     self.isUserSwiping = false
                                 }
                         } else if (0..<count - 1).contains(pageIndex)
                                     && min(value.predictedEndTranslation.width, value.translation.width)
                                     < -150 {
-                            withAnimation(.easeOut(duration: 0.3)) {
+                            withAnimation(.easeOut(duration: 0.25)) {
                                 self.offsetIndex -= 1
                                 self.isUserSwiping = false
                             }
                         } else {
                             withAnimation { self.offsetX = 0 }
-//                            self.isUserSwiping = false
+                            self.isUserSwiping = false
                         }
                     } else {
                         withAnimation { self.offsetX = 0 }
-//                        self.isUserSwiping = false
+                        self.isUserSwiping = false
                     }
                 }
                 self.pagingGesture = false

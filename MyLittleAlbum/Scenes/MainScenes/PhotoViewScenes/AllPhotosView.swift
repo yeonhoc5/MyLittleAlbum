@@ -50,10 +50,12 @@ struct AllPhotosView: View {
     // asset 선택모드용 프라퍼티
     @State var isSelectMode: Bool = false
     @State var selectedItemsIndex: [Int] = []
+    @State var isSelectingBySwipe: Bool = false
+    
+    @State var requsetDone: Bool! = false
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            
             if isPrivacy {
                 // [스마트 앨범]탭용 템프뷰
                 notValidatedView
@@ -91,6 +93,7 @@ struct AllPhotosView: View {
                                          removedIndex: album.removedIndexPath,
                                          changedIndex: album.changedIndexPath,
                                          currentCount: album.count,
+                                         isSelectingBySwipe: $isSelectingBySwipe,
                                          animationID: namespace)
                 }
                 if !stateChangeObject.isShowingAlert {
@@ -128,20 +131,42 @@ struct AllPhotosView: View {
         .onChange(of: isExpanded, perform: { bool in
             if !bool {
                 stateChangeObject.isSlideShowEnded = true
-                DispatchQueue.main.async {
-                    resumeBackgroundSound()
-                }
             }
         })
         .onChange(of: album?.count, perform: { newValue in
             DispatchQueue.main.async {
-                stateChangeObject.assetRemoving = false
+//                stateChangeObject.assetChanged = false
+                withAnimation {
+                    if albumType == .home {
+                        if settingDone  {
+                            stateChangeObject.assetChanged = .completed
+                        } else if album.count < newValue! {
+                            stateChangeObject.assetChanged = .done
+                        }
+                    } else if albumType == .smartAlbum {
+                        if isPrivacy {
+                            stateChangeObject.assetChanged = .completed
+                        }
+                    } else if albumType == .album {
+                        stateChangeObject.assetChanged = .completed
+                    } else {
+                        stateChangeObject.assetChanged = .done
+                    }
+                }
             }
         })
         .gesture(DragGesture(minimumDistance: 10, coordinateSpace: .global)
+            .onChanged({ value in
+                if isSelectMode {
+                    self.isSelectingBySwipe = true
+                }
+            })
             .onEnded({ value in
-                if value.translation.width > 50 {
+                if value.translation.width > 50 && !self.isSelectMode{
                     isPresented.wrappedValue.dismiss()
+                }
+                if self.isSelectingBySwipe {
+                    self.isSelectingBySwipe = false
                 }
             }))
         .fullScreenCover(isPresented: $isExpanded, content: {
@@ -176,8 +201,8 @@ struct AllPhotosView: View {
                                albumToEdit: album)
         }
         .overlay(content: {
-            if stateChangeObject.assetRemoving {
-                CustomProgressView()
+            if stateChangeObject.assetChanged != .done {
+                CustomProgressView(stateChangeObject: stateChangeObject)
             }
         })
         .navigationBarHidden(albumType == .home)
@@ -201,11 +226,28 @@ struct AllPhotosView: View {
                 Text("\n항목은 [나의 포토] 탭에서 찾을 수 있습니다.")
             }
         })
+//        .onChange(of: scenePhase) { newValue in
+//            if newValue == .background {
+//                if self.albumType == .home {
+//                    DispatchQueue.main.async {
+//                        self.settingDone = false
+//                        self.album = nil
+//                        self.belongingType = .nonAlbum
+//                    }
+//                } else if self.albumType == .smartAlbum {
+//                    DispatchQueue.main.async {
+//                        self.isPrivacy = true
+//                    }
+//                } else if self.albumType == .album {
+//                    self.isPresented.wrappedValue.dismiss()
+//                }
+//            }
+//        }
     }
 
 }
 
-// extenstion 1. subviews
+// MARK: - 1. extenstion. subviews
 extension AllPhotosView {
     var notValidatedView: some View {
         Rectangle()
@@ -250,11 +292,15 @@ extension AllPhotosView {
         Button("앨범에서 빼기") {
             album.removeAssetFromAlbum(indexSet: selectedItemsIndex)
             resetEditStatus()
-            stateChangeObject.assetRemoving = true            
+//            stateChangeObject.assetChanged = true
+//            withAnimation {
+                stateChangeObject.assetChanged = .changed
+//            }
         }
     }
 }
-// extenstion 2. functions
+
+// MARK: - 2. extenstion. functions
 extension AllPhotosView {
     
     func authenticate() {
@@ -345,11 +391,12 @@ extension AllPhotosView {
     }
     
     func discardImageCaching() {
-        let imageManger = PHCachingImageManager()
-        imageManger.stopCachingImagesForAllAssets()
-        
-        // 다른 탭으로 이동 시 포토그리드 뷰 벗어나기
+        print("캐싱 지우기")
         DispatchQueue.main.async {
+            // 이미지 캐싱 데이터 지우기
+            let imageManger = PHCachingImageManager()
+            imageManger.stopCachingImagesForAllAssets()
+            // 다른 탭으로 이동 시 포토그리드 뷰 벗어나기
             isPresented.wrappedValue.dismiss()
         }
     }
@@ -364,17 +411,6 @@ extension AllPhotosView {
                 self.isPrivacy = true
                 self.album = nil
                 self.filteringType = .all
-            }
-        }
-    }
-    
-    func resumeBackgroundSound() {
-        let audioSession = AVAudioSession.sharedInstance()
-        DispatchQueue.main.async {
-            do {
-                try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
-            } catch {
-                print(error)
             }
         }
     }

@@ -55,7 +55,8 @@ class StateChangeObject: ObservableObject {
     @Published var selectToggleSomePhotos: Bool = false
     
     @Published var scrollToFirst: Bool = false
-    @Published var assetRemoving: Bool = false
+    @Published var assetChanged: AssetChanged = .done
+    @Published var requestDone: Bool = false
     
     @Published var newName: String = ""
     @Published var selectedIndexes: [Int] = []
@@ -65,5 +66,13 @@ class StateChangeObject: ObservableObject {
     
     @Published var tabBarbtnScroll: Bool = false
     
+    @Published var photosPickerCanceled: Bool = false
+    
+    
 }
 
+
+
+enum AssetChanged {
+    case changed, completed, done
+}

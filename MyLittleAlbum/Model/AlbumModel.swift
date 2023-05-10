@@ -192,7 +192,8 @@ extension Album {
             } completionHandler: { bool, _ in
                 if bool {
                     DispatchQueue.main.async {
-                        stateObject.assetRemoving = true
+//                        stateObject.assetChanged = true
+                        stateObject.assetChanged = .changed
                     }
                     print("album [\(self.title)] Step 2. assets are INSERTED")
                 }
@@ -238,7 +239,8 @@ extension Album {
             } completionHandler: {bool, _ in
                 if bool {
                     DispatchQueue.main.async {
-                        stateObject.assetRemoving = true
+//                        stateObject.assetChanged = true
+                        stateObject.assetChanged = .changed
                         self.albumAssetsChanged = true
                     }
                 }
@@ -264,7 +266,8 @@ extension Album {
         } completionHandler: {bool, _ in
             if bool {
                 DispatchQueue.main.async {
-                    stateObject.assetRemoving = true
+//                    stateObject.assetChanged = true
+                    stateObject.assetChanged = .changed
                     self.albumAssetsChanged = true
                 }
             }
@@ -290,7 +293,8 @@ extension Album {
         } completionHandler: {bool, _ in
             if bool {
                 DispatchQueue.main.async {
-                    stateObject.assetRemoving = true
+//                    stateObject.assetChanged = true
+                    stateObject.assetChanged = .changed
                 }
                 print("album [\(self.title)] Step 6. assets are CANCEL HIDDEN")
 //                if self.album != nil {
@@ -362,8 +366,8 @@ extension Album: PHPhotoLibraryChangeObserver {
             withAnimation(.interactiveSpring()) {
                 if let albumChanges = changeInstance.changeDetails(for: self.album) {
                     print("album [\(self.title)] Step 40. album Change Detected by observer1 Tittle Changer")
-                    self.album = albumChanges.objectAfterChanges
-                    DispatchQueue.main.async {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        self.album = albumChanges.objectAfterChanges
                         self.title = self.album?.localizedTitle ?? ""
                     }
                 }

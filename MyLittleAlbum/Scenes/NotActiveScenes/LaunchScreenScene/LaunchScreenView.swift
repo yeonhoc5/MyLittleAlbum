@@ -33,11 +33,6 @@ struct LaunchScreenView: View {
             if videoPlayer != nil {
             // 레이어 3: 마스크 써클 비디오 [메인 비디오]
                 maskedCircleVideo(player: videoPlayer)
-                    .onDisappear {
-                        DispatchQueue.main.async {
-                            resumeAudioSession()
-                        }
-                    }
             // 레이어 4: 타이틀 뷰 [비디오 뜨기 전에]
                 BackgroudStateView()
                     .opacity(launchScreenManger.state == .ready ? 1 : 0)
@@ -65,7 +60,7 @@ extension LaunchScreenView {
     func maskedCircleVideo(player: AVPlayer) -> some View {
         let width = screenSize.width
         let height = screenSize.height
-        return AVPlayerController(player: player, title: "")
+        return AVPlayerController(player: player)
             .scaledToFill()
             .ignoresSafeArea()
             .frame(width: width, height: height, alignment: .center)
@@ -84,26 +79,12 @@ extension LaunchScreenView {
 extension LaunchScreenView {
     
     func loadVideo() {
+        // 1. video
         guard let url = Bundle.main.url(forResource: "doonge", withExtension: "mov") else { return }
         let player = AVPlayer(url: url)
         player.allowsExternalPlayback = false
         videoPlayer = player
-        let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setCategory(.soloAmbient, options: .mixWithOthers)
-            try audioSession.setActive(true)
-        } catch {
-            print(error)
-        }
-    }
-    
-    func resumeAudioSession() {
-        let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            print(error)
-        }
+        pauseBackgroundAudio()
     }
     
     func updateAnimation() {
@@ -113,6 +94,7 @@ extension LaunchScreenView {
                 withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.8, blendDuration: 0.25)) {
                     maskingScale = 0.8
                 }
+                
                 videoPlayer.play()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                     launchScreenManger.state = .second
@@ -139,6 +121,7 @@ extension LaunchScreenView {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 launchScreenManger.state = .complete
+                resumeBackgroundAudio()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 withAnimation(.linear(duration: 0.5)) {
@@ -149,6 +132,41 @@ extension LaunchScreenView {
             break
         }
     }
+    
+    func pauseBackgroundAudio() {
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.ambient, mode: .default, options: .mixWithOthers)
+            try audioSession.setActive(true)
+        } catch {
+            print(error)
+        }
+    }
+    
+    func resumeBackgroundAudio() {
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+            print("audiosession return to System")
+        } catch {
+            print(error)
+        }
+        resetAudiosession()
+    }
+    
+    func resetAudiosession() {
+        let audioSession = AVAudioSession.sharedInstance()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            do {
+                try audioSession.setCategory(.ambient, mode: .default)
+                try audioSession.setActive(true)
+            } catch {
+                print(error)
+            }
+        }
+
+    }
+    
 }
 
 

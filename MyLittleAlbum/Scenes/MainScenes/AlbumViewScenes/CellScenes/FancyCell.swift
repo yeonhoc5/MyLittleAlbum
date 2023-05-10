@@ -15,18 +15,19 @@ struct FancyCell: View {
 // 폴더, 앨범 공용 프라퍼티
     let title: String
 // 폴더용 프라퍼티
-    var countOfFolder: Int!
-    var countOfAlbum: Int!
+    var countFolder: Int!
+    var countAlbum: Int!
 // 앨범용 프라퍼티
-    let colorIndex: Int
-    let rprstPhoto1: PHAsset!
-    let rprstPhoto2: PHAsset!
+    var colorIndex: Int
+    var rprstPhoto1: PHAsset!
+    var rprstPhoto2: PHAsset!
 // 레이아웃
     var width: CGFloat! = 115
     let height: CGFloat! = 130
     let cornerRadius: CGFloat! = 5
     // 타이틀-이미지 / 이미지-이미지 spacing
     let spacing: CGFloat! = 5
+    var sampleCase: SampleCase! = SampleCase.none
     
     var body: some View {
         switch cellType {
@@ -39,14 +40,14 @@ struct FancyCell: View {
 
 extension FancyCell {
     var folderCell: some View {
-        imageNonScaled(systemName: "folder.fill", width: width * 0.8, height: height * 0.7, color: .folder)
+        imageNonScaled(systemName: "folder.fill", width: width * 0.8, height: width * 0.9, color: .folder)
             .overlay(alignment: .bottom) {
                 titleText(title, font: .footnote, color: .fancyBackground)
                     .frame(width: width * 0.7, height: height * 0.4, alignment: .topLeading)
                     .multilineTextAlignment(.leading)
             }
             .overlay(alignment: .bottomTrailing, content: {
-                titleText("\(countOfFolder ?? 0) / \(countOfAlbum ?? 0)", font: .caption, color: .fancyBackground.opacity(0.5))
+                titleText("\(countFolder ?? 0) / \(countAlbum ?? 0)", font: .caption, color: .fancyBackground.opacity(0.5))
                     .padding([.bottom, .trailing], 5)
             })
     }
@@ -64,32 +65,52 @@ extension FancyCell {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .padding(.leading, 5)
-                if rprstPhoto2 != nil {
-                    let firstWidth = width * 0.55
-                    let secondWidth = width * 0.25
-                    if let imageFirst = loadImage(asset: rprstPhoto1, thumbNailSize: CGSize(width: firstWidth * scale, height: imageHeight * scale)),
-                       let imageSecond = loadImage(asset: rprstPhoto2, thumbNailSize: CGSize(width: secondWidth * scale, height: imageHeight * scale)) {
-                        HStack(spacing: spacing) {
+                if sampleCase == SampleCase.none {
+                    if rprstPhoto2 != nil {
+                        let firstWidth = width * 0.55
+                        let secondWidth = width * 0.25
+                        if let imageFirst = loadImage(asset: rprstPhoto1, thumbNailSize: CGSize(width: firstWidth * scale, height: imageHeight * scale)),
+                           let imageSecond = loadImage(asset: rprstPhoto2, thumbNailSize: CGSize(width: secondWidth * scale, height: imageHeight * scale)) {
+                            HStack(spacing: spacing) {
+                                imageScaledFill(uiImage: imageFirst, width: firstWidth, height: imageHeight, radius: radius)
+                                imageScaledFill(uiImage: imageSecond, width: secondWidth, height: imageHeight, radius: radius)
+                            }
+                        } else {
+                            spacerRectangle(color: .clear, height: imageHeight)
+                        }
+                    } else if rprstPhoto1 != nil {
+                        let firstWidth = width * 0.8
+                        if let imageFirst = loadImage(asset: rprstPhoto1, thumbNailSize: CGSize(width: firstWidth * scale, height: imageHeight * scale)) {
                             imageScaledFill(uiImage: imageFirst, width: firstWidth, height: imageHeight, radius: radius)
-                            imageScaledFill(uiImage: imageSecond, width: secondWidth, height: imageHeight, radius: radius)
+                        } else {
+                            spacerRectangle(color: .clear, height: imageHeight)
                         }
                     } else {
-                        spacerRectangle(color: .clear, height: imageHeight)
+                        Text(emptyLabel[colorIndex % emptyLabel.count])
+                            .foregroundColor(.white.opacity(0.5))
+                            .frame(height: imageHeight)
                     }
-                } else if rprstPhoto1 != nil {
-                    let firstWidth = width * 0.8
-                    if let imageFirst = loadImage(asset: rprstPhoto1, thumbNailSize: CGSize(width: firstWidth * scale, height: imageHeight * scale)) {
-                        imageScaledFill(uiImage: imageFirst, width: firstWidth, height: imageHeight, radius: radius)
-                    } else {
-                        spacerRectangle(color: .clear, height: imageHeight)
+                } else if sampleCase == .overTwo {
+                    let firstWidth = width * 0.55
+                    let secondWidth = width * 0.25
+                    HStack {
+                        Color.white.opacity(0.5)
+                            .frame(width: firstWidth, height: imageHeight)
+                            .clipped()
+                            .cornerRadius(cornerRadius)
+                        Color.white.opacity(0.5)
+                            .frame(width: secondWidth, height: imageHeight)
+                            .clipped()
+                            .cornerRadius(cornerRadius)
                     }
                 } else {
-                    Text(emptyLabel[colorIndex % emptyLabel.count])
-                        .foregroundColor(.white.opacity(0.5))
-                        .frame(height: imageHeight)
+                    let firstWidth = width * 0.8
+                    Color.white.opacity(0.5)
+                        .frame(width: firstWidth, height: imageHeight)
+                        .clipped()
+                        .cornerRadius(cornerRadius)
                 }
             }
-            
         }
         .frame(width: width, height: height)
         .padding(1)
@@ -99,26 +120,33 @@ extension FancyCell {
         let imageWidth = width * 0.7
         let imageHeight = width * 1.13 * 0.47
         let radius = width * 0.056
-        let scale = 3.0
         return VStack {
             Spacer()
             ZStack {
                 RoundedRectangle(cornerRadius: radius)
                     .foregroundColor(colorSet[colorIndex % colorSet.count])
                 VStack(spacing: spacing) {
-                    titleText(title, font: .footnote, color: .black)
+                    titleText(title, font: .footnote, color: .black, inline: true)
                         .frame(width: imageWidth, height: width * 1.13 * 0.1, alignment: .leading)
                         .lineLimit(1)
-                    if rprstPhoto1 != nil {
-                        if let imageFirst = loadImage(asset: rprstPhoto1, thumbNailSize: CGSize(width: imageWidth * scale, height: imageHeight * scale)) {
-                            imageScaledFill(uiImage: imageFirst, width: imageWidth, height: imageHeight, radius: radius)
+                    if sampleCase == SampleCase.none {
+                        if rprstPhoto1 != nil {
+                            if let imageFirst = loadImage(asset: rprstPhoto1,
+                                                          thumbNailSize: CGSize(width: imageWidth * scale, height: imageHeight * scale)) {
+                                imageScaledFill(uiImage: imageFirst, width: imageWidth, height: imageHeight, radius: radius)
+                            } else {
+                                spacerRectangle(color: .clear, height: imageHeight)
+                            }
                         } else {
-                            spacerRectangle(color: .clear, height: imageHeight)
+                            Text(emptyLabel[colorIndex % emptyLabel.count])
+                                .foregroundColor(.white.opacity(0.5))
+                                .frame(height: imageHeight)
                         }
                     } else {
-                        Text(emptyLabel[colorIndex % emptyLabel.count])
-                            .foregroundColor(.white.opacity(0.5))
-                            .frame(height: imageHeight)
+                        Color.white.opacity(0.5)
+                            .frame(width: imageWidth, height: imageHeight)
+                            .clipped()
+                            .cornerRadius(cornerRadius)
                     }
                 }
             }
@@ -127,7 +155,7 @@ extension FancyCell {
     }
     
     func loadImage(asset: PHAsset, thumbNailSize: CGSize) -> UIImage? {
-        let imageManager = PHCachingImageManager()
+        let imageManager = PHImageManager()
         let requestOptions = PHImageRequestOptions()
         requestOptions.isSynchronous = true
         requestOptions.deliveryMode = .opportunistic
@@ -142,20 +170,35 @@ extension FancyCell {
         return image
     }
 }
-//
-//struct FancyCell_Previews: PreviewProvider {
-//    static var previews: some View {
-//        VStack {
-//            HStack {
-//                FancyCell(cellType: .album, album: Albu, count: 10)
-//                FancyCell(cellType: .album, title: "2022년 서울", count: 1)
-//                FancyCell(cellType: .album, title: "명동", count: 0)
-//            }
-//            HStack {
-//                FancyCell(cellType: .folder, title: "2022년")
-//                FancyCell(cellType: .miniAlbum, title: "단양", count: 1)
-//                FancyCell(cellType: .miniAlbum, title: "하동", count: 0)
-//            }
-//        }
-//    }
-//}
+
+struct FancyCell_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack {
+            HStack {
+                FancyCell(cellType: .album,
+                          title: "앨범1",
+                          colorIndex: 0, sampleCase: .overTwo)
+                FancyCell(cellType: .album,
+                          title: "앨범2",
+                          colorIndex: 1, sampleCase: .one)
+                FancyCell(cellType: .album,
+                          title: "앨범3",
+                          colorIndex: 2)
+            }
+            HStack {
+                FancyCell(cellType: .folder,
+                          title: "폴더",
+                          colorIndex: 0)
+                FancyCell(cellType: .miniAlbum,
+                          title: "미니앨범1",
+                          colorIndex: 3, sampleCase: .one)
+                FancyCell(cellType: .miniAlbum,
+                          title: "미니앨범2",
+                          colorIndex: 4)
+                
+            }
+        }
+        .frame(height: 100)
+        .preferredColorScheme(.dark)
+    }
+}

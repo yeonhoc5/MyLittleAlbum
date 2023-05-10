@@ -189,7 +189,8 @@ extension MoveCollectionCategoryView {
         DispatchQueue.main.async {
             albumToAdd.addAsset(assets: assets, stateObject: stateChangeObject)
             stateChangeObject.selectedIndexes = []
-            stateChangeObject.assetRemoving = true
+//            stateChangeObject.assetChanged = true
+            stateChangeObject.assetChanged = .changed
         }
     }
     

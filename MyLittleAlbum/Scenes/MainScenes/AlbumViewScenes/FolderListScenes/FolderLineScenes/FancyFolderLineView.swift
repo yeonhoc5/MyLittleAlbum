@@ -11,6 +11,8 @@ import Photos
 struct FancyFolderLineView: View {
     @ObservedObject var stateChangeObject: StateChangeObject
     @StateObject var pageFolder: Folder
+
+    var uiMode: UIMode
     
     var randomNum1: Int = 0
     var randomNum2: Int = 0
@@ -99,7 +101,7 @@ extension FancyFolderLineView {
         HStack(alignment: .bottom, spacing: 8) {
             let folders = pageFolder.folderArray
             let albums = pageFolder.albumArray
-            HStack {
+            HStack(alignment: .bottom) {
                 ForEach(0..<folders.count, id: \.self) { index in
                     let nextFolder = Folder(folder: folders[index],
                                             colorIndex: pageFolder.colorIndex + 4 * (index + 1))
@@ -127,14 +129,24 @@ extension FancyFolderLineView {
                       pageFolder: nextFolder,
                       isShowingSettingView: .constant(false))
         } label: {
-            FancyCell(cellType: .folder,
-                      title: nextFolder.title,
-                      countOfFolder: nextFolder.folderArray.count,
-                      countOfAlbum: nextFolder.albumArray.count,
-                      colorIndex: nextFolder.colorIndex,
-                      rprstPhoto1: nil,
-                      rprstPhoto2: nil,
-                      width: width)
+            if uiMode == .fancy {
+                FancyCell(cellType: .folder,
+                          title: nextFolder.title,
+                          countFolder: nextFolder.folderArray.count,
+                          countAlbum: nextFolder.albumArray.count,
+                          colorIndex: nextFolder.colorIndex,
+                          rprstPhoto1: nil,
+                          rprstPhoto2: nil,
+                          width: width)
+            } else if uiMode == .modern {
+                ModernCell(cellType: .folder,
+                          title: nextFolder.title,
+                          countFolder: nextFolder.folderArray.count,
+                          countAlbum: nextFolder.albumArray.count,
+                          rprstPhoto1: nil,
+                          width: width)
+            }
+            
         }
         .buttonStyle(ClickScaleEffect())
         .disabled(isEditingMode )
@@ -156,12 +168,20 @@ extension FancyFolderLineView {
         NavigationLink {
             AllPhotosView(album: album, title: album.title)
         } label: {
-            FancyCell(cellType: .miniAlbum,
-                      title: album.title,
-                      colorIndex: album.colorIndex % colorSet.count,
-                      rprstPhoto1: album.rprsttivePhoto1,
-                      rprstPhoto2: nil,
-                      width: width)
+            if uiMode == .fancy {
+                FancyCell(cellType: .miniAlbum,
+                          title: album.title,
+                          colorIndex: album.colorIndex % colorSet.count,
+                          rprstPhoto1: album.rprsttivePhoto1,
+                          rprstPhoto2: nil,
+                          width: width)
+            } else if uiMode == .modern {
+                ModernCell(cellType: .miniAlbum,
+                          title: album.title,
+                          rprstPhoto1: album.rprsttivePhoto1,
+                          width: width)
+            }
+            
         }
         .buttonStyle(ClickScaleEffect())
         .disabled(isEditingMode || stateChangeObject.isShowingMenu)
@@ -302,7 +322,7 @@ enum SecondarySeetType {
 
 struct FancyFolderLineView_Previews: PreviewProvider {
     static var previews: some View {
-        FancyFolderLineView(stateChangeObject: StateChangeObject(), pageFolder: Folder(isHome: true), isShowingSheet: .constant(false), isShowingPhotosPicker: .constant(false), isEditingMode: false, currentFolder: .constant(Folder(isHome: true)))
+        FancyFolderLineView(stateChangeObject: StateChangeObject(), pageFolder: Folder(isHome: true), uiMode: .fancy, isShowingSheet: .constant(false), isShowingPhotosPicker: .constant(false), isEditingMode: false, currentFolder: .constant(Folder(isHome: true)))
     }
 }
 

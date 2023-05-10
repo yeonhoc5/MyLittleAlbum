@@ -135,15 +135,18 @@ extension MoveAssetCategoryView {
         let collections = PHCollection.fetchTopLevelUserCollections(with: nil)
         return ForEach(0..<collections.count, id: \.self) { index in
             if collections[index].isKind(of: PHAssetCollection.self) {
-                let subText = collections[index] == currentAlbum ? "[현재 앨범]" : ""
-                AlbumLineView(title: collections[index].localizedTitle ?? "", subText: subText)
+                let album = collections[index]
+                let subText = album == currentAlbum.album ? "[현재 앨범]" : ""
+                AlbumLineView(title: album.localizedTitle ?? "", subText: subText)
                     .listRowBackground(Color.white)
                     .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 0, trailing: 40))
-                    .foregroundColor(collections[index] == currentAlbum ? .disabledColor : (albumToAddPhotos == collections[index] ? .selectedColor:.nonSelectedColor))
+                    .foregroundColor(album == currentAlbum.album ?
+                        .disabledColor : (album == albumToAddPhotos
+                                          ? .selectedColor : .nonSelectedColor))
                     .onTapGesture {
-                        toggleAlbumToAddAssets(album: collections[index])
+                        toggleAlbumToAddAssets(album: album)
                     }
-                    .disabled(collections[index] == currentAlbum)
+                    .disabled(album == currentAlbum.album)
             }
         }
     }
@@ -227,7 +230,8 @@ extension MoveAssetCategoryView {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     currentAlbum.removeAssetFromAlbum(indexSet: indexSet)
                 }
-                stateChangeObject.assetRemoving = true
+//                stateChangeObject.assetChanged = true
+                stateChangeObject.assetChanged = .changed
             }
         }
         
@@ -263,7 +267,6 @@ struct FolderCategory: View {
                         withAnimation { isOpen.toggle() }
                     }
             }
-            
             if isOpen {
                 ForEach(0..<collections.count, id: \.self) { index in
                     if collections[index].isKind(of: PHAssetCollection.self) {
@@ -274,7 +277,7 @@ struct FolderCategory: View {
                             AlbumLineView(title: album.localizedTitle ?? "", subText: subText)
                                 .listRowBackground(Color.white)
                                 .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 0, trailing: 40))
-                                .foregroundColor(album == currentAlbum ? .disabledColor : (albumToAddPhotos == collections[index] ? .selectedColor:.nonSelectedColor))
+                                .foregroundColor(album == currentAlbum ? .disabledColor : (album == albumToAddPhotos ? .selectedColor:.nonSelectedColor))
                                 .id(album.localIdentifier)
                                 .onTapGesture {
                                     if albumToAddPhotos == album as? PHAssetCollection {
@@ -286,7 +289,7 @@ struct FolderCategory: View {
                                         "[\(albumToAddPhotos.localizedTitle ?? "")]에" : "[\(albumToAddPhotos.localizedTitle ?? "")](으)로"
                                     }
                                 }
-                                .disabled(collections[index] == currentAlbum)
+                                .disabled(album == currentAlbum)
                         }
                     }
                 }

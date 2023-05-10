@@ -257,16 +257,9 @@ extension PhotosGridMenu {
         let image = edge == .top ? "chevron.left.to.line" : "chevron.right.to.line"
         return menuButton(btnSize: btnSize, type: .image, image: image, rotate: .pi/2) {
             switch edge {
-            case .top:
-                withAnimation(.interactiveSpring()) {
-                    edgeToScroll = .top
-                }
-            default:
-                withAnimation(.interactiveSpring()) {
-                    edgeToScroll = .bottom
-                }
+            case .top: edgeToScroll = .top
+            default: edgeToScroll = .bottom
             }
-            
         }
     }
     // home에서 사진함 선택

@@ -17,10 +17,6 @@ struct AlbumListView: View {
     // 현재 앨범들이 속한 폴더
     @ObservedObject var pageFolder: Folder
     // 레이아웃
-    
-//    @State var albumArray: [PHAssetCollection]
-//    let colorIndex: Int
-    
     let uiMode: UIMode
     let randomNum1: Int
     let randomNum2: Int
@@ -125,10 +121,6 @@ extension AlbumListView {
                 .id(album.identifier)
         }
         
-        
-        
-        
-        
     }
     
     func deleteAlbumInDepth(album: Album) {
@@ -142,18 +134,24 @@ extension AlbumListView {
         NavigationLink {
             AllPhotosView(album: album, title: album.title)
         } label: {
-            if uiMode == .classic {
+            switch uiMode {
+            case .classic:
                 ClassicCell(cellType: .album,
                             title: album.title,
-                            rprsttivePhoto1: album.rprsttivePhoto1,
+                            rprstPhoto1: album.rprsttivePhoto1,
                             width: widthOfAlbum,
                             height: heightOfAlbum)
-            } else if uiMode == .fancy {
+            case .fancy:
                 FancyCell(cellType: .album,
                           title: album.title,
                           colorIndex: album.colorIndex % colorSet.count,
                           rprstPhoto1: album.rprsttivePhoto1,
                           rprstPhoto2: album.rprsttivePhoto2,
+                          width: widthOfAlbum)
+            case .modern:
+                ModernCell(cellType: .album,
+                          title: album.title,
+                          rprstPhoto1: album.rprsttivePhoto1,
                           width: widthOfAlbum)
             }
         }

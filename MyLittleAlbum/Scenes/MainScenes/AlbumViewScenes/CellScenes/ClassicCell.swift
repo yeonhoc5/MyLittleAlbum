@@ -9,16 +9,14 @@ import SwiftUI
 import Photos
 
 struct ClassicCell: View {
+    
     var cellType: CellType
-    
-//    var album: Album!
-    
     var title: String!
     
-    var countAlbum: Int!
     var countFolder: Int!
+    var countAlbum: Int!
     
-    var rprsttivePhoto1: PHAsset!
+    var rprstPhoto1: PHAsset!
     
     var width: CGFloat! = 100
     var height: CGFloat! = 100
@@ -28,6 +26,8 @@ struct ClassicCell: View {
     var color: Color! = .orange
     let emptyLabel: String = "빈 앨범"
     var cornerRadius: CGFloat! = 5
+    
+    var sampleCase: SampleCase! = SampleCase.none
     
     var body: some View {
         VStack(spacing: 0) {
@@ -58,21 +58,29 @@ extension ClassicCell {
     
     @ViewBuilder
     func albumCell(width: CGFloat!, height: CGFloat!, padding: CGFloat = 0) -> some View {
-        if let image = loadImage(thumbNailSize: CGSize(width: width * scale, height: height * scale)) {
-            imageScaledFill(uiImage: image, width: width, height: height)
-                .cornerRadius(5)
-                .padding(.top, padding)
+        if sampleCase == SampleCase.none {
+            if let image = loadImage(thumbNailSize: CGSize(width: width * scale, height: height * scale)) {
+                imageScaledFill(uiImage: image, width: width, height: height)
+                    .cornerRadius(cornerRadius)
+                    .padding(.top, padding)
+            } else {
+                Color.gray.opacity(0.3)
+                    .frame(width: width, height: height)
+                    .cornerRadius(5)
+                    .overlay(alignment: .bottomTrailing) {
+                        Text(emptyLabel)
+                        .font(.caption).foregroundColor(.secondary)
+                        .padding([.bottom, .trailing], 5)
+                    }
+                    .padding(.top, padding)
+            }
         } else {
-            Color.gray.opacity(0.3)
+            Color.white.opacity(0.5)
                 .frame(width: width, height: height)
-                .cornerRadius(5)
-                .overlay(alignment: .bottomTrailing) {
-                    Text(emptyLabel)
-                    .font(.caption).foregroundColor(.secondary)
-                    .padding([.bottom, .trailing], 5)
-                }
-                .padding(.top, padding)
+                .clipped()
+                .cornerRadius(cornerRadius)
         }
+        
     }
     
     var cellTitle: some View {
@@ -83,14 +91,14 @@ extension ClassicCell {
     }
     
     func loadImage(thumbNailSize: CGSize) -> UIImage? {
-        let imageManager = PHCachingImageManager()
+        let imageManager = PHImageManager()
         let requestOptions = PHImageRequestOptions()
         requestOptions.isSynchronous = true
         requestOptions.deliveryMode = .highQualityFormat
         requestOptions.resizeMode = .exact
         requestOptions.isNetworkAccessAllowed = true
         var image: UIImage!
-        if let asset = rprsttivePhoto1 {
+        if let asset = rprstPhoto1 {
             imageManager.requestImage(for: asset, targetSize: thumbNailSize, contentMode: .default, options: requestOptions) { assetImage, _ in
                     if let assetImage = assetImage {
                         image = assetImage
@@ -103,18 +111,19 @@ extension ClassicCell {
     
 }
 
-//struct FolderAndAlbumCell_Previews: PreviewProvider {
-//    static var previews: some View {
-//        VStack {
-//            HStack {
-//                ClassicCell(cellType: .album, title: "단양여행", image: "sample", color: .orange)
-//                ClassicCell(cellType: .album, title: "단양여행", image: "sample", color: .orange)
-//            }
-//            HStack(alignment: .bottom) {
-//                ClassicCell(cellType: .folder, title: "단양여행", color: .orange)
-//                ClassicCell(cellType: .miniAlbum, title: "단양여행", image: "sample", color: .orange)
-//                ClassicCell(cellType: .miniAlbum, title: "단양여행", color: .orange)
-//            }
-//        }
-//    }
-//}
+struct FolderAndAlbumCell_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack {
+            HStack {
+                ClassicCell(cellType: .album, title: "앨범1", sampleCase: .one)
+                ClassicCell(cellType: .album, title: "앨범1")
+            }
+            HStack(alignment: .bottom) {
+                ClassicCell(cellType: .folder, title: "폴더")
+                ClassicCell(cellType: .miniAlbum, title: "미니앨범1", sampleCase: .one)
+                ClassicCell(cellType: .miniAlbum, title: "미니앨범2")
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}

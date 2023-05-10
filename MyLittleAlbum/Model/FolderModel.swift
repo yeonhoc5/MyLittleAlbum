@@ -238,7 +238,8 @@ extension Folder: PHPhotoLibraryChangeObserver {
     
     func photoLibraryDidChange(_ changeInstance: PHChange) {
         if let folder = self.folder {
-            DispatchQueue.main.async {
+            print("Change 옵저버 [FOLDER] 1")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 if let change = changeInstance.changeDetails(for: folder) {
                     let newFolder = change.objectAfterChanges
                     self.folder = newFolder
@@ -248,7 +249,8 @@ extension Folder: PHPhotoLibraryChangeObserver {
         }
         
         if let detail = changeInstance.changeDetails(for: self.fetchResult) {
-            DispatchQueue.main.async {
+            print("Change 옵저버 [FOLDER] 2")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 let newFetchResult: PHFetchResult<PHCollection>!
                 if let folder = self.folder {
                     newFetchResult = PHCollection.fetchCollections(in: folder, options: nil)
@@ -270,7 +272,8 @@ extension Folder: PHPhotoLibraryChangeObserver {
         if detail.insertedObjects.first?.isKind(of: PHAssetCollection.self) == true
             || detail.removedObjects.first?.isKind(of: PHAssetCollection.self) == true
             || detail.changedObjects.first?.isKind(of: PHAssetCollection.self) == true {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.41) {
+            print("Change 옵저버 [FOLDER] 3")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.8)) {
                     self.refreshAlbumList(newFetchResult)
                 }
@@ -282,6 +285,7 @@ extension Folder: PHPhotoLibraryChangeObserver {
         if detail.insertedObjects.first?.isKind(of: PHCollectionList.self) == true
             || detail.removedObjects.first?.isKind(of: PHCollectionList.self) == true
             || detail.changedObjects.first?.isKind(of: PHCollectionList.self) == true {
+            print("Change 옵저버 [FOLDER] 4")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.8)) {
                     self.refreshFolderList(newFetchResult)

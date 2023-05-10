@@ -21,4 +21,6 @@ class LaunchScreenManager: ObservableObject {
     @Published var state: LaunchScreenPhase = .ready
     @Published var isOpend: Bool = false
     
+    deinit {
+    }
 }

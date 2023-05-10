@@ -13,7 +13,7 @@ struct ImageDetailView: View {
     
     @Binding var isExpanded: Bool
     let asset: PHAsset
-    let navigationTitle: String
+//    let navigationTitle: String
     let imageManager = PHCachingImageManager()
     @Binding var variableScale: CGFloat
     @Binding var currentScale: CGFloat
@@ -22,10 +22,13 @@ struct ImageDetailView: View {
     
     var body: some View {
         if fetchtedImage == nil {
-            Color.black
+            ProgressView()
+                .tint(.color1)
+                .progressViewStyle(.circular)
+                .scaleEffect(1.5)
                 .onAppear {
-                    if fetchtedImage == nil {
-                        DispatchQueue.main.async {
+                    DispatchQueue.main.async {
+                        withAnimation {
                             fetchtedImage = fetchingImage(asset: asset)
                         }
                     }
@@ -33,7 +36,7 @@ struct ImageDetailView: View {
         } else {
             GeometryReader { proxy in
                 ScrollView([.horizontal, .vertical], showsIndicators: false) {
-                    Image(uiImage: (fetchtedImage ?? UIImage(named: "")!))
+                    Image(uiImage: (fetchtedImage))
                         .resizable()
                         .scaledToFit()
                         .frame(width: proxy.size.width * variableScale)
@@ -45,27 +48,27 @@ struct ImageDetailView: View {
     }
     
     
-    var titleView: some View {
-        HStack(alignment: .center) {
-            Button {
-                withAnimation {
-                    isExpanded = false
-                }
-            } label: {
-                Image(systemName: "xmark")
-                    .imageScale(.large)
-                    .foregroundColor(.white)
-                    .bold()
-                    .frame(width: 50, height: 40, alignment: .center)
-            }
-            Text(navigationTitle)
-                .foregroundColor(.white)
-                .font(Font.system(size: 17, weight: .bold))
-                .frame(width: screenSize.width - 100, height: 40, alignment: .center)
-            Spacer(minLength: 50)
-        }
-        .frame(width: screenSize.width, height: 85, alignment: .bottom)
-    }
+//    var titleView: some View {
+//        HStack(alignment: .center) {
+//            Button {
+//                withAnimation {
+//                    isExpanded = false
+//                }
+//            } label: {
+//                Image(systemName: "xmark")
+//                    .imageScale(.large)
+//                    .foregroundColor(.white)
+//                    .bold()
+//                    .frame(width: 50, height: 40, alignment: .center)
+//            }
+//            Text(navigationTitle)
+//                .foregroundColor(.white)
+//                .font(Font.system(size: 17, weight: .bold))
+//                .frame(width: screenSize.width - 100, height: 40, alignment: .center)
+//            Spacer(minLength: 50)
+//        }
+//        .frame(width: screenSize.width, height: 85, alignment: .bottom)
+//    }
     
     
     var zoomGestureByTab: some Gesture {
@@ -95,6 +98,7 @@ extension ImageDetailView {
         options.isNetworkAccessAllowed = true
         let width = screenSize.width * scale
         let size = CGSize(width: width, height: .infinity)
+        
         imageManager.requestImage(for: asset,
                                   targetSize: size,
                                   contentMode: .aspectFit,

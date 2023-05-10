@@ -13,10 +13,7 @@ struct PhotosCollectionView: UIViewRepresentable {
     
     @ObservedObject var stateChangeObject: StateChangeObject
     var albumType: AlbumType = .album
-
     @ObservedObject var album: Album
-//     이미지/비디오 필터링 프라퍼티
-//    @Binding var filteringType: FilteringType
     // 스크롤 관리 프라퍼티
     @State var scrollAtFirst: Bool = true
     @Binding var edgeToScroll: EdgeToScroll
@@ -30,11 +27,11 @@ struct PhotosCollectionView: UIViewRepresentable {
     @Binding var isExpanded: Bool
     @State var selectedIndex: IndexPath!
     
-    
     @State var insertedIndex: [IndexPath]
     @State var removedIndex: [IndexPath]
     @State var changedIndex: [IndexPath]
     @State var currentCount: Int
+    @Binding var isSelectingBySwipe: Bool
     
     var animationID: Namespace.ID!
     
@@ -51,11 +48,18 @@ struct PhotosCollectionView: UIViewRepresentable {
 //        collectionView.register(GridCell.self, forCellWithReuseIdentifier: "ProgressCell")
         collectionView.dataSource = context.coordinator
         collectionView.delegate = context.coordinator
+//        collectionView.allowsMultipleSelection = false
+        collectionView.isMultipleTouchEnabled = false
+        collectionView.allowsMultipleSelectionDuringEditing = true
+        
         collectionView.isScrollEnabled = true
         return collectionView
     }
     
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
+        
+        collectionView.isEditing = self.isSelectMode
+        
         
         // 1. 첫 진입시 : [나의 앨범]에서는 맨 위 / 그 외(나의사진/피커뷰/스마트앨범)에서는 첫 진입 시 맨 아래로 스크롤
         if albumType != .album && scrollAtFirst {
@@ -66,6 +70,7 @@ struct PhotosCollectionView: UIViewRepresentable {
         if edgeToScroll != .none {
             moveToEdge(collectionView: collectionView)
         }
+        
         // 3. 필터링 4 : (공통) 비디오 / 이미지 / 모두 보기 필터링
         if filteringTypeChanged {
             reloadAllPhotos(collectionView: collectionView) { count in
@@ -109,7 +114,10 @@ struct PhotosCollectionView: UIViewRepresentable {
                     if currentCount == count {
                 // step 3. progressView뷰 종료
                         DispatchQueue.main.async {
-                            stateChangeObject.assetRemoving = false
+//                            stateChangeObject.assetChanged = false
+                            withAnimation {
+                                stateChangeObject.assetChanged = .completed
+                            }
                         }
                     }
                 }
@@ -120,7 +128,8 @@ struct PhotosCollectionView: UIViewRepresentable {
                 album.insertedIndexPath = []
             }
         // 6-2. 카운트 변화 없음: [마이포토] all / album에서 사진 추가
-        } else if stateChangeObject.assetRemoving
+//        } else if stateChangeObject.assetChanged
+        } else if stateChangeObject.assetChanged == .changed
                     && albumType == .home
                     && album.belongingType != .nonAlbum
                     && !album.albumAssetsChanged {
@@ -134,8 +143,9 @@ struct PhotosCollectionView: UIViewRepresentable {
                     reloadAllPhotos(collectionView: collectionView, all: false, index: index) { count in
                         if currentCount == count {
             // step 3. progressView뷰 종료
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                                stateChangeObject.assetRemoving = false
+//                            stateChangeObject.assetChanged = false
+                            withAnimation {
+                                stateChangeObject.assetChanged = .completed
                             }
                         }
                     }
@@ -151,6 +161,14 @@ struct PhotosCollectionView: UIViewRepresentable {
                 stateChangeObject.showPickerButton = false
             }
             print("update 5-2. picker button are come home")
+        }
+        
+        // 8. 포토 피커 취소할 시 피커버튼 다시 작동되도록
+        if stateChangeObject.photosPickerCanceled {
+            DispatchQueue.main.async {
+                collectionView.reloadItems(at: [IndexPath(item: currentCount, section: 0)])
+                stateChangeObject.photosPickerCanceled = false
+            }
         }
 
         // 5. 콜렉션뷰 배치 업데이트 - (1) 삭제된 아이템
@@ -201,9 +219,8 @@ struct PhotosCollectionView: UIViewRepresentable {
 //                }
 //            }
 //        }
-        
     }
-
+    
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
@@ -228,12 +245,12 @@ struct PhotosCollectionView: UIViewRepresentable {
             let contentSize = collectionView.contentSize
             if contentSize.height > collectionView.bounds.size.height {
                 let targetContentOffset = CGPointMake(0.0, contentSize.height - collectionView.bounds.size.height )
-                UIView.animate(withDuration: 0.3) {
+                UIView.animate(withDuration: 1) {
                     collectionView.setContentOffset(targetContentOffset, animated: true)
                 }
             }
         } else if collecitonEdge == .top {
-            UIView.animate(withDuration: 0.3) {
+            UIView.animate(withDuration: 1) {
                 collectionView.scrollToItem(at: IndexPath(row: 0, section: 0), at: collecitonEdge, animated: true)
             }
         }
@@ -310,23 +327,6 @@ struct PhotosCollectionView: UIViewRepresentable {
         }
     }
     
-//    func changeAlbumFilter(collectionView: UICollectionView) {
-//        DispatchQueue.main.async {
-//            withAnimation(.easeInOut(duration: 0.35)) {
-//                collectionView.reloadData()
-//                stateChangeObject.allPhotosChanged = false
-//            }
-//        }
-//    }
-//
-//    func changeMediaTypeFilter(collectionView: UICollectionView) {
-//            UIView.animate(withDuration: 0.2) {
-//                collectionView.reloadData()
-//            }
-//        DispatchQueue.main.async {
-//            stateChangeObject.typeFilterChanged = false
-//        }
-//    }
     
 //    func checkChange(albumType: AlbumType, collectionView: UICollectionView) {
 //        if albumType == .home {
@@ -465,6 +465,9 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
             }
         }
         cell.animationID = self.parent.animationID
+        
+        
+        cell.showsLargeContentViewer = true
         return cell
     }
     
@@ -482,12 +485,24 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
         switch indexPath.row {
         case 0..<count:
             if self.parent.isSelectMode {
-                if self.parent.selectedItemsIndex.contains(indexPath.row) {
-                    guard let index = self.parent.selectedItemsIndex.firstIndex(of: indexPath.row) else { return }
-                    self.parent.selectedItemsIndex.remove(at: index)
-                } else {
-                    self.parent.selectedItemsIndex.append(indexPath.row)
-                }
+//                if !parent.isSelectingBySwipe {
+                    if self.parent.selectedItemsIndex.contains(indexPath.row) {
+                        guard let index = self.parent.selectedItemsIndex.firstIndex(of: indexPath.row) else { return }
+                        self.parent.selectedItemsIndex.remove(at: index)
+                    } else {
+                        self.parent.selectedItemsIndex.append(indexPath.row)
+                    }
+                    UIView.animate(withDuration: 0.25) {
+                        collectionView.reloadItems(at: [indexPath])
+                    }
+//                } else {
+//                    if self.parent.selectedItemsIndex.contains(indexPath.row) {
+//                        guard let index = self.parent.selectedItemsIndex.firstIndex(of: indexPath.row) else { return }
+//                        self.parent.selectedItemsIndex.remove(at: index)
+//                    } else {
+//                        self.parent.selectedItemsIndex.append(indexPath.row)
+//                    }
+//                }
             } else {
                 self.parent.indexToView = indexPath.row
                 self.parent.selectedIndex = indexPath
@@ -495,10 +510,8 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
                     self.parent.isExpanded = true
                 }
             }
-            UIView.animate(withDuration: 0.25) {
-                collectionView.reloadItems(at: [indexPath])
-            }
         case count:
+            print(parent.isSelectMode)
             if self.parent.albumType == .album {
                 if !self.parent.isSelectMode {
                     self.parent.isShowingPhotosPicker = true
@@ -633,6 +646,7 @@ class GridCell: UICollectionViewCell {
         durationLabel.layer.shadowOffset = CGSize(width: 1, height: 1)
         durationLabel.layer.shadowOpacity = 1
         durationLabel.layer.shadowRadius = 7
+        
         checkMarkView.frame = CGRect(x: width - (width / 3.5) , y: width - (width / 3.5), width: width / 4, height: width / 4)
         checkMarkView.layer.cornerRadius = checkMarkView.frame.width / 2
         checkMarkView.clipsToBounds = true

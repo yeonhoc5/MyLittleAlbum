@@ -54,6 +54,17 @@ struct TabBarView: View {
         }
         .environmentObject(launchScreenManger)
     }
+    
+    func pauseBackgroundAudio() {
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.ambient, mode: .default)
+            try audioSession.setActive(true)
+        } catch {
+            print(error)
+        }
+    }
+    
 }
 
 
