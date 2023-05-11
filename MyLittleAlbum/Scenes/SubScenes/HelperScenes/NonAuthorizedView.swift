@@ -8,6 +8,9 @@
 import SwiftUI
 
 struct NonAuthorizedView: View {
+    @EnvironmentObject var photoData: PhotoData
+    @ObservedObject var topFolder: Folder
+    
     var body: some View {
         Rectangle()
             .fill(Color.fancyBackground)
@@ -53,6 +56,19 @@ struct NonAuthorizedView: View {
                     
                 }
             }
+            .onDisappear {
+                if photoData.status == .authorized {
+                    let fetchResult = topFolder.fetchResult
+                    withAnimation {
+                        DispatchQueue.main.async {
+                            topFolder.refreshFolderList(fetchResult)
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            topFolder.refreshAlbumList(fetchResult)
+                        }
+                    }
+                }
+            }
     }
     
     var myLittleAlbum: some View {
@@ -93,6 +109,7 @@ struct NonAuthorizedView: View {
 
 struct NonAuthorizedView_Previews: PreviewProvider {
     static var previews: some View {
-        NonAuthorizedView()
+        NonAuthorizedView(topFolder: Folder(isHome: true))
+            .environmentObject(PhotoData())
     }
 }

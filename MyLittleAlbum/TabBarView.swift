@@ -37,7 +37,7 @@ struct TabBarView: View {
                         .position(x: isShowingSettingView ? proxy.size.width / 2 : -proxy.size.width,
                                   y: proxy.size.height / 2)
                 }
-            default: NonAuthorizedView()
+            default: NonAuthorizedView(topFolder: topFolder)
             }
             
         // 2. background 스크린 (state == inactive로 설정하면 알럿 창 나타날 때도 이 화면이 나타나므로 background로 지정해야 함)
