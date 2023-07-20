@@ -204,7 +204,7 @@ extension Album {
     // 앨범에서 asset 빼기
     func removeAssetFromAlbum(indexSet: [Int]) {
         var assetArray: [PHAsset] = []
-        switch self.filteringType {
+        switch filteringType {
         case .all:
             assetArray = self.photosArray
         case .image:

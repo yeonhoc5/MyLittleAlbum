@@ -7,7 +7,7 @@
 
 import SwiftUI
 import Photos
-import PhotosUI
+//import PhotosUI
 
 // 앨범 뷰
 struct AlbumView: View {

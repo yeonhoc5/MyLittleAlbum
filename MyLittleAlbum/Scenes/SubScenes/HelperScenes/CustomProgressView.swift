@@ -33,7 +33,7 @@ extension CustomProgressView {
 
     var progressDoneView: some View {
         Image(systemName: "checkmark")
-            .scaleEffect(3)
+            .font(Font.system(size: 55))
             .foregroundColor(.color1)
             .onAppear {
                 let impactMed = UIImpactFeedbackGenerator(style: .medium)
@@ -50,7 +50,7 @@ extension CustomProgressView {
     var progressView: some View {
         ProgressView()
             .progressViewStyle(.circular)
-            .scaleEffect(1.5)
+//            .scaleEffect(1.5)
             .tint(color)
     }
 }

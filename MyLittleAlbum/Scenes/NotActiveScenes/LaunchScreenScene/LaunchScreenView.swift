@@ -7,7 +7,7 @@
 
 import SwiftUI
 import AVKit
-import AVFoundation
+//import AVFoundation
 
 
 struct LaunchScreenView: View {

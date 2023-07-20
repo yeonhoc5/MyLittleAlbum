@@ -27,6 +27,7 @@ struct PhotosCollectionView: UIViewRepresentable {
     @Binding var isExpanded: Bool
     @State var selectedIndex: IndexPath!
     
+    @State var multiSelectIndex: [Int] = []
     @State var insertedIndex: [IndexPath]
     @State var removedIndex: [IndexPath]
     @State var changedIndex: [IndexPath]
@@ -36,6 +37,8 @@ struct PhotosCollectionView: UIViewRepresentable {
     var animationID: Namespace.ID!
     
     @State var collectionView: UICollectionView!
+    
+    @State var lastSelectedCell = IndexPath()
     
     func makeUIView(context: Context) -> UICollectionView {
         
@@ -49,17 +52,41 @@ struct PhotosCollectionView: UIViewRepresentable {
         collectionView.dataSource = context.coordinator
         collectionView.delegate = context.coordinator
 //        collectionView.allowsMultipleSelection = false
-        collectionView.isMultipleTouchEnabled = false
-        collectionView.allowsMultipleSelectionDuringEditing = true
+//        collectionView.isMultipleTouchEnabled = false
+//        collectionView.allowsMultipleSelectionDuringEditing = true
+        
+        
+//        collectionView.allowsSelection = true
+//        collectionView.allowsMultipleSelection = false
+//        collectionView.allowsMultipleSelectionDuringEditing = true
+//        collectionView.allowsFocus = true
+//        collectionView.allowsFocusDuringEditing = true
+//        collectionView.selectionFollowsFocus = true
         
         collectionView.isScrollEnabled = true
+        
+        let panGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.didPan(toSelectCells:)))
+        panGesture.delegate = context.coordinator as any UIGestureRecognizerDelegate
+        panGesture.minimumNumberOfTouches = 1
+        collectionView.addGestureRecognizer(panGesture)
+        DispatchQueue.main.async {
+            self.collectionView = collectionView
+        }
         return collectionView
+        
     }
+    
+    
     
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
         
-        collectionView.isEditing = self.isSelectMode
+//
+//        collectionView.isEditing = self.isSelectMode
         
+//        if isSelectMode {
+//            collectionView.isEditing = true
+//            print("editingmode is True")
+//        }
         
         // 1. 첫 진입시 : [나의 앨범]에서는 맨 위 / 그 외(나의사진/피커뷰/스마트앨범)에서는 첫 진입 시 맨 아래로 스크롤
         if albumType != .album && scrollAtFirst {
@@ -219,11 +246,15 @@ struct PhotosCollectionView: UIViewRepresentable {
 //                }
 //            }
 //        }
+        
+        
     }
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
+
+    
     
     // -> (1) scroll at first
     func scrollToBottomAtFirst(collectionView: UICollectionView) {
@@ -357,16 +388,98 @@ struct PhotosCollectionView: UIViewRepresentable {
 //
 //    }
     
-    
-    
 }
 
-class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, UIGestureRecognizerDelegate {
     private let parent: PhotosCollectionView
+    
     
     init(_ collectionView: PhotosCollectionView) {
         self.parent = collectionView
     }
+    
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer)
+            -> Bool {
+            return true
+    }
+    
+    
+    @objc func didPan(toSelectCells panGesture: UIPanGestureRecognizer) {
+        if parent.isSelectMode {
+            if let collectionView = self.parent.collectionView {
+                if panGesture.state == .began {
+                    let startLocation: CGPoint = panGesture.location(in: collectionView)
+                    if let startIndex: Int = collectionView.indexPathForItem(at: startLocation)?.row {
+                        
+                    }
+                } else if panGesture.state == .changed {
+                    
+                }
+            }
+        }
+//        if let collectionView = self.parent.collectionView {
+            
+//            if parent.isSelectMode {
+//                if panGesture.state == .began {
+////                    collectionView.isUserInteractionEnabled = false
+////                    collectionView.isScrollEnabled = false
+//                    let location: CGPoint = panGesture.location(in: collectionView)
+//                    if let indexPath: IndexPath = collectionView.indexPathForItem(at: location) {
+////                        if indexPath != parent.lastSelectedCell {
+////                            self.selectCell(indexPath, selected: true)
+////                            collectionView.reloadItems(at: [indexPath])
+////                            parent.lastSelectedCell = indexPath
+////                        }
+//                        let startPoint = indexPath.row
+//                        if panGesture.state == .
+//                    }
+//                } else if panGesture.state == .changed {
+//                    let location: CGPoint = panGesture.location(in: collectionView)
+//                    if let indexPath: IndexPath = collectionView.indexPathForItem(at: location) {
+//                        if indexPath != parent.lastSelectedCell {
+//                            self.selectCell(indexPath, selected: true)
+//                            collectionView.reloadItems(at: [indexPath])
+//                            parent.lastSelectedCell = indexPath
+//                        }
+//                    }
+//                } else if panGesture.state == .ended {
+////                    collectionView.isScrollEnabled = true
+////                    collectionView.isUserInteractionEnabled = true
+//    //                swipeSelect = false
+//                }
+//            }
+//        }
+    }
+    
+    func selectCell(startInt: Int, lastInt: Int! = nil) {
+        if lastInt == nil {
+            let array = [startInt]
+        } else {
+            let array = [startInt...lastInt]
+        }
+    }
+    
+    func selectCell(_ indexPath: IndexPath, selected: Bool) {
+        if let cell = parent.collectionView.cellForItem(at: indexPath) {
+            if parent.selectedItemsIndex.contains(indexPath.row) {
+                parent.collectionView.deselectItem(at: indexPath, animated: true)
+                
+                if let index = parent.selectedItemsIndex.firstIndex(of: indexPath.row) {
+                    parent.selectedItemsIndex.remove(at: index)
+                }
+                parent.collectionView.scrollToItem(at: indexPath, at: UICollectionView.ScrollPosition.centeredVertically, animated: true)
+            } else {
+                parent.collectionView.selectItem(at: indexPath, animated: true, scrollPosition: UICollectionView.ScrollPosition.centeredVertically)
+                parent.selectedItemsIndex.append(indexPath.row)
+            }
+            if let numberOfSelections = parent.collectionView.indexPathsForSelectedItems?.count {
+//                title = "\(numberOfSelections) items selected"
+            }
+        }
+    }
+    
+    
     
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         return 1
@@ -545,6 +658,7 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
 //            }
 //        return image
 //    }
+    
     
 }
 

@@ -7,7 +7,7 @@
 
 import SwiftUI
 import Photos
-import PhotosUI
+//import PhotosUI
 
 enum LabelType {
     case text, image

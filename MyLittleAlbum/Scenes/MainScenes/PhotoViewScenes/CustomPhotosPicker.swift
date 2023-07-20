@@ -112,6 +112,9 @@ struct CustomPhotosPicker: View {
                     ToolbarItem(placement: .navigationBarLeading) { toolbarLeading }
                     ToolbarItem(placement: .navigationBarTrailing) { toolbarTrailing }
                 }
+                .onDisappear {
+                    album = nil
+                }
             }
             .background {
                 FancyBackground()

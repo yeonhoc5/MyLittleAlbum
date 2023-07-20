@@ -7,7 +7,7 @@
 
 import SwiftUI
 import Photos
-import PhotosUI
+//import PhotosUI
 
 // MARK: - 1st Struct
 struct MoveAssetCategoryView: View {
@@ -111,13 +111,15 @@ extension MoveAssetCategoryView {
         Button {
             stateChangeObject.isShowingAlert = true
         } label: {
-            HStack {
-                Text("앨범 추가하여 넣기")
-                imageScaledFit(systemName: "rectangle.stack.fill.badge.plus", width: 20, height: 20)
-                Rectangle()
-                    .foregroundColor(.white)
-            }
-            .foregroundColor(.blue)
+            Rectangle()
+                .foregroundColor(.white)
+                .overlay {
+                    HStack {
+                        Text("앨범 추가하여 \(albumType == .home ? "넣기" : "이동하기")")
+                        imageScaledFit(systemName: "rectangle.stack.fill.badge.plus", width: 20, height: 20)
+                    }
+                    .foregroundColor(.blue)
+                }
         }
         .listRowBackground(Color.white)
         .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 0, trailing: 40))

@@ -10,10 +10,14 @@ import Photos
 import UIKit
 import SwiftUI
 
+
 var screenSize: CGSize {
-    guard let size = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.screen.bounds.size else { return .zero }
-    return size
+    get {
+        guard let size = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.screen.bounds.size else { return .zero }
+        return size
+    }
 }
+
 var scale: CGFloat {
     guard let scale = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.screen.scale else { return .zero }
     return scale
@@ -183,9 +187,9 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
     
     // 앨범 이미지용 랜덤 수 2개
     func getRandomNum() {
-        let randomNum = Int.random(in: 0..<self.allPhotos.count)
+        let randomNum = Int.random(in: 0..<Int.max)
         self.randomNum1 = randomNum
-        self.randomNum2 = randomNum + Int.random(in: 1..<(self.allPhotos.count - 1))
+        self.randomNum2 = randomNum + Int.random(in: 1..<randomNum)
         print("step 3: random numbers generated")
     }
     

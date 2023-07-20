@@ -25,7 +25,7 @@ struct CustomSeekBar: UIViewRepresentable {
         slider.addTarget(context.coordinator,
                          action: #selector(context.coordinator.changed(slider:)),
                          for: .valueChanged)
-        slider.isContinuous = true
+        slider.isContinuous = false
         DispatchQueue.main.async {
             self.slider = slider
         }

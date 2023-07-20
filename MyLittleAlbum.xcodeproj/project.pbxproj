@@ -221,11 +221,11 @@
 				1A3EA90428F6A3850071CB25 /* MyLittleAlbum.swift */,
 				1A3EA91228F6A9F30071CB25 /* TabBarView.swift */,
 				1A04E26E2991F1A100C7CA08 /* CustomTabBarView.swift */,
-				1A8C5CEA2A0279910028CF20 /* Lazypop */,
 				1ADFD66C295D530D00418042 /* Scenes */,
 				1A18072D29820613005117D2 /* Model */,
 				1ADD56F5290A679D00755989 /* DataAndObservable */,
 				1A6E4375292B8C6500D0873B /* Extension */,
+				1A8C5CEA2A0279910028CF20 /* Lazypop */,
 				1A8DEA6E29E00C7200EEA9B7 /* Developing */,
 				1A3EA90828F6A3860071CB25 /* Assets.xcassets */,
 				1A3EA90A28F6A3860071CB25 /* Preview Content */,
@@ -447,9 +447,9 @@
 		1ADFD66C295D530D00418042 /* Scenes */ = {
 			isa = PBXGroup;
 			children = (
-				1A422F3529CC2D0B001411E5 /* NotActiveScenes */,
 				1A6125542978EF63009450F9 /* MainScenes */,
 				1A422F3229CC06DE001411E5 /* SubScenes */,
+				1A422F3529CC2D0B001411E5 /* NotActiveScenes */,
 			);
 			path = Scenes;
 			sourceTree = "<group>";
@@ -743,7 +743,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = yeonhoc5.MyLittleAlbum;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -781,7 +781,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
+				MARKETING_VERSION = 1.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = yeonhoc5.MyLittleAlbum;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

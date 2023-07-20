@@ -67,12 +67,6 @@ struct VideoDetailView: View {
                             avPlayer.pause()
                         }
                     })
-                    .onChange(of: isSeeking) { newValue in
-                        if newValue && self.timeObserver == nil {
-//                            addObserverToPlayer()
-                            print("step2")
-                        }
-                    }
                     .onChange(of: offsetIndex) { newValue in
                         if newValue != 0 {
                             removeObserver()
@@ -89,9 +83,11 @@ struct VideoDetailView: View {
                         }
                     }
                     .onChange(of: value) { newValue in
-                        if newValue == 1.0 {
-                            removeObserver()
-                            resetVideo()
+                        DispatchQueue.main.async {
+                            if newValue == 1.0 {
+                                removeObserver()
+                                resetVideo()
+                            }
                         }
                     }
                     .onChange(of: scenePhase) { newValue in
@@ -195,10 +191,10 @@ extension VideoDetailView {
         Button {
             if let total = avPlayer.currentItem?.duration.seconds.rounded(.toNearestOrAwayFromZero) {
                 if total - currentTime <= 5 {
-                    avPlayer.seek(to: CMTime(seconds: total, preferredTimescale: 1))
+                    avPlayer.seek(to: CMTime(seconds: total, preferredTimescale: 10))
                     currentTime = total
                 } else {
-                    avPlayer.seek(to: CMTime(seconds: currentTime + 5, preferredTimescale: 1))
+                    avPlayer.seek(to: CMTime(seconds: currentTime + 5, preferredTimescale: 10))
                     currentTime = currentTime + 5
                 }
                 DispatchQueue.main.async {
@@ -326,12 +322,11 @@ extension VideoDetailView {
 // MARK: - 4. avplayer Observer functions
 extension VideoDetailView {
     func addObserverToPlayer() {
-        let time = CMTime(seconds: 1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        let time = CMTime(seconds: 0.01, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         let runningTime = asset.duration
         print("옵저버 ADDed")
         guard let _ = self.avPlayer.currentItem else { return }
         self.timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: time, queue: .main) { time in
-            print("observer works at \(time.seconds)")
             DispatchQueue.global(qos: .background).async {
                 self.value = Float(time.seconds / runningTime)
             }

@@ -7,7 +7,7 @@
 
 import SwiftUI
 import Photos
-import PhotosUI // photospicker
+//import PhotosUI // photospicker
 import LocalAuthentication
 
 struct AllPhotosView: View {
@@ -67,7 +67,7 @@ struct AllPhotosView: View {
             } else if settingDone == false {
                 // [나의 사진]탭용 템프뷰
                 RefreshPhotoView()
-                    .onAppear {
+                    .task {
                         if scenePhase != .background {
                             DispatchQueue.main.async {
                                 readyToShowMyPhotos(type: belongingType)
@@ -135,22 +135,23 @@ struct AllPhotosView: View {
         })
         .onChange(of: album?.count, perform: { newValue in
             DispatchQueue.main.async {
-//                stateChangeObject.assetChanged = false
-                withAnimation {
-                    if albumType == .home {
-                        if settingDone  {
+                if let album = album {
+                    withAnimation {
+                        if albumType == .home {
+                            if settingDone  {
+                                stateChangeObject.assetChanged = .completed
+                            } else if album.count < newValue! {
+                                stateChangeObject.assetChanged = .done
+                            }
+                        } else if albumType == .smartAlbum {
+                            if isPrivacy {
+                                stateChangeObject.assetChanged = .completed
+                            }
+                        } else if albumType == .album {
                             stateChangeObject.assetChanged = .completed
-                        } else if album.count < newValue! {
+                        } else {
                             stateChangeObject.assetChanged = .done
                         }
-                    } else if albumType == .smartAlbum {
-                        if isPrivacy {
-                            stateChangeObject.assetChanged = .completed
-                        }
-                    } else if albumType == .album {
-                        stateChangeObject.assetChanged = .completed
-                    } else {
-                        stateChangeObject.assetChanged = .done
                     }
                 }
             }
@@ -176,29 +177,35 @@ struct AllPhotosView: View {
                 PhotosDetailView(assetArray: assetArray, indexToView: $indexToView, isExpanded: $isExpanded, navigationTitle: "")
         })
         .sheet(isPresented: $isShowingSheet) {
-            NavigationView {
-                if album != nil {
-                    MoveAssetCategoryView(isShowingSheet: $isShowingSheet,
-                                          isShowingSelectFolderSheet: $isShowingSelectFolderSheet,
-                                          stateChangeObject: stateChangeObject,
-                                          albumType: albumType,
-                                          currentAlbum: album,
-                                          selectedItemsIndex: $selectedItemsIndex,
-                                          isSelectMode: $isSelectMode)
+            if albumType == .home || albumType == .album {
+                NavigationView {
+                    if album != nil {
+                        MoveAssetCategoryView(isShowingSheet: $isShowingSheet,
+                                              isShowingSelectFolderSheet: $isShowingSelectFolderSheet,
+                                              stateChangeObject: stateChangeObject,
+                                              albumType: albumType,
+                                              currentAlbum: album,
+                                              selectedItemsIndex: $selectedItemsIndex,
+                                              isSelectMode: $isSelectMode)
+                    }
                 }
             }
         }
         .sheet(isPresented: $isShowingSelectFolderSheet) {
-            MoveCollectionCategoryView(isHome: true,
-                                       isShowingSheet: $isShowingSelectFolderSheet,
-                                       currentFolder: .constant(nil),
-                                       currentAlbum: album,
-                                       stateChangeObject: stateChangeObject)
+            if albumType == .home || albumType == .album {
+                MoveCollectionCategoryView(isHome: true,
+                                           isShowingSheet: $isShowingSelectFolderSheet,
+                                           currentFolder: .constant(nil),
+                                           currentAlbum: album,
+                                           stateChangeObject: stateChangeObject)
+            }
         }
         .sheet(isPresented: $isShowingPhotosPicker) {
-            CustomPhotosPicker(isShowingPhotosPicker: $isShowingPhotosPicker,
-                               stateChangeObject: stateChangeObject,
-                               albumToEdit: album)
+            if albumType == .album {
+                CustomPhotosPicker(isShowingPhotosPicker: $isShowingPhotosPicker,
+                                   stateChangeObject: stateChangeObject,
+                                   albumToEdit: album)
+            }
         }
         .overlay(content: {
             if stateChangeObject.assetChanged != .done {
@@ -226,23 +233,23 @@ struct AllPhotosView: View {
                 Text("\n항목은 [나의 포토] 탭에서 찾을 수 있습니다.")
             }
         })
-//        .onChange(of: scenePhase) { newValue in
-//            if newValue == .background {
-//                if self.albumType == .home {
-//                    DispatchQueue.main.async {
-//                        self.settingDone = false
-//                        self.album = nil
-//                        self.belongingType = .nonAlbum
-//                    }
-//                } else if self.albumType == .smartAlbum {
-//                    DispatchQueue.main.async {
-//                        self.isPrivacy = true
-//                    }
-//                } else if self.albumType == .album {
-//                    self.isPresented.wrappedValue.dismiss()
-//                }
-//            }
-//        }
+        .onChange(of: scenePhase) { newValue in
+            if newValue == .background {
+                if self.albumType == .home {
+                    DispatchQueue.main.async {
+                        self.settingDone = false
+                        self.album = nil
+                        self.belongingType = .nonAlbum
+                    }
+                } else if self.albumType == .smartAlbum {
+                    DispatchQueue.main.async {
+                        self.isPrivacy = true
+                    }
+                } else if self.albumType == .album {
+                    self.isPresented.wrappedValue.dismiss()
+                }
+            }
+        }
     }
 
 }
