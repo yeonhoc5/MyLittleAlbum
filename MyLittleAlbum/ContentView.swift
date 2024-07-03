@@ -20,11 +20,7 @@ struct TabBarView: View {
     @State var isShowingSettingView: Bool = false
     
     var body: some View {
-        // custom Tabbar 사용
-        let appearance = UITabBar.appearance()
-        appearance.isHidden = true
-        
-        return ZStack {
+        ZStack {
         // 0. 백그라운드 설정 없을 시 런치스크린과 메인 뷰 사이에 블랙 스크린 나타남
             FancyBackground()
             
@@ -41,12 +37,12 @@ struct TabBarView: View {
             }
             
         // 2. background 스크린 (state == inactive로 설정하면 알럿 창 나타날 때도 이 화면이 나타나므로 background로 지정해야 함)
-            if scenePhase == .background {
-                BackgroudStateView()
-            }
+//            if scenePhase == .background {
+//                BackgroudStateView()
+//            }
             
         // 3. 런치 스크린
-            if launchScreenManger.state != .complete {
+            if photoData.useOpeningAni && launchScreenManger.state != .complete {
                 LaunchScreenView(launchScreenManger: launchScreenManger,
                                  maskingScale: $maskingScale,
                                  isOpen: $isOpen)
@@ -69,14 +65,6 @@ struct TabBarView: View {
 
 
 extension TabBarView {
-    // 런치 스크린 종류 후, 메인 뷰 트랜지션 마스크 뷰
-    func maskCircle(manager: LaunchScreenManager, startSize: CGFloat, endSize: CGFloat) -> some View {
-        FancyBackground()
-            .clipShape(Circle())
-            .scaleEffect(isOpen == true ? endSize : startSize)
-            .offset(y: -90)
-    }
-    
     // 메인 뷰 - 각 뷰에 별도의 네비게이션 스타일(extension) 적용 (For 탭1에 네비게이션바 가림)
     var mainView: some View {
         VStack(spacing: 0) {
@@ -100,7 +88,9 @@ extension TabBarView {
                              maskingScale: $maskingScale)
         }
         .ignoresSafeArea()
-        .mask { maskCircle(manager: launchScreenManger, startSize: 0.0001, endSize: 4) }
+        .mask { maskCircle(manager: launchScreenManger, 
+                           startSize: 0.0001,
+                           endSize: 4) }
     }
 }
 
@@ -111,32 +101,27 @@ extension TabBarView {
                             album: PHAssetCollection! = nil,
                             title: String! = "",
                             isShowingSettingView: Binding<Bool>) -> some View {
-        let appearanceScroll = UINavigationBarAppearance()
-        let appearanceStandard = UINavigationBarAppearance()
-        [appearanceStandard, appearanceScroll].forEach {
-            $0.shadowColor = UIColor(patternImage: UIImage())
-            $0.shadowImage = UIImage()
-            $0.titleTextAttributes = [.foregroundColor: UIColor.white]
-        }
-        appearanceScroll.backgroundColor = UIColor(Color.fancyBackground)
-        appearanceStandard.backgroundColor = UIColor(Color.fancyBackground).withAlphaComponent(0.7)
-        UINavigationBar.appearance().standardAppearance = appearanceStandard
-        UINavigationBar.appearance().scrollEdgeAppearance = appearanceScroll
-        
-        UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self]).overrideUserInterfaceStyle = .dark
-        
         return NavigationStack(root: {
-            if type == .photo {
+            switch type {
+            case .photo:
                 AllPhotosView(albumType: .home, settingDone: false)
-            } else if type == .album {
+            case .album:
                 AlbumView(stateChangeObject: StateChangeObject(),
                           pageFolder: topFolder,
                           title: title,
                           isShowingSettingView: isShowingSettingView)
-            } else {
+            case .other:
                 SmartAlbumView()
             }
         })
+    }
+    
+    // 런치 스크린 종류 후, 메인 뷰 트랜지션 마스크 뷰
+    func maskCircle(manager: LaunchScreenManager, startSize: CGFloat, endSize: CGFloat) -> some View {
+        FancyBackground()
+            .clipShape(Circle())
+            .scaleEffect(isOpen == true ? endSize : startSize)
+            .offset(y: -90)
     }
 }
 
