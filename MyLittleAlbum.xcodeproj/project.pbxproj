@@ -137,8 +137,8 @@
 		1A8DEA7829E62EF300EEA9B7 /* BlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurView.swift; sourceTree = "<group>"; };
 		1A8DEA7C29E79F7C00EEA9B7 /* AlbumListModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumListModel.swift; sourceTree = "<group>"; };
 		1AA0F95D2C363B2F00CB98C0 /* GlobalProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalProperties.swift; sourceTree = "<group>"; };
-		1AA0F9602C363DB600CB98C0 /* FunctionSettingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FunctionSettingView.swift; path = MyLittleAlbum/FunctionSettingView.swift; sourceTree = SOURCE_ROOT; };
-		1AA0F9622C363DD800CB98C0 /* SkinSampleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SkinSampleView.swift; path = MyLittleAlbum/SkinSampleView.swift; sourceTree = SOURCE_ROOT; };
+		1AA0F9602C363DB600CB98C0 /* FunctionSettingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FunctionSettingView.swift; path = MyLittleAlbum/Scenes/MainScenes/SettingViewScenes/FunctionSettingView/FunctionSettingView.swift; sourceTree = SOURCE_ROOT; };
+		1AA0F9622C363DD800CB98C0 /* SkinSampleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SkinSampleView.swift; path = MyLittleAlbum/Scenes/MainScenes/SettingViewScenes/FunctionSettingView/SkinSampleView.swift; sourceTree = SOURCE_ROOT; };
 		1AAC1395294C571B00D27853 /* customText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = customText.swift; sourceTree = "<group>"; };
 		1AB7892B29C2C74200414A03 /* NoCollectionPhotoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoCollectionPhotoView.swift; sourceTree = "<group>"; };
 		1AB7893129C9BB3500414A03 /* DepthCircle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthCircle.swift; sourceTree = "<group>"; };
