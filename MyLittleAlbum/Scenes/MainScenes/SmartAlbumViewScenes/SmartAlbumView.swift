@@ -72,7 +72,7 @@ extension SmartAlbumView {
     
 struct SmarAlbumView_Previews: PreviewProvider {
     static var previews: some View {
-        TabBarView(selection: .smart, isOpen: true).mainView
+        ContentView(selection: .smart, isOpen: true).mainView
             .environmentObject(PhotoData())
     }
 }

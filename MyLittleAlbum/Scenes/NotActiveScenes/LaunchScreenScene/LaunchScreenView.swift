@@ -69,7 +69,7 @@ extension LaunchScreenView {
                     .clipShape(Circle())
                     .ignoresSafeArea()
                     .scaleEffect(maskingScale)
-                    .offset(y: -90)
+                    .offset(y: device == .phone ? -90 : -135)
             }
     }
 }
@@ -80,7 +80,11 @@ extension LaunchScreenView {
     
     func loadVideo() {
         // 1. video
-        guard let url = Bundle.main.url(forResource: "doonge", withExtension: "mov") else { return }
+        guard let url = Bundle.main.url(forResource: "doonge",
+                                        withExtension: "mov") 
+        else {
+            return
+        }
         let player = AVPlayer(url: url)
         player.allowsExternalPlayback = false
         videoPlayer = player
@@ -164,9 +168,7 @@ extension LaunchScreenView {
                 print(error)
             }
         }
-
     }
-    
 }
 
 
