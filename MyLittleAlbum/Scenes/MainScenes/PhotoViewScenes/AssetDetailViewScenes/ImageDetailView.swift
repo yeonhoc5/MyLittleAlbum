@@ -115,7 +115,7 @@ extension ImageDetailView {
 
 struct ImageDetailView_Previews: PreviewProvider {
     static var previews: some View {
-        TabBarView()
+        ContentView()
             .environmentObject(PhotoData())
     }
 }

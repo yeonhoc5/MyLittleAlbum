@@ -97,7 +97,9 @@ struct AlbumView: View {
         .edgesIgnoringSafeArea(.trailing)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) { rightToolBarItems }
-            pageFolder.isHome ? ToolbarItem(placement: .navigationBarLeading) { leftHomeToolBarItem } : nil
+            pageFolder.isHome 
+            ? ToolbarItem(placement: .navigationBarLeading) { leftHomeToolBarItem }
+            : nil
         }
         .foregroundColor(.secondary)
         .alert("", isPresented: $stateChangeObject.isShowingAlert, actions: {
@@ -220,6 +222,9 @@ extension AlbumView {
         } label: {
             ZStack {
                 imageWithScale(systemName: settingIcon, scale: .large)
+                    .rotationEffect(.degrees(isShowingSettingView ? 90 : 0))
+                    .animation(isShowingSheet ? .linear.delay(1.5) : .linear,
+                               value: isShowingSheet)
                 Rectangle()
                     .foregroundColor(.clear)
             }

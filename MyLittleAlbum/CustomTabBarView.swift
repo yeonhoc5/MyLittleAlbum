@@ -21,8 +21,13 @@ struct CustomTabBarView: View {
         let smartIcon = selectedTab == .smart ? "list.star" : "list.bullet"
         
         ZStack {
-            Rectangle()
-                .foregroundColor(.fancyBackground)
+            if device == .phone {
+                Rectangle()
+                    .foregroundColor(.fancyBackground)
+            } else {
+                RoundedRectangle(cornerRadius: 10)
+                    .foregroundColor(.white.opacity(0.3))
+            }
             HStack {
                 Spacer()
                 customTabItem(tab: .photo, image: photoIcon, title: "나의 포토")
@@ -42,13 +47,12 @@ struct CustomTabBarView: View {
                 Spacer()
                 
             }
-            .padding(.bottom, 20)
+            .padding(.bottom, device == .phone ? 20 : 0)
             .padding(.top, 5)
         }
-        .frame(width: screenSize.width, height: 80)
-        
+        .frame(width: device == .phone ? screenSize.width : 600, height: 80)
+        .padding(.bottom, device == .phone ? 0 : 30)
     }
-    
 }
 
 
@@ -72,7 +76,6 @@ extension CustomTabBarView {
             }
         }
     }
-    
 }
 
 // MARK: - 3. functions
@@ -104,7 +107,6 @@ extension CustomTabBarView {
                  
             }
     }
-    
 }
 
 struct CustomTabBarView_Previews: PreviewProvider {
