@@ -95,7 +95,9 @@ extension LaunchScreenView {
         switch launchScreenManger.state {
         case .first:
             if videoPlayer.status == .readyToPlay {
-                withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.8, blendDuration: 0.25)) {
+                withAnimation(.interactiveSpring(response: 0.4, 
+                                                 dampingFraction: 0.8,
+                                                 blendDuration: 0.25)) {
                     maskingScale = 0.8
                 }
                 
@@ -120,7 +122,9 @@ extension LaunchScreenView {
                 textGo = false
             }
         case .forth:
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.9, blendDuration: 0.8)) {
+            withAnimation(.spring(response: 0.35, 
+                                  dampingFraction: 0.9,
+                                  blendDuration: 0.8)) {
                 maskingScale = 0.0001
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -140,7 +144,9 @@ extension LaunchScreenView {
     func pauseBackgroundAudio() {
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.ambient, mode: .default, options: .mixWithOthers)
+            try audioSession.setCategory(.ambient, 
+                                         mode: .default,
+                                         options: .mixWithOthers)
             try audioSession.setActive(true)
         } catch {
             print(error)
@@ -150,7 +156,8 @@ extension LaunchScreenView {
     func resumeBackgroundAudio() {
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+            try audioSession.setActive(false, 
+                                       options: .notifyOthersOnDeactivation)
             print("audiosession return to System")
         } catch {
             print(error)
@@ -174,7 +181,9 @@ extension LaunchScreenView {
 
 struct LaunchScreenView_Previews: PreviewProvider {
     static var previews: some View {
-        LaunchScreenView(launchScreenManger: LaunchScreenManager(), maskingScale: .constant(4), isOpen: .constant(true))
+        LaunchScreenView(launchScreenManger: LaunchScreenManager(), 
+                         maskingScale: .constant(4),
+                         isOpen: .constant(true))
     }
 }
 

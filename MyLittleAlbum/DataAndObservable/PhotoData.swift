@@ -18,65 +18,26 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
     
     // (1) 전체 사진   ->  Array/Set
     var allPhotos = PHFetchResult<PHAsset>() {
-        didSet {
-            self.allPhotosArray = self.allPhotos
-                .objects(at: IndexSet(integersIn: 0..<self.allPhotos.count))
-            self.setAllPhotos = Set(self.allPhotosArray)
-//                allPhotosChanged = true
-        }
+        didSet { self.updateAllPhotos() }
     }
-    
     // (2-1) 전체 앨범   -  step 1: [앨범] -> [앨범fetchresult]
     var albumsInAllLevels = PHFetchResult<PHAssetCollection>() {
-        didSet {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                let array = Array(self.albumsInAllLevels
-                    .objects(at: IndexSet(integersIn: 0..<self.albumsInAllLevels.count)))
-                let fetchOptions = PHFetchOptions()
-                fetchOptions.includeHiddenAssets = false
-                fetchOptions.wantsIncrementalChangeDetails = true
-                self.albumFetchResultArray = array
-                    .map{ PHAsset.fetchAssets(in: $0, options: fetchOptions) }
-            }
-        }
-        
+        didSet { updateAllAlbumsFetchResult() }
     }
     // (2-2) 전체 앨범   -  step 2: [앨범fetchresult] -> Set<사진>
     var albumFetchResultArray = [PHFetchResult<PHAsset>]() {
-        didSet {
-            DispatchQueue.main.async {
-                var resultSet = Set<PHAsset>()
-                self.albumFetchResultArray.forEach {
-                    resultSet = resultSet
-                        .union(Set($0.objects(at: IndexSet(integersIn: 0..<$0.count))))
-                }
-                self.setPhotosInAllAlbums = resultSet
-            }
-        }
-        
+        didSet { updateAllAlbumsSet() }
     }
-    
     // (3) 앨범 있는 사진 Set   ->  (1)-(2)   ->  앨범 있는/없는 사진 Array
     var setPhotosInAllAlbums = Set<PHAsset>() {
         didSet {
-            DispatchQueue.main.async {
-                self.allPhotosArrayInAllAlbum = Array(self.setPhotosInAllAlbums)
-                    .sorted{ $0.creationDate! < $1.creationDate!}
-                self.photosArrayNotInAnyAlbum = Array(self.setAllPhotos
-                    .subtracting(self.setPhotosInAllAlbums))
-                    .sorted{ $0.creationDate! < $1.creationDate! }
-            }
+            updateNotInAnyAlbumPhotos()
+            updateAllAlbumPhotos()
         }
     }
-    
+    // (4) result Array
     var setAllPhotos = Set<PHAsset>() {
-        didSet {
-            DispatchQueue.main.async {
-                self.photosArrayNotInAnyAlbum = Array(self.setAllPhotos
-                    .subtracting(self.setPhotosInAllAlbums))
-                .sorted{ $0.creationDate! < $1.creationDate! }
-            }
-        }
+        didSet { updateNotInAnyAlbumPhotos() }
     }
     
     // MARK: - TAB 1용 배열
@@ -104,7 +65,6 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
     // 앨범 커버용 Random 숫자
     @Published var randomNum1: Int = 0
     @Published var randomNum2: Int = 0
-    // ui 체인지
     
     // ui 체인지
     @Published var uiMode: UIMode = .fancy
@@ -114,20 +74,23 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
     @Published var backgroundColor: Color = .fancyBackground
     @Published var uiModeChanged: Bool = false
     
-    
     @Published var albumAdded: Bool = false
     @Published var folderAdded: Bool = false
     
     @Published var allPhotosChanged: Bool = false
     @Published var isShowingDetailView: Bool = false
     
+    @Published var scrollToTop: Bool = false
+    
     // MARK: - 디지털 액자용 프라퍼티
-    var transitionIndex: Int = 2
-    var digitalPhotoArray: [PHAsset] = []
     @Published var isShowingDigitalShow: Bool = false
+    var digitalShowRandom: Bool = true
+    var transitionIndex: Int = 2
+    var digitalPhotoAlbums: [Album] = []
+    var isHiddenAsset: Bool = false
+    @Namespace var digitalView
     
-    
-// MARK: - init
+    // MARK: - init
     override init() {
         super.init()
         // 1. load UImode (from UserDefault)
@@ -158,20 +121,25 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
         // 3. 노트 기능
         let knock = userDefaults
             .bool(forKey: UserDefaultsKey.useKnock.rawValue)
-        // 4. 디지털 액자 사진 전환 주기
+        // 4. 디지털 액자 랜덤 or 순서대로
+        let isRandom = userDefaults
+            .bool(forKey: UserDefaultsKey.digitalShowRandom.rawValue)
+        digitalShowRandom = isRandom
+        // 5. 디지털 액자 사진 전환 주기
         useKnock = knock
         let transition = userDefaults
             .integer(forKey: UserDefaultsKey.transitionIndex.rawValue)
         transitionIndex = transition
-        // 5. 최신 공지 확인 여부
+        // 6. 최신 공지 확인 여부
         let readDone = userDefaults
             .bool(forKey: UserDefaultsKey.userReadDone.rawValue)
         userReadDone = readDone
         print("-- 1. UImode - \(uiMode.rawValue)")
         print("-- 2. use Opening Animation - \(useOpeningAni)")
         print("-- 3. use Konck - \(useKnock)")
-        print("-- 4. transition Time - \(transitionRange[transitionIndex])sec")
-        print("-- 5. user Read recent notice? - \(userReadDone)")
+        print("-- 4. digitalShow Random - \(digitalShowRandom)")
+        print("-- 5. digitalShow Transition Time - \(transitionRange[transitionIndex])sec")
+        print("-- 6. user Read recent notice? - \(userReadDone)")
         print("[Load User Setting Done]")
     }
     
@@ -242,7 +210,49 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
         let userDefaults = UserDefaults.standard
         userDefaults.set(uiMode.rawValue, forKey: "uimode")
     }
-    
+}
+
+// 앨범이 없는 사진
+extension PhotoData {
+    private func updateAllPhotos() {
+        self.allPhotosArray = self.allPhotos
+            .objects(at: IndexSet(integersIn: 0..<self.allPhotos.count))
+        self.setAllPhotos = Set(self.allPhotosArray)
+    }
+    private func updateAllAlbumsFetchResult() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            let array = Array(self.albumsInAllLevels
+                .objects(at: IndexSet(integersIn: 0..<self.albumsInAllLevels.count)))
+            let fetchOptions = PHFetchOptions()
+            fetchOptions.includeHiddenAssets = false
+            fetchOptions.wantsIncrementalChangeDetails = true
+            self.albumFetchResultArray = array
+                .map{ PHAsset.fetchAssets(in: $0, options: fetchOptions) }
+        }
+    }
+    private func updateAllAlbumsSet() {
+        DispatchQueue.main.async {
+            var resultSet = Set<PHAsset>()
+            self.albumFetchResultArray.forEach {
+                resultSet = resultSet
+                    .union(Set($0.objects(at: IndexSet(integersIn: 0..<$0.count))))
+            }
+            self.setPhotosInAllAlbums = resultSet
+        }
+    }
+    private func updateAllAlbumPhotos() {
+        DispatchQueue.main.async {
+            self.allPhotosArrayInAllAlbum = Array(self.setPhotosInAllAlbums)
+                .sorted{ $0.creationDate! < $1.creationDate!}
+        }
+    }
+    private func updateNotInAnyAlbumPhotos() {
+        DispatchQueue.main.async {
+            self.photosArrayNotInAnyAlbum = Array(
+                self.setAllPhotos.subtracting(self.setPhotosInAllAlbums)
+            ).sorted{ $0.creationDate! < $1.creationDate! }
+        }
+    }
 }
 
 extension PhotoData: PHPhotoLibraryChangeObserver {

@@ -11,12 +11,19 @@ import SwiftUI
 struct MyLittleAlbum: App {
     
     init() {
-        // setting 초기값 세팅
-        UserDefaults.standard.register(defaults: [UserDefaultsKey.uimode.rawValue: UIMode.modern.rawValue])
-        UserDefaults.standard.register(defaults: [UserDefaultsKey.useOpeningAni.rawValue: true])
-        UserDefaults.standard.register(defaults: [UserDefaultsKey.useKnock.rawValue: true])
-        UserDefaults.standard.register(defaults: [UserDefaultsKey.transitionIndex.rawValue: 2])
-        UserDefaults.standard.register(defaults: [UserDefaultsKey.userReadDone.rawValue: false])
+        // User setting 초기값 세팅
+        UserDefaults.standard
+            .register(defaults: [UserDefaultsKey.uimode.rawValue: UIMode.modern.rawValue])
+        UserDefaults.standard
+            .register(defaults: [UserDefaultsKey.useOpeningAni.rawValue: true])
+        UserDefaults.standard
+            .register(defaults: [UserDefaultsKey.useKnock.rawValue: true])
+        UserDefaults.standard
+            .register(defaults: [UserDefaultsKey.transitionIndex.rawValue: 2])
+        UserDefaults.standard
+            .register(defaults: [UserDefaultsKey.digitalShowRandom.rawValue: true])
+        UserDefaults.standard
+            .register(defaults: [UserDefaultsKey.userReadDone.rawValue: false])
         
         // custom Tabbar 사용 설정
         let tabBarAppearance = UITabBar.appearance()
@@ -36,7 +43,7 @@ struct MyLittleAlbum: App {
         naviAppearance.standardAppearance = appearanceStandard
         naviAppearance.scrollEdgeAppearance = appearanceScroll
         
-        // 알럿 컬러 : dark로
+        // 알럿 컬러 설정 : dark로
         UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self])
             .overrideUserInterfaceStyle = .dark
     }

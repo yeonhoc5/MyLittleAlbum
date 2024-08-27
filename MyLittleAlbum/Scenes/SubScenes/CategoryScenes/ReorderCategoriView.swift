@@ -219,7 +219,9 @@ extension ReorderCategoriView {
     func rowLine(type: CollectionType, collection: PHCollection, index: Int) -> some View {
         HStack {
             Circle()
-                .foregroundColor(type == .folder ? colorSet[1] : (type == .album ? colorSet[0]: colorSet[2]))
+                .foregroundColor(type == .folder 
+                                 ? colorSet[1]
+                                 : (type == .album ? colorSet[0]: colorSet[2]))
                 .frame(width: 30, height: 30)
                 .overlay {
                     Text("\(index)")
@@ -231,6 +233,9 @@ extension ReorderCategoriView {
                 .font(Font.system(size: 17, weight: .medium, design: .rounded))
                 .foregroundColor(Color.fancyBackground.opacity(0.85))
                 .padding(.leading, 5)
+            Spacer()
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.gray)
         }
     }
     

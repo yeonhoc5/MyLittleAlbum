@@ -1,6 +1,6 @@
 //
 //  MoveCollectionCategoryView.swift
-//  AlbumYouWant
+//  MyLittleAlbum
 //
 //  Created by yeonhoc5 on 2023/01/28.
 //
@@ -103,7 +103,8 @@ extension MoveCollectionCategoryView {
                 if isSelectedTopFolder {
                     displaceCollelction(isTopFolder: isSelectedTopFolder)
                 } else {
-                    displaceCollelction(isTopFolder: isSelectedTopFolder, folder: folderToAddCollection)
+                    displaceCollelction(isTopFolder: isSelectedTopFolder, 
+                                        folder: folderToAddCollection)
                 }
                 self.isShowingSheet = false
             }

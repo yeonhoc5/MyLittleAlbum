@@ -25,8 +25,11 @@ struct PhotosGridMenu: View {
     @StateObject var stateChangeObject: StateChangeObject
     
     var albumType: AlbumType = .album
-    var album: Album! 
+    var album: Album!
+    var albumToEdit: Album!
     var smartAlbumType: SmartAlbum = .none
+    
+    var isHiddenAssets: Bool = false
     
     @Binding var settingDone: Bool!
     @Binding var belongingType: BelongingType
@@ -38,156 +41,174 @@ struct PhotosGridMenu: View {
     @Binding var edgeToScroll: EdgeToScroll
     @State var isSelectedAll: Bool = false
     
-//    @Binding var isShowingAlert: Bool
-//    @Binding var editType: EditType
     @Binding var isShowingSheet: Bool
-    
     @Binding var isShowingShareSheet: Bool
+    @Binding var isShowingPhotosPicker: Bool
     
-    let width = (min(screenSize.width, screenSize.height) - 19) / 10
+    var nameSpace: Namespace.ID
+    
+    let width: CGFloat
+    let unitCount = 9.0
     let spacing: CGFloat = 8
     let opacity: CGFloat = 0.8
     
     var body: some View {
-        switch albumType {
-        case .home: homeStack
-        case .album: albumStack
-        case .smartAlbum: smartAlbumStack
-        default: pickerStack
-        }
+        HStack(spacing: spacing, content: {
+            // left mini
+            VStack(spacing: spacing) {
+                btnLeftTop(albumType: albumType,
+                           isSelectMode: isSelectMode)
+                btnLeftBottom(albumType: albumType,
+                              isSelectMode: isSelectMode)
+            }
+            // center
+            VStack(spacing: spacing) {
+                centerTop(albumType: albumType,
+                          isSelectMode: isSelectMode,
+                          isHiddenAssets: isHiddenAssets)
+                btnsCenterBottom(albumType: albumType,
+                                 isSelectMode: isSelectMode,
+                                 isHiddenAssets: isHiddenAssets)
+            }
+            // right mini
+            VStack(spacing: spacing) {
+                btnRightTop(albumType: albumType,
+                            isSelectMode: isSelectMode)
+                btnRightBottom(albumType: albumType,
+                               isSelectMode: isSelectMode)
+            }
+        })
     }
 }
 
-// 모드에 따라 뷰 구분
 extension PhotosGridMenu {
-    // 1. home 스택
-    var homeStack: some View {
-        HStack(alignment: .bottom, spacing: spacing) {
-            VStack(spacing: spacing) {
-                if isSelectMode {
-                    btnDelete()
-                } else {
-                    btnFilter()
-                }
-            }
-            VStack(spacing: spacing) {
-                centerMenuBar
-                HStack(alignment: .center, spacing: spacing) {
-                    if isSelectMode {
-                        btnHidden(btnSize: .half)
-                        btnMove(btnSize: .half)
-                    } else {
-                        btnPhotos(btnSize: .medium)
-                        btnScrollToEdge(btnSize: .medium, edge: .bottom)
-                        btnScrollToEdge(btnSize: .medium, edge: .top)
-                    }
-                }
-            }
-            VStack(spacing: spacing) {
-                btnTransSelectMode()
+    func btnLeftTop(albumType: AlbumType, isSelectMode: Bool) -> some View {
+        Group {
+            if albumType == .album && !isSelectMode && !isHiddenAssets {
+                btnPlus
+            } else {
+                emptySpace(size: .mini)
             }
         }
     }
-    // 2. album 스택
-    var albumStack: some View {
-        HStack(alignment: .bottom, spacing: spacing) {
-            VStack(spacing: spacing) {
+    func btnLeftBottom(albumType: AlbumType, isSelectMode: Bool) -> some View {
+        Group {
+            if albumType == .picker {
+                btnFilter()
+            } else {
                 if isSelectMode {
                     btnDelete()
                 } else {
                     btnFilter()
                 }
             }
-            VStack(spacing: spacing) {
-                centerMenuBar
-                HStack(alignment: .center, spacing: spacing) {
-                    if isSelectMode {
-                        btnHidden(btnSize: .medium)
-                        btnTakeFrom(btnSize: .medium)
-                        btnMove(btnSize: .medium)
+        }
+    }
+    func centerTop(albumType: AlbumType, isSelectMode: Bool, isHiddenAssets: Bool) -> some View {
+        Group {
+            switch albumType {
+            case .picker:
+                btnMove(albumType: albumType, btnSize: .big)
+            default:
+                centerMenuBar(isSelectMode: isSelectMode)
+            }
+        }
+    }
+    func btnsCenterBottom(albumType: AlbumType, isSelectMode: Bool, isHiddenAssets: Bool) -> some View {
+        HStack(spacing: spacing) {
+            if !isSelectMode {
+                if isHiddenAssets == true || albumType == .smartAlbum {
+                    btnScrollToEdge(btnSize: .half, edge: .bottom)
+                    btnScrollToEdge(btnSize: .half, edge: .top)
+                } else {
+                    if albumType == .home {
+                        btnPhotos(btnSize: .medium)
                     } else {
                         btnModifyTitle(btnSize: .medium)
-                        btnScrollToEdge(btnSize: .medium, edge: .bottom)
-                        btnScrollToEdge(btnSize: .medium, edge: .top)
                     }
+                    btnScrollToEdge(btnSize: .medium, edge: .bottom)
+                    btnScrollToEdge(btnSize: .medium, edge: .top)
+                }
+            } else {
+                switch albumType {
+                case .home, .smartAlbum:
+                    if albumType == .home {
+                        btnHidden(btnSize: .half)
+                    } else {
+                        btnUnHide(btnSize: .half)
+                    }
+                    btnMove(albumType: albumType, btnSize: .half)
+                case .album:
+                    if !isHiddenAssets {
+                        btnHidden(btnSize: .medium)
+                    } else {
+                        btnUnHide(btnSize: .medium)
+                    }
+                    btnTakeFrom(btnSize: .medium)
+                    btnMove(albumType: albumType, btnSize: .medium)
+                case .picker:
+                btnPhotos(btnSize: .medium)
+                btnScrollToEdge(btnSize: .medium, edge: .bottom)
+                btnScrollToEdge(btnSize: .medium, edge: .top)
                 }
             }
-            VStack(spacing: spacing) {
+        }
+    }
+    func btnRightTop(albumType: AlbumType, isSelectMode: Bool) -> some View {
+        Group {
+            switch albumType {
+            case .album:
                 if isSelectMode {
                     btnSelectAll
-                }
-                btnTransSelectMode()
-            }
-        }
-    }
-    // 3. smartAlbum 스택
-    var smartAlbumStack: some View {
-        HStack(alignment: .bottom, spacing: spacing) {
-            VStack(spacing: spacing) {
-                if isSelectMode {
-                    if smartAlbumType == .trashCan {
-                        colorBar(opacity: 0)
-                            .frame(width: width * 1.2)
-                    } else {
-                        btnDelete()
-                    }
                 } else {
-                    btnFilter()
-                }
-            }
-            VStack(spacing: spacing) {
-                centerMenuBar
-                HStack(alignment: .center, spacing: spacing) {
-                    if isSelectMode {
-                        if smartAlbumType == .hiddenAsset {
-                            btnUnHide(btnSize: .big)
+                    btnDigitalShow()
+                        .background {
+                            RoundedRectangle(cornerRadius: (width - (2 * spacing)) / unitCount)
+                                .foregroundStyle(.ultraThinMaterial)
+                                .matchedGeometryEffect(id: "digitalShow", in: nameSpace)
                         }
-                    } else {
-                        btnScrollToEdge(btnSize: .half, edge: .bottom)
-                        btnScrollToEdge(btnSize: .half, edge: .top)
-                    }
                 }
-            }
-            VStack(spacing: spacing) {
-                if smartAlbumType == .trashCan {
-                    colorBar(opacity: 0)
-                        .frame(width: width * 1.2)
-                } else {
-                    if isSelectMode {
-                        btnSelectAll
-                    }
-                    btnTransSelectMode()
-                }
+            case .picker:
+                btnDeselectInPicker
+            default: emptySpace(size: .mini)
             }
         }
     }
-    // 4. picker 스택
-    var pickerStack: some View {
-        HStack(alignment: .top) {
-            btnFilter()
-            btnPhotos(btnSize: .medium)
-            btnScrollToEdge(btnSize: .medium, edge: .bottom)
-            btnScrollToEdge(btnSize: .medium, edge: .top)
+    func btnRightBottom(albumType: AlbumType, isSelectMode: Bool) -> some View {
+        Group {
+            switch albumType {
+            case .picker: btnClose
+            default: btnTransSelectMode(btnSize: .mini)
+            }
         }
     }
 }
-
 
 // MARK: - 포토 그리드 공통 버튼
 extension PhotosGridMenu {
     
+    var btnClose: some View {
+        return menuButton(btnSize: .mini, type: .text, text: "close") {
+            self.selectedItemsIndex.removeAll()
+            withAnimation {
+                self.isShowingPhotosPicker = false
+            }
+        }
+    }
+    
     // 가운데 라벨바
-    var centerMenuBar: some View {
-        let imageText = "사진 : \(album.countOfImage)"
-        let videoText = "동영상 : \(album.countOfVidoe)"
+    func centerMenuBar(isSelectMode: Bool) -> some View {
+        let unitWidth = (width - (2 * spacing)) / unitCount
+        let imageText = "사진: \(isHiddenAssets ? album.hiddenAssetsArray.filter{ $0.mediaType == .image}.count : album.countOfImage)"
+        let videoText = "비디오: \(isHiddenAssets ? album.hiddenAssetsArray.filter{ $0.mediaType == .video}.count : album.countOfVidoe)"
         let selecteModeText = "\(selectedItemsIndex.count)개의 항목 선택됨"
         return ZStack(alignment: .center) {
-            colorBar()
+            colorBar(unitWidth: unitWidth)
             if isSelectMode {
                 Text(selecteModeText)
                     .foregroundColor(.primaryColorInvert)
             } else {
-                Text(imageText)
+                Text(isHiddenAssets ? "가려진 \(imageText)" : imageText)
                     .foregroundColor(filteringType == .image ? .blue : .primaryColorInvert)
                 + Text(" / ")
                     .foregroundColor(.primaryColorInvert)
@@ -196,14 +217,32 @@ extension PhotosGridMenu {
             }
         }
         .font(.system(.subheadline, design: .rounded, weight: .medium))
-        .frame(width: width * 7, height: width)
     }
+    // 사진 추가 버튼
+    var btnPlus: some View {
+        return menuButton(btnSize: .mini,
+                          type: .image,
+                          image: "plus",
+                          scale: .large,
+                          color: .white,
+                          bgColor: .blue,
+                          disabled: isSelectMode) {
+            withAnimation {
+                self.isShowingPhotosPicker = true
+            }
+        }
+    }
+    
     // 선택 모드 토글 버튼
     func btnTransSelectMode(btnSize: ButtonSize! = .mini) -> some View {
         let text = isSelectMode ? "취소" : "선택"
         return menuButton(btnSize: btnSize, type: .text, text: text) {
-            isSelectMode.toggle()
-            if !isSelectMode {
+//            withAnimation {
+                isSelectMode.toggle()
+//            }
+            if isSelectMode {
+                stateChangeObject.showPickerButton = true
+            } else {
                 if isSelectedAll {
                     stateChangeObject.selectToggleAllPhotos = true
                     selectedItemsIndex.removeAll()
@@ -211,8 +250,6 @@ extension PhotosGridMenu {
                     stateChangeObject.selectToggleSomePhotos = true
                 }
                 isSelectedAll = false
-                stateChangeObject.showPickerButton = true
-            } else {
                 stateChangeObject.showPickerButton = true
             }
         }
@@ -225,10 +262,11 @@ extension PhotosGridMenu {
             isSelectedAll.toggle()
             
             var count: Int
+            let array = !isHiddenAssets ? album.photosArray : album.hiddenAssetsArray
             switch album.filteringType {
-            case .all: count = album.count
-            case .image: count = album.countOfImage
-            case .video: count = album.countOfVidoe
+            case .all: count = array.count
+            case .image: count = array.filter { $0.mediaType == .image }.count
+            case .video: count = array.filter { $0.mediaType == .video }.count
             }
             
             if isSelectedAll {
@@ -240,16 +278,53 @@ extension PhotosGridMenu {
         }
         .onChange(of: selectedItemsIndex.count) { newValue in
             var count: Int
+            let array = !isHiddenAssets ? album.photosArray : album.hiddenAssetsArray
             switch album.filteringType {
-            case .all: count = album.count
-            case .image: count = album.countOfImage
-            case .video: count = album.countOfVidoe
+            case .all: count = array.count
+            case .image: count = array.filter { $0.mediaType == .image }.count
+            case .video: count = array.filter { $0.mediaType == .video }.count
             }
-            if selectedItemsIndex.count != count {
-                isSelectedAll = false
-            } else {
-                isSelectedAll = true
+            isSelectedAll = selectedItemsIndex.count == count
+        }
+    }
+    var btnDeselectInPicker: some View {
+        return menuButton(btnSize: .mini,
+                          type: .text,
+                          text: "선택\n해제",
+                          color: selectedItemsIndex.count == 0 ? .gray.opacity(0.5) : .black,
+                          disabled: selectedItemsIndex.count == 0) {
+            selectedItemsIndex.removeAll()
+            DispatchQueue.main.async {
+                stateChangeObject.selectToggleSomePhotos = true
             }
+        }
+    }
+    
+    // 디지털 액자 버튼
+    func btnDigitalShow(btnSize: ButtonSize! = .mini) -> some View {
+        let color: Color = (isHiddenAssets
+                            ? album.hiddenAssetsArray.count == 0
+                            : album.photosArray.count == 0)
+        ? .gray.opacity(0.5):.black
+        return menuButton(btnSize: btnSize,
+                          type: .image,
+                          image: "play.square.stack",
+                          scale: .small,
+                          color: color,
+                          disabled: self.isHiddenAssets
+                          ? album.hiddenAssetsArray.count == 0
+                          : album.photosArray.count == 0) {
+            var photos = self.isHiddenAssets ? album.hiddenAssetsArray : album.photosArray
+            if photoData.digitalShowRandom {
+                photos.shuffle()
+            }
+            photoData.isHiddenAsset = self.isHiddenAssets
+            photoData.digitalPhotoAlbums = [self.album]
+//            photoData.digitalPhotoArray = photos
+            withAnimation(.easeInOut) {
+                photoData.isShowingDigitalShow = true
+            }
+            UIApplication.shared.isIdleTimerDisabled = true
         }
     }
     // 스크롤 버튼
@@ -264,15 +339,23 @@ extension PhotosGridMenu {
     }
     // home에서 사진함 선택
     func btnPhotos(btnSize: ButtonSize! = .mini) -> some View {
-        let text = belongingType == .all ? "모든 사진함" : (belongingType == .album ? "앨범있는 사진함" : "앨범없는 사진함")
+        let text = belongingType == .all 
+                    ? "모든 사진함"
+                    : (belongingType == .album ? "앨범있는 사진함" : "앨범없는 사진함")
+        let textColor: Color = selectedItemsIndex.count > 0 ? .gray.opacity(0.5):.blue
+        
         return Menu {
             photoMenu
         } label: {
-            menuButton(btnSize: btnSize, type: .text, text: text, color: .blue) {
+            menuButton(btnSize: btnSize,
+                       type: .text,
+                       text: text,
+                       color: textColor,
+                       disabled: selectedItemsIndex.count > 0) {
             }
             .fontWeight(.bold)
         }
-        
+        .disabled(selectedItemsIndex.count > 0)
     }
     
     // 필터링
@@ -283,15 +366,20 @@ extension PhotosGridMenu {
         case .video: image = "video.fill"
         default: image = "line.3.horizontal.decrease"
         }
+        let textColor: Color = selectedItemsIndex.count > 0 ? .gray.opacity(0.5):.black
         return Menu {
             filteringMenu
         } label: {
             menuButton(btnSize: btnSize,
                        type: .image,
                        image: image,
-                       color: filteringType == .all ? .primaryColorInvert : .blue) {
+                       color: selectedItemsIndex.count > 0 
+                            ? .gray.opacity(0.5)
+                            : (filteringType == .all ? .black : .blue),
+                       disabled: selectedItemsIndex.count > 0) {
             }
         }
+        .disabled(selectedItemsIndex.count > 0)
     }
     var filteringMenu: some View {
         VStack {
@@ -422,7 +510,6 @@ extension PhotosGridMenu {
         }
         print("check 2. filtering Change \(stateChangeObject.filteringChanged)")
     }
-    
 }
 
 //MARK: - 선택한 사진 처리 버튼 정의
@@ -433,15 +520,25 @@ extension PhotosGridMenu {
         let count = selectedItemsIndex.count
         let tempFilteringType = self.filteringType
         let tempSelectedItems = self.selectedItemsIndex
-        return menuButton(btnSize: btnSize, type: .image, image: "trash", color: color, disabled: count == 0) {
-            deleteAsset(indexSet: selectedItemsIndex, filter: tempFilteringType, selected: tempSelectedItems)
+        return menuButton(btnSize: btnSize, 
+                          type: .image, 
+                          image: "trash",
+                          color: color,
+                          disabled: count == 0) {
+            deleteAsset(indexSet: selectedItemsIndex, 
+                        filter: tempFilteringType,
+                        selected: tempSelectedItems)
         }
     }
     // 앨범에서 빼기
     func btnTakeFrom(btnSize: ButtonSize! = .mini) -> some View {
         let color: Color = selectedItemsIndex.count == 0 ? .gray.opacity(0.5):.primaryColorInvert
         let count = selectedItemsIndex.count
-        return menuButton(btnSize: btnSize, type: .text, text: "앨범에서 빼기", color: color, disabled: count == 0) {
+        return menuButton(btnSize: btnSize, 
+                          type: .text,
+                          text: "앨범에서 빼기",
+                          color: color,
+                          disabled: count == 0) {
             stateChangeObject.editType = .add
             stateChangeObject.isShowingAlert = true
         }
@@ -453,7 +550,11 @@ extension PhotosGridMenu {
             SharePreview(items.caption, image: items.image)
         } label: {
             let color: Color = selectedItemsIndex.count == 0 ? .gray.opacity(0.5):.primaryColorInvert
-            buttonLabel(btnSize: btnSize, type: .text, text: "공유하기", font: .caption, color: color)
+            buttonLabel(btnSize: btnSize, 
+                        type: .text,
+                        text: "공유하기",
+                        font: .caption,
+                        color: color)
         }
         .disabled(selectedItemsIndex.count == 0)
     }
@@ -461,7 +562,11 @@ extension PhotosGridMenu {
     func btnRestore(btnSize: ButtonSize! = .mini) -> some View {
         let color: Color = selectedItemsIndex.count == 0 ? .gray.opacity(0.5):.primaryColorInvert
         let count = selectedItemsIndex.count
-        return menuButton(btnSize: btnSize, type: .text, text: "복구하기", color: color, disabled: count == 0) {
+        return menuButton(btnSize: btnSize, 
+                          type: .text,
+                          text: "복구하기",
+                          color: color,
+                          disabled: count == 0) {
             PHPhotoLibrary.shared().performChanges {
                 
             }
@@ -496,12 +601,40 @@ extension PhotosGridMenu {
     
     
     // 앨범에 넣기 / 다른 앨범으로 이동 (둘 모두 시트에서 처리)
-    func btnMove(btnSize: ButtonSize! = .mini) -> some View {
-        let text = albumType == .home ? "앨범에 넣기" : "다른 앨범으로\n이동하기"
-        let color: Color = selectedItemsIndex.count == 0 ? .gray.opacity(0.5):.primaryColorInvert
+    func btnMove(albumType: AlbumType, btnSize: ButtonSize! = .mini) -> some View {
+        let text: String
+        let textColor: Color
+        let bgColor: Color
+        switch albumType {
+        case .home: text = "앨범에 넣기"
+        case .album: text = "다른 앨범으로\n이동하기"
+        default: text = selectedItemsIndex.count
+            > 0 ? "\(selectedItemsIndex.count)개의 항목 이 앨범에 넣기"
+            : "선택한 항목 없음"
+        }
+        
+        switch albumType {
+        case .home, .album:
+            textColor = selectedItemsIndex.count == 0 ? .gray.opacity(0.5):.black
+            bgColor = .white
+        default:
+            textColor = .white
+            bgColor = .blue.opacity(selectedItemsIndex.count == 0 ? 0.3 : 1)
+        }
+        
         let count = selectedItemsIndex.count
-        return menuButton(btnSize: btnSize, type: .text, text: text, color: color, disabled: count == 0) {
-            isShowingSheet = true
+        return menuButton(btnSize: btnSize, 
+                          type: .text,
+                          text: text,
+                          color: textColor,
+                          bgColor: bgColor,
+                          disabled: count == 0) {
+            if albumType == .picker {
+                addAssetIntoAlbum(indexSet: selectedItemsIndex)
+            } else {
+                isShowingSheet = true
+            }
+            
         }
         .disabled(selectedItemsIndex.count == 0)
     }
@@ -509,7 +642,11 @@ extension PhotosGridMenu {
     func btnHidden(btnSize: ButtonSize! = .mini) -> some View {
         let color: Color = selectedItemsIndex.count == 0 ? .gray.opacity(0.5):.primaryColorInvert
         let count = selectedItemsIndex.count
-        return menuButton(btnSize: btnSize, type: .text, text: "가리기", color: color, disabled: count == 0) {
+        return menuButton(btnSize: btnSize, 
+                          type: .text,
+                          text: "가리기",
+                          color: color,
+                          disabled: count == 0) {
             hiddenAsset(indexSet: selectedItemsIndex)
         }
     }
@@ -517,7 +654,11 @@ extension PhotosGridMenu {
     func btnUnHide(btnSize: ButtonSize! = .mini) -> some View {
         let color: Color = selectedItemsIndex.count == 0 ? .gray.opacity(0.5):.primaryColorInvert
         let count = selectedItemsIndex.count
-        return menuButton(btnSize: btnSize, type: .text, text: "가리기 해제", color: color, disabled: count == 0) {
+        return menuButton(btnSize: btnSize, 
+                          type: .text,
+                          text: "가리기 해제",
+                          color: color,
+                          disabled: count == 0) {
             unHideAsset(indexSet: selectedItemsIndex)
         }
     }
@@ -528,6 +669,34 @@ extension PhotosGridMenu {
 extension PhotosGridMenu {
     
     // 앨범에서 빼기 - 경고창을 위해 grid 뷰에서 처리
+    // 현재 앨범에 넣기
+    func addAssetIntoAlbum(indexSet: [Int]) {
+        self.isShowingPhotosPicker = false
+        var assetArray: [PHAsset] = []
+        switch album.filteringType {
+        case .all:
+            assetArray = album.photosArray
+        case .image:
+            assetArray = album.photosArray.filter({$0.mediaType == .image})
+        case .video:
+            assetArray = album.photosArray.filter({$0.mediaType == .video})
+        }
+        let sortedIndexSet = indexSet.sorted{ $0 < $1 }
+        var assets: [PHAsset] = []
+        for i in sortedIndexSet {
+            assets.append(assetArray[i])
+        }
+        if isShowingPhotosPicker {
+            withAnimation {
+                isShowingPhotosPicker = false
+            }
+        }
+        selectedItemsIndex = []
+
+        DispatchQueue.global(qos: .userInteractive).async {
+            albumToEdit?.addAsset(assets: assets, stateObject: stateChangeObject)
+        }
+    }
     
     // 기기에서 삭제
     func deleteAsset(indexSet: [Int], filter: FilteringType, selected: [Int]) {
@@ -540,7 +709,21 @@ extension PhotosGridMenu {
     }
     
     func unHideAsset(indexSet: [Int]) {
-        album.unHideAsset(indexSet: indexSet, stateObject: stateChangeObject)
+        if indexSet.count >= 1000 {
+            for i in 0..<indexSet.count / 100 {
+                let subIndexSet = Array(indexSet[(i*100)..<((i+1)*100)])
+                album.unHideAsset(indexSet: subIndexSet,
+                                  stateObject: stateChangeObject,
+                                  isAlbum: true,
+                                  isSeperated: true)
+            }
+            let remain = Array(indexSet[(100 * (indexSet.count / 100))..<indexSet.count])
+            album.unHideAsset(indexSet: remain,
+                              stateObject: stateChangeObject,
+                              isAlbum: true)
+        } else {
+            album.unHideAsset(indexSet: indexSet, stateObject: stateChangeObject, isAlbum: true)
+        }
     }
     
     func getURL(ofPhotoWith mPhasset: PHAsset, completionHandler : @escaping ((_ responseURL : URL?) -> Void)) {
@@ -557,7 +740,10 @@ extension PhotosGridMenu {
                let options: PHVideoRequestOptions = PHVideoRequestOptions()
                options.version = .current
                options.isNetworkAccessAllowed = true
-               PHImageManager.default().requestAVAsset(forVideo: mPhasset, options: options, resultHandler: { (asset, audioMix, info) in
+               PHImageManager.default()
+                   .requestAVAsset(forVideo: mPhasset,
+                                   options: options,
+                                   resultHandler: { (asset, audioMix, info) in
                    if let urlAsset = asset as? AVURLAsset {
                        let localVideoUrl = urlAsset.url
                        completionHandler(localVideoUrl)
@@ -566,44 +752,72 @@ extension PhotosGridMenu {
                    }
                })
            }
-           
        }
+    func emptySpace(size: ButtonSize) -> some View {
+        buttonLabel(btnSize: size, type: .text)
+            .opacity(0)
+            .disabled(true)
+    }
     
 }
 
 // MARK: - 버튼 레이아웃
 extension PhotosGridMenu {
     // 공용 백그라운드 바
-    func colorBar(opacity: CGFloat! = 0.9) -> some View {
-        Color.primary.opacity(opacity)
-            .cornerRadius(width / 2)
+    func colorBar(opacity: CGFloat! = 0.9,
+                  unitWidth: CGFloat,
+                  color: Color! = .primary) -> some View {
+        color.opacity(opacity)
+            .cornerRadius(unitWidth / 2)
     }
     
-    func menuButton(btnSize: ButtonSize, type: LabelType, text: String! = "", image: String! = "", rotate: Double! = 0.0,
-                    font: Font! = .caption, color: Color! = .primaryColorInvert,
+    func menuButton(btnSize: ButtonSize,
+                    type: LabelType,
+                    text: String! = "",
+                    image: String! = "",
+                    scale: Image.Scale = .medium,
+                    rotate: Double! = 0.0,
+                    font: Font! = .caption, 
+                    color: Color! = .primaryColorInvert,
+                    bgColor: Color! = .primary,
                     disabled: Bool! = false,
                     action: @escaping () -> Void) -> some View {
         Button {
             action()
         } label: {
-            buttonLabel(btnSize: btnSize , type: type, text: text, image: image, rotate: rotate, font: font, color: color, disabled: disabled)
+            buttonLabel(btnSize: btnSize,
+                        type: type, text: text, image: image,
+                        rotate: rotate,
+                        font: font, 
+                        color: color, bgColor: bgColor,
+                        disabled: disabled)
         }
         .disabled(disabled)
         .buttonStyle(ClickScaleEffect(scale: 0.95))
     }
     
-    func buttonLabel(btnSize: ButtonSize, type: LabelType, text: String! = "", image: String! = "", rotate: Double! = 0.0,
-                      font: Font! = .caption, color: Color! = .primaryColorInvert,
-                      disabled: Bool! = false) -> some View {
+    func buttonLabel(btnSize: ButtonSize, 
+                     type: LabelType,
+                     text: String! = "", 
+                     image: String! = "",
+                     rotate: Double! = 0.0,
+                     font: Font! = .caption,
+                     color: Color! = .primaryColorInvert,
+                     bgColor: Color! = .primary,
+                     disabled: Bool! = false) -> some View {
+        let unitWidth = (width - (2 * spacing)) / unitCount
         let resultWidth: CGFloat!
         switch btnSize {
-        case .big: resultWidth = self.width * 7
-        case .half: resultWidth = (self.width * 7/2) - ((self.spacing) / 2)
-        case .medium: resultWidth = (self.width * 7/3)-(2 * (self.spacing) / 3)
-        default: resultWidth = width * 1.2
+        case .big: resultWidth = unitWidth * 7
+        case .half: resultWidth = (unitWidth * 7 - (spacing * 1)) / 2
+        case .medium: resultWidth = (unitWidth * 7 - (spacing * 2)) / 3
+        default: resultWidth = unitWidth * 1
         }
         return ZStack(alignment: .center) {
-            colorBar()
+            colorBar(unitWidth: unitWidth, color: bgColor)
+                .cornerRadius(unitWidth / 2)
+                .clipped()
+                .shadow(color: Color.fancyBackground.opacity(0.5), radius: 2, x: 0, y: 0)
             switch type {
             case .text:
                 Text(text)
@@ -616,7 +830,7 @@ extension PhotosGridMenu {
             }
         }
         .foregroundColor(color)
-        .frame(width: resultWidth, height: width)
+        .frame(width: resultWidth)
     }
     
 //    func miniButton(type: LabelType, text: String! = "", image: String! = "",

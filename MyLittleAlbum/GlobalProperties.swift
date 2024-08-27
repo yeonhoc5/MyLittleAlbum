@@ -46,10 +46,66 @@ let transitionRange: [Int] = [
 ]
 
 
+let secondaryLoadingJson = "Loading3.json"
+
 enum UserDefaultsKey: String {
     case uimode
     case useOpeningAni
     case useKnock
     case transitionIndex
+    case digitalShowRandom
     case userReadDone
+}
+
+let tabbarHeight: CGFloat = 80.0
+let tabbarTopPadding: CGFloat = 10.0
+let tabbarBottomPadding: CGFloat = device == .phone ? 0 : 30.0
+
+// 앨범 / 폴더 컨텐츠 레이아웃
+var listCount: Int {
+    return device == .phone 
+    ? 3 : (screenSize.width > screenSize.height ? 9 : 6)
+}
+enum CellCountType {
+    case big, middle1, middel2, small
+}
+func cellCount(type: CellCountType) -> Int {
+    switch type {
+    case .big:
+        return 10
+    case .middle1:
+        return 8
+    case .middel2:
+        return 6
+    case .small:
+        return 5
+    }
+}
+
+var screenWidth: CGFloat {
+    return device == .phone
+    ? min(screenSize.width, screenSize.height)
+    : screenSize.width
+}
+
+func heightRatio(uiMode: UIMode, cellType: CellType = .album) -> CGFloat {
+    var ratio: CGFloat
+    if cellType == .album {
+        switch uiMode {
+        case .classic: ratio = 0.8
+        case .modern: ratio = 1.2
+        case .fancy: ratio = 1.15
+        }
+    } else {
+        switch uiMode {
+        case .classic: ratio = 1
+        case .modern: ratio = 1.2
+        case .fancy: ratio = 1.12
+        }
+    }
+    return ratio
+}
+
+func secondaryHeight(width: CGFloat, uiMode: UIMode) -> CGFloat {
+    return width * heightRatio(uiMode: uiMode, cellType: .folder)
 }

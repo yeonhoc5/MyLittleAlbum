@@ -20,7 +20,7 @@ struct MoveAssetCategoryView: View {
     var albumType: AlbumType = .album
     // 현재 앨범
     var currentAlbum: Album!
-    
+    var isHiddenAssets: Bool = false
     // 앨범에서 선택한 사진 인덱스
     @Binding var selectedItemsIndex: [Int]
     // 사진을 옮길 목표지 앨범
@@ -215,32 +215,32 @@ extension MoveAssetCategoryView {
     // 사진 넣기 최종 함수
     // tab1 : 선택한 앨범에 사진 넣기 / tab2 : Asset 다른 앨범으로 옮기기
     func addAssetIntoAlbum(indexSet: [Int]) {
-        var assetArray: [PHAsset] = []
+        var assetArray = isHiddenAssets ? currentAlbum.hiddenAssetsArray : currentAlbum.photosArray
         switch currentAlbum.filteringType {
-        case .all: assetArray = currentAlbum.photosArray
-        case .image: assetArray = currentAlbum.photosArray.filter({$0.mediaType == .image})
-        case .video: assetArray = currentAlbum.photosArray.filter({$0.mediaType == .video})
+        case .image: assetArray = assetArray.filter{ $0.mediaType == .image }
+        case .video: assetArray = assetArray.filter{ $0.mediaType == .video }
+        default: break
         }
-        var assets: [PHAsset] = []
-        let indexSet = indexSet.sorted(by: { $0 < $1 })
-        for i in indexSet {
-            assets.append(assetArray[i])
-        }
-        
-        if albumType != .home {
-            DispatchQueue.main.async {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    currentAlbum.removeAssetFromAlbum(indexSet: indexSet)
-                }
-//                stateChangeObject.assetChanged = true
-                stateChangeObject.assetChanged = .changed
-            }
-        }
-        
+    
+        let assets: [PHAsset] = indexSet
+            .sorted(by: { $0 < $1 })
+            .map { assetArray[$0] }
+        // 목표 앨범에서 삽입
         let albumToAdd = Album(album: albumToAddPhotos)
         DispatchQueue.main.async {
             albumToAdd.addAsset(assets: assets, stateObject: stateChangeObject)
         }
+        // 현재 앨범에서 제거
+        if albumType == .album {
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    currentAlbum.removeAssetFromAlbum(indexSet: indexSet,
+                                                      isHidden: isHiddenAssets)
+                }
+                stateChangeObject.assetChanged = .changed
+            }
+        }
+        
     }
     
 }

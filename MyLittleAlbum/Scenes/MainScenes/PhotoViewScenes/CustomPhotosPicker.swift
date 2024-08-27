@@ -16,7 +16,7 @@ struct CustomPhotosPicker: View {
     
     @State var album: Album!
     
-//    @State var assetArray: [PHAsset]!
+    //    @State var assetArray: [PHAsset]!
     @State var title: String = "앨범 없는 사진함"
     @State var assetCount: Int = 0
     
@@ -29,95 +29,95 @@ struct CustomPhotosPicker: View {
     @State var filteringTypeChanged: Bool = false
     @State var settingDone: Bool! = false
     
+    @Namespace private var nameSpace
+    
     var albumToEdit: Album
-
+    
     var body: some View {
         NavigationView {
             VStack {
-                HStack {
-                    Text(title)
-                        .foregroundColor(.white)
-                    Text("(\(assetCount)개 항목)")
-                        .foregroundColor(.gray)
-                }
-                .font(Font.system(size: 20, weight: .semibold, design: .rounded))
-                .bold()
-                .padding(.top, 10)
-                .padding(.bottom, 20)
-                ZStack(alignment: .bottom) {
-                    if settingDone == false {
-                        RefreshPhotoView(sentence: "Wait.  I'll bring you photos~meow")
-                            .offset(y: -100)
-                            .scaleEffect(0.9)
-                            .background{
-                                FancyBackground()
-                            }
-                            .onAppear {
-                                readyToShowMyPhotos(type: belongingType)
-                            }
-                    } else {
-                        PhotosCollectionView(stateChangeObject: stateChangeObject,
-                                             albumType: .picker,
-                                             album: album,
-//                                             filteringType: $filteringType,
-                                             edgeToScroll: $edgeToScroll,
-                                             filteringTypeChanged: $filteringTypeChanged,
-                                             isSelectMode: .constant(true),
-                                             selectedItemsIndex: $selectedItemsIndex,
-                                             isShowingPhotosPicker: .constant(false),
-                                             indexToView: .constant(0),
-                                             isExpanded: .constant(false),
-                                             insertedIndex: [],
-                                             removedIndex: [],
-                                             changedIndex: [],
-                                             currentCount: album.count,
-                                             isSelectingBySwipe: .constant(false))
-                        PhotosGridMenu(stateChangeObject: stateChangeObject,
-                                       albumType: .picker,
-                                       album: album,
-                                       settingDone: $settingDone,
-                                       belongingType: $belongingType,
-                                       filteringType: $filteringType,
-                                       filteringTypeChanged: $filteringTypeChanged,
-                                       isSelectMode: .constant(true),
-                                       selectedItemsIndex: .constant([]),
-                                       edgeToScroll: $edgeToScroll,
-                                       isShowingSheet: .constant(false),
-                                       isShowingShareSheet: .constant(false))
-                            .padding(.bottom, 20)
-                    }
-                }
-                .ignoresSafeArea()
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-                .onChange(of: self.belongingType, perform: { value in
-                    self.settingDone = false
-                })
-                .onChange(of: album?.filteringType, perform: { newValue in
-                    print("picker filteringtype works")
-                    DispatchQueue.main.async {
-                        withAnimation {
-                            switch album?.filteringType {
-                            case .video:
-                                assetCount = album.countOfVidoe
-                            case .image:
-                                assetCount = album.countOfImage
-                            default:
-                                assetCount = album.count
-                            }
-                        }
-                    }
-                })
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) { toolbarLeading }
-                    ToolbarItem(placement: .navigationBarTrailing) { toolbarTrailing }
-                }
-                .onDisappear {
-                    album = nil
+                if !settingDone {
+                    loadingView
+                } else {
+                    photoPickerView
                 }
             }
             .background {
                 FancyBackground()
+            }
+        }
+    }
+    
+}
+
+extension CustomPhotosPicker {
+    var loadingView: some View {
+        RefreshPhotoView(sentence: "Wait.  I'll bring you photos~meow")
+            .scaleEffect(0.9)
+            .background{
+                FancyBackground()
+            }
+            .onAppear {
+                readyToShowMyPhotos(type: belongingType)
+            }
+    }
+    
+    var photoPickerView: some View {
+        VStack {
+            HStack {
+                Text(title)
+                    .foregroundColor(.white)
+                Text("(\(assetCount)개 항목)")
+                    .foregroundColor(.gray)
+            }
+            .font(Font.system(size: 20, weight: .semibold, design: .rounded))
+            .bold()
+            .padding(.top, 40)
+            .padding(.bottom, 20)
+            ZStack(alignment: .bottom) {
+                GeometryReader { geoProxy in
+                    PhotosCollectionView(stateChangeObject: stateChangeObject,
+                                         albumType: .picker,
+                                         album: album,
+                                         edgeToScroll: $edgeToScroll,
+                                         filteringTypeChanged: $filteringTypeChanged,
+                                         isSelectMode: .constant(true),
+                                         selectedItemsIndex: $selectedItemsIndex,
+                                         isShowingPhotosPicker: .constant(false),
+                                         indexToView: .constant(0),
+                                         isExpanded: .constant(false),
+                                         insertedIndex: [],
+                                         removedIndex: [],
+                                         changedIndex: [],
+                                         currentCount: album.count,
+                                         isSelectingBySwipe: .constant(false),
+                                         geoProxy: geoProxy
+                    )
+                }
+                GeometryReader { geoProxy in
+                    PhotosGridMenu(stateChangeObject: stateChangeObject,
+                                   albumType: .picker,
+                                   album: album,
+                                   albumToEdit: albumToEdit,
+                                   settingDone: $settingDone,
+                                   belongingType: $belongingType,
+                                   filteringType: $filteringType,
+                                   filteringTypeChanged: $filteringTypeChanged,
+                                   isSelectMode: .constant(true),
+                                   selectedItemsIndex: $selectedItemsIndex,
+                                   edgeToScroll: $edgeToScroll,
+                                   isShowingSheet: .constant(false),
+                                   isShowingShareSheet: .constant(false),
+                                   isShowingPhotosPicker: $isShowingPhotosPicker,
+                                   nameSpace: nameSpace,
+                                   width: geoProxy.size.width)
+                }
+                .clipped()
+                .shadow(color: Color.fancyBackground.opacity(0.5), radius: 2, x: 0, y: 0)
+                .padding(.horizontal,
+                         device == .phone ? tabbarTopPadding : 0)
+                .frame(width: device == .phone ? screenWidth : (screenWidth / 4) * 3, height: tabbarHeight)
+                .padding(.bottom, 20)
             }
         }
     }

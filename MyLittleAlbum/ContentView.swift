@@ -11,41 +11,30 @@ struct ContentView: View {
     @EnvironmentObject var photoData: PhotoData
     @StateObject var topFolder = Folder(isHome: true, colorIndex: 0)
     @State var selection: Tabs = .album
+    @Namespace var nameSpace
     // 런치스크린 프라퍼티
     @StateObject var launchScreenManger = LaunchScreenManager()
     @State var isOpen = false
     @State var maskingScale: CGFloat = 4
     // 세팅뷰 프라퍼티
     @State var isShowingSettingView: Bool = false
+    @State var isphotosView: Bool = false
     
     var body: some View {
         ZStack {
             // 0. 백그라운드 설정 없을 시 런치스크린과 메인 뷰 사이에 블랙 스크린 나타남
             FancyBackground()
-            
-            // 1. 사진 권한에 따라 - [메인뷰] / [권한 안내 뷰]
-            // (권한 설정 시 런치스크린부터 재시작)
+            // 1. 사진 권한에 따라 - [메인뷰] / [권한 안내 뷰] : (권한 설정 시 런치스크린부터 재시작)
             switch photoData.status {
             case .authorized:
-                GeometryReader { proxy in
-                    mainView
-                    SettingView(isShowingSettingView: $isShowingSettingView)
-                        .position(x: isShowingSettingView ? proxy.size.width / 2 : -proxy.size.width,
-                                  y: proxy.size.height / 2)
-                        .animation(isShowingSettingView
-                                   ? .linear.delay(0.15) : .linear,
-                                   value: isShowingSettingView)
-                        .shadow(color: .black, radius: 7, x: 4, y: 0)
-                }
+                mainView(selection: $selection, isPhotosView: $isphotosView)
             default:
                 NonAuthorizedView(topFolder: topFolder)
             }
-            
-            // 2. background 스크린 (state == inactive로 설정하면 알럿 창 나타날 때도 이 화면이 나타나므로 background로 지정해야 함)
-//            if scenePhase == .background {
-//                BackgroudStateView()
-//            }
-            
+            // 2. 디지털 액자 뷰
+            if photoData.isShowingDigitalShow {
+                DigitalShowView(nameSpace: nameSpace)
+            }
             // 3. 런치 스크린
             if photoData.useOpeningAni
                 && launchScreenManger.state != .complete {
@@ -61,35 +50,55 @@ struct ContentView: View {
             }
         }
         .environmentObject(launchScreenManger)
+        .onAppear {
+            // 오프닝 애니메이션 (비사용 -> 사용)으로 변경시 오프닝 자동 실행되지 않도록
+            if !photoData.useOpeningAni {
+                launchScreenManger.state = .complete
+                isOpen = true
+            }
+        }
     }
 }
 
-
 extension ContentView {
-    // 메인 뷰 - 각 뷰에 별도의 네비게이션 스타일(extension) 적용 (For 탭1에 네비게이션바 가림)
-    var mainView: some View {
-        VStack(spacing: 0) {
-            TabView(selection: $selection) {
-                // Tab 1 : 앨범없는 사진첩
-                viewWithNavigation(type: .photo,
-                                   isShowingSettingView: .constant(false))
-                    .tag(Tabs.photo)
-                // Tab 2 : 유저 앨범
-                viewWithNavigation(type: .album,
-                                   title: "마이 리틀 앨범",
-                                   isShowingSettingView: $isShowingSettingView)
-                    .tag(Tabs.album)
-                // Tab 3 : 스마트앨범 (사진 관리)
-                viewWithNavigation(type: .other,
-                                   title: "사진 관리",
-                                   isShowingSettingView: .constant(false))
-                    .tag(Tabs.smart)
+    // 메인 뷰 - 각 탭뷰 별도의 네비게이션 스타일(extension) 적용
+    // (For 탭1에 네비게이션바 가림)
+    func mainView(selection: Binding<Tabs>, isPhotosView: Binding<Bool>) -> some View {
+        ZStack(alignment: device == .phone
+               ? .bottom
+               : (isPhotosView.wrappedValue ? .bottomLeading : .bottom), content: {
+            TabView(selection: selection) {
+                NavigationStack(root: {
+                    AllPhotosView(albumType: .home,
+                                  settingDone: false,
+                                  isPhotosView: $isphotosView,
+                                  nameSpace: nameSpace)
+                })
+                .tag(Tabs.photo)
+                NavigationStack(root: {
+                    AlbumView(
+                        pageFolder: topFolder,
+                        title: "마이 리틀 앨범",
+                        isPhotosView: $isphotosView,
+                        nameSpace: nameSpace,
+                        isShowingSettingView: $isShowingSettingView,
+                        stateChangeObject: StateChangeObject())
+                })
+                .tag(Tabs.album)
+                NavigationStack(root: {
+                    SmartAlbumView(isPhotosView: $isphotosView,
+                                   nameSpace: nameSpace)
+                })
+                .tag(Tabs.other)
             }
-            CustomTabBarView(launchScreenManager: launchScreenManger,
-                             selectedTab: $selection,
+            CustomTabBarView(selectedTab: selection,
+                             launchScreenManager: launchScreenManger,
                              isOpen: $isOpen,
-                             maskingScale: $maskingScale)
-        }
+                             maskingScale: $maskingScale,
+                             isPhotosView: isphotosView
+            )
+                .offset(y: isShowingSettingView ? 150 : 0)
+        })
         .ignoresSafeArea()
         .mask {
             if photoData.useOpeningAni {
@@ -102,29 +111,6 @@ extension ContentView {
             }
         }
     }
-}
-
-
-extension ContentView {
-    // 네비게이션 뷰
-    func viewWithNavigation(type: TypeView,
-                            album: PHAssetCollection! = nil,
-                            title: String! = "",
-                            isShowingSettingView: Binding<Bool>) -> some View {
-        return NavigationStack(root: {
-            switch type {
-            case .photo:
-                AllPhotosView(albumType: .home, settingDone: false)
-            case .album:
-                AlbumView(stateChangeObject: StateChangeObject(),
-                          pageFolder: topFolder,
-                          title: title,
-                          isShowingSettingView: isShowingSettingView)
-            case .other:
-                SmartAlbumView()
-            }
-        })
-    }
     
     // 런치 스크린 종류 후, 메인 뷰 트랜지션 마스크 뷰
     func maskCircle(manager: LaunchScreenManager, startSize: CGFloat, endSize: CGFloat) -> some View {
@@ -133,6 +119,9 @@ extension ContentView {
             .scaleEffect(isOpen == true ? endSize : startSize)
             .offset(y: -90)
     }
+}
+
+extension ContentView {
     // 오디오 리턴
     func pauseBackgroundAudio() {
         let audioSession = AVAudioSession.sharedInstance()
@@ -147,7 +136,7 @@ extension ContentView {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView(selection: .album, isOpen: true).mainView
+        ContentView(selection: .album, isOpen: true)
             .environmentObject(PhotoData())
     }
 }

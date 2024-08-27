@@ -11,136 +11,108 @@ import Photos
 
 
 struct AlbumListView: View {
-    
     // 앨범 추가됐는지 확인용 프라퍼티
     @ObservedObject var stateChangeObject: StateChangeObject
     // 현재 앨범들이 속한 폴더
     @ObservedObject var pageFolder: Folder
     // 레이아웃
     let uiMode: UIMode
+    let widthOfAlbum: CGFloat
     let randomNum1: Int
     let randomNum2: Int
-    let widthOfAlbum: CGFloat? = (min(screenSize.width, screenSize.height) - 35) / 3 - 5
-    let heightOfAlbum: CGFloat? = (min(screenSize.width, screenSize.height) - 35) / 3 - 5
+    @State var firstAppear: Bool = true
     // 보여주기 ui 스위칭 프라퍼티
-    @State var modeOfAlbumList: Bool
+    @State var modeOfAlbumList: Bool = false
+    @State var spacing: CGFloat = 10.0
     // 화면 전환용 프라퍼티
     @Binding var isShowingSheet: Bool
     @Binding var isShowingPhotosPicker: Bool
     var isEditingMode: Bool
     // namespace
-    @Namespace var albumViewEdge
-    @Namespace var namespace
+    var nameSpace: Namespace.ID
+    var albumViewNameSpace: Namespace.ID
     // 앨범 / 폴더 위치 이동 시 현재 폴더 나타내기용 프라퍼티
     @Binding var currentFolder: Folder!
-
+    @Binding var isPhotosView: Bool
+    
     var body: some View {
+        let albumList = albumList(pageFolder: pageFolder,
+                                  widthOfAlbum: widthOfAlbum)
         VStack(spacing: 0) {
-            let albumList = albumList(pageFolder: pageFolder)
-            sectionView(countAlbum: pageFolder.countAlbum, mode: modeOfAlbumList)
-            albumListView(view: albumList, mode: modeOfAlbumList, widthOfAlbum: widthOfAlbum ?? 0)
-                .buttonStyle(ClickScaleEffect())
+            SectionView(sectionType: .album,
+                        uiMode: uiMode,
+                        collectionCount: pageFolder.countAlbum,
+                        viewMode: $modeOfAlbumList)
+            albumListView(view: albumList,
+                          mode: modeOfAlbumList,
+                          widthOfAlbum: widthOfAlbum)
+            .onAppear(perform: {
+                albumViewModeChange(isFirstAppear: firstAppear)
+            })
         }
     }
 }
 
 extension AlbumListView {
-    // 섹션 뷰
-    func sectionView(countAlbum: Int, mode: Bool) -> some View{
-        let changeLabel = mode ? "한줄 보기" : "펼쳐 보기"
-        return HStack(alignment: .bottom) {
-            SectionView(sectionType: .album, uiMode: uiMode, collectionCount: countAlbum)
-                .zIndex(1)
-            if countAlbum > 3 {
-                titleText(changeLabel, font: .footnote, color: .gray)
-            }
-        }
-        .padding(.horizontal, 10)
-        .onTapGesture {
-            DispatchQueue.global(qos: .userInteractive).async {
-                withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.8, blendDuration: 0)) {
-                    self.modeOfAlbumList.toggle()
-                }
-            }
-        }
-    }
-    
-    
-    
-    
-    
     // 앨범 리스트 레이아웃 by modeOfAlbumList
     @ViewBuilder
     func albumListView(view: some View, mode: Bool, widthOfAlbum: CGFloat) -> some View {
-//    func albumListView(view: some View, count: Int, mode: Bool, widthOfAlbum: CGFloat) -> some View {
-        let modeOfAlbumList = mode
-        let columnOrRow = Array(repeating: GridItem(.flexible(), alignment: .leading),
-                                count: mode ? Int(screenSize.width / (widthOfAlbum + 10)) : 1)
-        
-        if modeOfAlbumList {
-            LazyVGrid(columns: columnOrRow, alignment: .center, spacing: 10) {
-                view
-            }
-            .id(albumViewEdge)
-            .padding([.leading, .vertical], 10)
-            .padding(.trailing, 5)
-        } else {
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHGrid(rows: columnOrRow, alignment: .center, spacing: 4) {
-                        HStack {
-                            view
-                        }
-                    }
-                    .padding(.all, 10)
-                    .id(albumViewEdge)
-                    .onChange(of: pageFolder.albumArray.count) { [oldValue = pageFolder.albumArray.count] newValue in
-                        if oldValue < newValue && !modeOfAlbumList {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                withAnimation(.interactiveSpring()) {
-                                    proxy.scrollTo(albumViewEdge, anchor: .trailing)
-                                }
-                            }
+        let spacing = (screenWidth - 5.0 - (CGFloat(listCount) * widthOfAlbum)) / CGFloat(listCount)
+        let column = Array(
+            repeating: GridItem(spacing: !mode ? 10 : spacing),
+            count: mode ? listCount : pageFolder.countAlbum)
+        ScrollViewReader(content: { proxy in
+            ScrollView(.horizontal, showsIndicators: false, content: {
+                LazyVGrid(columns: column)  {
+                    view
+                }
+                .transition(.scale(scale: 1, anchor: .topTrailing))
+                .id("albumViewEdge")
+                .padding([.leading, .vertical], 10)
+                .padding(.trailing, 5)
+                
+            })
+            .scrollDisabled(mode)
+            .onChange(of: pageFolder.albumArray.count) { 
+                [oldValue = pageFolder.albumArray.count] newValue in
+                if oldValue < newValue && !mode {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        withAnimation(.interactiveSpring()) {
+                            proxy.scrollTo("albumViewEdge", anchor: .trailing)
                         }
                     }
                 }
             }
-        }
+        })
     }
     
-//    func albumList(albums: [PHAssetCollection], colorIndex: Int, editingMode: Bool, randomNum1: Int, randomNum2: Int) -> some View {
-    func albumList(pageFolder: Folder) -> some View {
+    func albumList(pageFolder: Folder, widthOfAlbum: CGFloat) -> some View {
         return ForEach(pageFolder.albumArray, id: \.self) { phAssetCollection in
             let index = pageFolder.albumArray.firstIndex(of: phAssetCollection)!
             let album = Album(album: phAssetCollection,
                               colorIndex: pageFolder.colorIndex + index,
                               randomNum1: randomNum1,
                               randomNum2: randomNum2)
-            viewForEach(album: album)
-                .matchedGeometryEffect(id: album.identifier, in: namespace)
-                .id(album.identifier)
+            viewForEach(album: album, widthOfAlbum: widthOfAlbum)
+                .matchedGeometryEffect(id: album.identifier,
+                                       in: albumViewNameSpace)
+                .buttonStyle(ClickScaleEffect())
         }
-        
     }
     
-    func deleteAlbumInDepth(album: Album) {
-        DispatchQueue.main.async {
-            album.deleteAlbum() { bool in
-            }
-        }
-    }
-
-    func viewForEach(album: Album) -> some View {
+    func viewForEach(album: Album, widthOfAlbum: CGFloat) -> some View {
         NavigationLink {
-            AllPhotosView(album: album, title: album.title)
+            AllPhotosView(album: album,
+                          title: album.title,
+                          isPhotosView: $isPhotosView,
+                          nameSpace: nameSpace)
         } label: {
             switch uiMode {
             case .classic:
                 ClassicCell(cellType: .album,
                             title: album.title,
                             rprstPhoto1: album.rprsttivePhoto1,
-                            width: widthOfAlbum,
-                            height: heightOfAlbum)
+                            width: widthOfAlbum)
             case .fancy:
                 FancyCell(cellType: .album,
                           title: album.title,
@@ -155,7 +127,6 @@ extension AlbumListView {
                           width: widthOfAlbum)
             }
         }
-        .buttonStyle(ClickScaleEffect())
         .disabled(isEditingMode || stateChangeObject.isShowingMenu)
         .contextMenu {
             if !stateChangeObject.isEditingMode { editAlumbMenu(album: album) }
@@ -170,9 +141,24 @@ extension AlbumListView {
             }
             .opacity(isEditingMode ? 1:0)
             .scaleEffect(isEditingMode ? 1:0.1, anchor: .topLeading)
-            .buttonStyle(ClickScaleEffect())
             .offset(CGSize(width: uiMode == .classic ? -2:0, height: uiMode == .classic ? -2:0))
         }
+    }
+}
+
+// contexMenu funcs
+extension AlbumListView {
+    func albumViewModeChange(isFirstAppear: Bool) {
+        if firstAppear {
+            DispatchQueue.main.async {
+                withAnimation {
+                    modeOfAlbumList
+                    = pageFolder.folderArray.count == 0
+                    && pageFolder.albumArray.count > listCount
+                }
+            }
+        }
+        firstAppear = false
     }
     
     func editAlumbMenu(album: Album) -> some View {
@@ -204,12 +190,12 @@ extension AlbumListView {
         }
     }
     
-}
-
-
-// contexMenu funcs
-extension AlbumListView {
-    
+    func deleteAlbumInDepth(album: Album) {
+        DispatchQueue.main.async {
+            album.deleteAlbum() { bool in
+            }
+        }
+    }
     func showingSheet(sheetType: SheetType, folder: Folder! = nil, collection: Album) {
         if sheetType == .moveCollection {
             self.isShowingSheet = true
@@ -234,20 +220,16 @@ extension AlbumListView {
         stateChangeObject.collectionToEdit = collection
     }
     
-//    func deleteAlbumInDepth(album: Album) {
-//        DispatchQueue.main.async {
-//            album.deleteAlbum() { bool in
-//            }
-//        }
-//    }
-    
-    
 }
 
 
-//struct AlbumListView_Previews: PreviewProvider {
-//    static var previews: some View {
-//        AlbumListView(modeOfAlbumList: .constant(false), isShowingAlert: .constant(false), isShowingMenu: .constant(false), pressedPhotosPicker: .constant(false), draggedItem: .constant(nil), depthType: .constant(.none), pressedType: .constant(.none), collectionType: .constant(.none), editType: .constant(.none), collectionToEdit: .constant(nil), isAlbumAdded: .constant(false))
-//            .background(Color.fancyBackground)
-//    }
-//}
+struct AlbumListView_Previews: PreviewProvider {
+    static var previews: some View {
+        AlbumView(pageFolder: Folder(isHome: true),
+                  isPhotosView: .constant(false),
+                  nameSpace: Namespace().wrappedValue,
+                  isShowingSettingView: .constant(false),
+                  stateChangeObject: StateChangeObject())
+            .environmentObject(PhotoData())
+    }
+}
