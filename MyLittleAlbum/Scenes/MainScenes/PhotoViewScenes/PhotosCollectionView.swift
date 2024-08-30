@@ -45,15 +45,8 @@ struct PhotosCollectionView: UIViewRepresentable {
     
     func makeUIView(context: Context) -> UICollectionView {
         // setting layout (cell size)
-        let cellCount = device == .phone 
-            ? cellCount(type: .small)
-            : (albumType == .picker
-                ? cellCount(type: .middel2) 
-                : (geoProxy.size.width > geoProxy.size.height 
-                   ? cellCount(type: .big)
-                   : cellCount(type: .middle1)
-                  )
-            )
+        let cellCount = device == .phone ? cellCount(type: .small) : (
+            albumType == .picker ? cellCount(type: .middel2) : (geoProxy.size.width > geoProxy.size.height ? cellCount(type: .big) : cellCount(type: .middle1)))
         let cellWidth = (geoProxy.size.width - CGFloat(1 * (cellCount-1))) / CGFloat(cellCount)
         
         let layout = UICollectionViewFlowLayout()
@@ -95,6 +88,10 @@ struct PhotosCollectionView: UIViewRepresentable {
     }
     
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
+        if beforGeo != geoProxy.size {
+            print("you rotation the view, but nothing will happen")
+            beforGeo = geoProxy.size
+        }
                 
         // 1. 첫 진입시 : [나의 앨범]에서는 맨 위 / 그 외(나의사진/피커뷰/스마트앨범)에서는 첫 진입 시 맨 아래로 스크롤
         if albumType != .album && scrollAtFirst {
@@ -102,7 +99,7 @@ struct PhotosCollectionView: UIViewRepresentable {
             print("updated 1. scrolled to bottom First")
         }
         // 2. (공통) 스크롤 위/아래 이동
-        if edgeToScroll != .none && currentCount != 0 {
+        if edgeToScroll != .none {
             moveToEdge(collectionView: collectionView)
         }
         
@@ -290,14 +287,13 @@ struct PhotosCollectionView: UIViewRepresentable {
             let contentSize = collectionView.contentSize
             if contentSize.height > collectionView.bounds.size.height {
                 let targetContentOffset = CGPointMake(0.0, contentSize.height - collectionView.bounds.size.height )
-                withAnimation {
+                UIView.animate(withDuration: 1) {
                     collectionView.setContentOffset(targetContentOffset, animated: true)
                 }
             }
         } else if collecitonEdge == .top {
-            withAnimation {
-                collectionView.scrollToItem(at: IndexPath(row: 0, section: 0), 
-                                            at: collecitonEdge, animated: true)
+            UIView.animate(withDuration: 1) {
+                collectionView.scrollToItem(at: IndexPath(row: 0, section: 0), at: collecitonEdge, animated: true)
             }
         }
         print("updated 2. scrolled to \(edgeToScroll) by Tab button")
@@ -310,13 +306,13 @@ struct PhotosCollectionView: UIViewRepresentable {
     func reloadAllPhotos(collectionView: UICollectionView, all: Bool = true, index: [IndexPath] = [], completion: @escaping (Int) -> Void) {
         if all {
             DispatchQueue.main.async {
-                withAnimation {
+                UIView.animate(withDuration: 0.2) {
                     collectionView.reloadData()
                 }
             }
         } else {
             DispatchQueue.main.async {
-                withAnimation {
+                UIView.animate(withDuration: 0.2) {
                     collectionView.reloadItems(at: index)
                 }
             }
@@ -327,7 +323,7 @@ struct PhotosCollectionView: UIViewRepresentable {
     // -> (6) selectedCell change
     func reloadSelectedPhotos(all: Bool, collectionView: UICollectionView) {
         if all {
-            withAnimation {
+            UIView.animate(withDuration: 0.1) {
                 collectionView.reloadData()
             }
             DispatchQueue.main.async {
@@ -345,7 +341,7 @@ struct PhotosCollectionView: UIViewRepresentable {
             }
             
             let indexPaths = selectedItemsIndex.map{IndexPath(item: $0, section: 0)}
-            withAnimation {
+            UIView.animate(withDuration: 0.1) {
                 collectionView.reloadItems(at: indexPaths )
                 collectionView.reloadItems(at: [IndexPath(row: count, section: 0)])
             }
@@ -648,6 +644,7 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
                 }
             }
         case count:
+            print(parent.isSelectMode)
             if self.parent.albumType == .album {
                 if !self.parent.isSelectMode {
                     self.parent.isShowingPhotosPicker = true

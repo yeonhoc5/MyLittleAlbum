@@ -36,7 +36,7 @@ extension View {
                 Color.gray.opacity(0.3)
             }
         }
-        .frame(width: abs(width), height: abs(height))
+        .frame(width: width, height: height)
         .clipped()
         .cornerRadius(radius)
     }

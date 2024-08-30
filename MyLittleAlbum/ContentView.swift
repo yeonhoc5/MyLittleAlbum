@@ -18,7 +18,7 @@ struct ContentView: View {
     @State var maskingScale: CGFloat = 4
     // 세팅뷰 프라퍼티
     @State var isShowingSettingView: Bool = false
-    @State var isphotosView: Int = 0
+    @State var isphotosView: Bool = false
     
     var body: some View {
         ZStack {
@@ -63,10 +63,10 @@ struct ContentView: View {
 extension ContentView {
     // 메인 뷰 - 각 탭뷰 별도의 네비게이션 스타일(extension) 적용
     // (For 탭1에 네비게이션바 가림)
-    func mainView(selection: Binding<Tabs>, isPhotosView: Binding<Int>) -> some View {
+    func mainView(selection: Binding<Tabs>, isPhotosView: Binding<Bool>) -> some View {
         ZStack(alignment: device == .phone
                ? .bottom
-               : (isPhotosView.wrappedValue != 0 ? .bottomLeading : .bottom), content: {
+               : (isPhotosView.wrappedValue ? .bottomLeading : .bottom), content: {
             TabView(selection: selection) {
                 NavigationStack(root: {
                     AllPhotosView(albumType: .home,

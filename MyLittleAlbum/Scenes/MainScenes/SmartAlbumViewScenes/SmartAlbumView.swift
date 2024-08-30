@@ -9,10 +9,10 @@ import SwiftUI
 import Photos
 
 struct SmartAlbumView: View {
-    @Binding var isPhotosView: Int
+    @Binding var isPhotosView: Bool
     var smartAlbum: [SmartAlbum] = [.trashCan, .hiddenAsset]
     var smartAlbumTitle: [String] = ["최근 삭제한 항목", "가린 항목"]
-    var smartAlbumImage: [String] = ["trash.fill", "lock.fill"]
+    var smartAlbumImage: [String] = ["trash.fill", "eye.slash"]
     var nameSpace: Namespace.ID
     
     var body: some View {
@@ -55,6 +55,13 @@ struct SmartAlbumView: View {
             .scrollDisabled(true)
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("사진 관리")
+            .onAppear {
+                if isPhotosView {
+                    withAnimation {
+                        isPhotosView = false
+                    }
+                }
+            }
         }
     }
     

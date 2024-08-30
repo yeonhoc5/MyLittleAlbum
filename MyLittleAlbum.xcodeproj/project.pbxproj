@@ -64,9 +64,9 @@
 		1A8DEA7529E13FEB00EEA9B7 /* AllPhotosAreInAlbumsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8DEA7429E13FEB00EEA9B7 /* AllPhotosAreInAlbumsView.swift */; };
 		1A8DEA7929E62EF300EEA9B7 /* BlurView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8DEA7829E62EF300EEA9B7 /* BlurView.swift */; };
 		1A8DEA7D29E79F7C00EEA9B7 /* AlbumListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8DEA7C29E79F7C00EEA9B7 /* AlbumListModel.swift */; };
-		1A8F391A2C8193AF005344B1 /* DegitalImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8F39192C8193AF005344B1 /* DegitalImageView.swift */; };
 		1A9712902C6B355500CC97ED /* DigitalShowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A97128F2C6B355500CC97ED /* DigitalShowView.swift */; };
 		1AA0F95E2C363B2F00CB98C0 /* GlobalProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AA0F95D2C363B2F00CB98C0 /* GlobalProperties.swift */; };
+		1AA0F9682C3B6F1100CB98C0 /* LottieUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1AA0F9672C3B6F1100CB98C0 /* LottieUI */; };
 		1AA4B4432C3CE1000006D445 /* SectionDigitalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AA4B4422C3CE1000006D445 /* SectionDigitalView.swift */; };
 		1AA4B4452C3CEE2D0006D445 /* SettingToggleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AA4B4442C3CEE2D0006D445 /* SettingToggleView.swift */; };
 		1AA4B4472C3D17FA0006D445 /* Loading1.json in Resources */ = {isa = PBXBuildFile; fileRef = 1AA4B4462C3D17FA0006D445 /* Loading1.json */; };
@@ -83,7 +83,6 @@
 		1ADD56F7290A67AF00755989 /* PhotoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADD56F6290A67AF00755989 /* PhotoData.swift */; };
 		1ADD56F9290A7BC200755989 /* ClickScaleEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADD56F8290A7BC200755989 /* ClickScaleEffect.swift */; };
 		1ADD56FC290A96D100755989 /* CustomDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADD56FB290A96D100755989 /* CustomDivider.swift */; };
-		1AECA0672C8050A700502D3A /* LottieUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1AECA0662C8050A700502D3A /* LottieUI */; };
 		1AFF0F262980F339004A92E1 /* FancyBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AFF0F252980F339004A92E1 /* FancyBackground.swift */; };
 /* End PBXBuildFile section */
 
@@ -147,7 +146,6 @@
 		1A8DEA7429E13FEB00EEA9B7 /* AllPhotosAreInAlbumsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllPhotosAreInAlbumsView.swift; sourceTree = "<group>"; };
 		1A8DEA7829E62EF300EEA9B7 /* BlurView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlurView.swift; sourceTree = "<group>"; };
 		1A8DEA7C29E79F7C00EEA9B7 /* AlbumListModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumListModel.swift; sourceTree = "<group>"; };
-		1A8F39192C8193AF005344B1 /* DegitalImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DegitalImageView.swift; sourceTree = "<group>"; };
 		1A97128F2C6B355500CC97ED /* DigitalShowView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DigitalShowView.swift; sourceTree = "<group>"; };
 		1AA0F95D2C363B2F00CB98C0 /* GlobalProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalProperties.swift; sourceTree = "<group>"; };
 		1AA4B4422C3CE1000006D445 /* SectionDigitalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionDigitalView.swift; sourceTree = "<group>"; };
@@ -174,7 +172,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1AECA0672C8050A700502D3A /* LottieUI in Frameworks */,
+				1AA0F9682C3B6F1100CB98C0 /* LottieUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -293,7 +291,7 @@
 				1A18072E2982B426005117D2 /* CategoryScenes */,
 				1A422F3629CC2D23001411E5 /* HelperScenes */,
 				1AD624D829DFD9EB003D8B4B /* CustomViewsAndStyles */,
-				1A8F39182C819382005344B1 /* DigitalShowScenes */,
+				1A97128F2C6B355500CC97ED /* DigitalShowView.swift */,
 			);
 			path = SubScenes;
 			sourceTree = "<group>";
@@ -440,15 +438,6 @@
 			path = CategoryLineScenes;
 			sourceTree = "<group>";
 		};
-		1A8F39182C819382005344B1 /* DigitalShowScenes */ = {
-			isa = PBXGroup;
-			children = (
-				1A97128F2C6B355500CC97ED /* DigitalShowView.swift */,
-				1A8F39192C8193AF005344B1 /* DegitalImageView.swift */,
-			);
-			path = DigitalShowScenes;
-			sourceTree = "<group>";
-		};
 		1AA0F95F2C363DAB00CB98C0 /* SectionViews */ = {
 			isa = PBXGroup;
 			children = (
@@ -547,7 +536,7 @@
 			);
 			name = MyLittleAlbum;
 			packageProductDependencies = (
-				1AECA0662C8050A700502D3A /* LottieUI */,
+				1AA0F9672C3B6F1100CB98C0 /* LottieUI */,
 			);
 			productName = AlbumYouWant;
 			productReference = 1A3EA90128F6A3850071CB25 /* MyLittleAlbum.app */;
@@ -578,7 +567,7 @@
 			);
 			mainGroup = 1A3EA8F828F6A3850071CB25;
 			packageReferences = (
-				1AECA0652C8050A700502D3A /* XCRemoteSwiftPackageReference "LottieUI" */,
+				1AA0F9662C3B6F1100CB98C0 /* XCRemoteSwiftPackageReference "LottieUI" */,
 			);
 			productRefGroup = 1A3EA90228F6A3850071CB25 /* Products */;
 			projectDirPath = "";
@@ -666,7 +655,6 @@
 				1ADD56F9290A7BC200755989 /* ClickScaleEffect.swift in Sources */,
 				1A04E26F2991F1A100C7CA08 /* CustomTabBarView.swift in Sources */,
 				1AD06B372964327B00334553 /* SmartAlbumView.swift in Sources */,
-				1A8F391A2C8193AF005344B1 /* DegitalImageView.swift in Sources */,
 				1ADD56FC290A96D100755989 /* CustomDivider.swift in Sources */,
 				1AA4B4452C3CEE2D0006D445 /* SettingToggleView.swift in Sources */,
 				1A00980A29A252F0004942C1 /* StateChangeObject.swift in Sources */,
@@ -810,7 +798,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"MyLittleAlbum/Preview Content\"";
 				DEVELOPMENT_TEAM = BAX6K368WN;
 				ENABLE_PREVIEWS = YES;
@@ -848,7 +836,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"MyLittleAlbum/Preview Content\"";
 				DEVELOPMENT_TEAM = BAX6K368WN;
 				ENABLE_PREVIEWS = YES;
@@ -903,7 +891,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		1AECA0652C8050A700502D3A /* XCRemoteSwiftPackageReference "LottieUI" */ = {
+		1AA0F9662C3B6F1100CB98C0 /* XCRemoteSwiftPackageReference "LottieUI" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/tfmart/LottieUI";
 			requirement = {
@@ -914,9 +902,9 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		1AECA0662C8050A700502D3A /* LottieUI */ = {
+		1AA0F9672C3B6F1100CB98C0 /* LottieUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 1AECA0652C8050A700502D3A /* XCRemoteSwiftPackageReference "LottieUI" */;
+			package = 1AA0F9662C3B6F1100CB98C0 /* XCRemoteSwiftPackageReference "LottieUI" */;
 			productName = LottieUI;
 		};
 /* End XCSwiftPackageProductDependency section */
