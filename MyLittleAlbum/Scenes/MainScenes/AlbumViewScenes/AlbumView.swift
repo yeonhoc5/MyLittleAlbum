@@ -13,94 +13,166 @@ import Photos
 struct AlbumView: View {
     // 사진 데이터 프라퍼티
     @EnvironmentObject var photoData: PhotoData
-    @StateObject var stateChangeObject: StateChangeObject
     @StateObject var pageFolder: Folder
-    
-    @Environment(\.presentationMode) var isPresented: Binding<PresentationMode>
-    
     // UI 프라퍼티
-    var title: String! = "My Album"
+    @State var title: String! = "My Album"
+    var isTopFolder: Bool! = true
     var color: Color! = .orange
-    
-    @State var newName: String = ""
-    // 앨범 밖에서 사진 추가용 프라퍼티
-    @State var selectedItems: [Int] = []
-    
+    @State var isPortrait: Bool = true
+    @Binding var isPhotosView: Int
+    // 애니메이션 프라퍼티
+    var nameSpace: Namespace.ID
+    @Namespace var albumViewNameSpace
+    @Namespace var folderViewInScroll
+    @Namespace var albumViewInScroll
+    @State var scrollToEdge: EdgeToScroll = .none
+    // 추가 뷰 프라퍼티
     @State var isShowingSheet: Bool = false
     @State var isShowingPhotosPicker: Bool = false
     @State var isShowingReorderSheet: Bool = false
     @Binding var isShowingSettingView: Bool
+    // 수정용 프라퍼티
+    @StateObject var stateChangeObject: StateChangeObject
+    // 수정 모드 프라퍼티
     @State var isEditingMode: Bool = false
-    
-    @Namespace var folderViewInScroll
-    @Namespace var albumViewInScroll
-
+    // 앨범 타이틀 수정용 프라퍼티
+    @State var newName: String = ""
+    // 앨범 밖에서 사진 추가용 프라퍼티
+    @State var selectedItems: [Int] = []
+    // 앨범 / 폴더 리스트에서 수정 발생 시 기준 폴더 전달용
     @State var currentFolder: Folder!
-    @State var isSelecteMode: Bool = true
-    @State var scrollToEdge: EdgeToScroll = .none
-    
+    // 제스처로 팝오프용 프라퍼티
+    @Environment(\.presentationMode) var isPresented: Binding<PresentationMode>
     
     var body: some View {
-        let uiMode = photoData.uiMode
-        let randomNum1 = photoData.randomNum1
-        let randomNum2 = photoData.randomNum2
-        ScrollViewReader { proxy in
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 10) {
-                    let modeOfAlbumList = pageFolder.countFolder == 0 ? true : false
-                    AlbumListView(stateChangeObject: stateChangeObject,
-                                  pageFolder: pageFolder,
-                                  uiMode: uiMode, randomNum1: randomNum1, randomNum2: randomNum2,
-                                  modeOfAlbumList: modeOfAlbumList,
-                                  isShowingSheet: $isShowingSheet,
-                                  isShowingPhotosPicker: $isShowingPhotosPicker,
-                                  isEditingMode: isEditingMode,
-                                  currentFolder: $currentFolder)
+        GeometryReader(content: { geometry in
+            let widthOfAlbum = (geometry.size.width - (10 * CGFloat(listCount + 2))) / CGFloat(listCount)
+            let secondaryWidth = (geometry.size.width - 20 - CGFloat(listCount * 10))
+            / CGFloat(listCount + 1)
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        AlbumListView(
+                            stateChangeObject: stateChangeObject,
+                            pageFolder: pageFolder,
+                            uiMode: photoData.uiMode,
+                            widthOfAlbum: widthOfAlbum,
+                            randomNum1: photoData.randomNum1,
+                            randomNum2: photoData.randomNum2,
+                            isShowingSheet: $isShowingSheet,
+                            isShowingPhotosPicker: $isShowingPhotosPicker,
+                            isEditingMode: isEditingMode,
+                            nameSpace: nameSpace,
+                            albumViewNameSpace: albumViewNameSpace,
+                            currentFolder: $currentFolder,
+                            isPhotosView: $isPhotosView
+                        )
                         .padding(.top, 10)
                         .id(albumViewInScroll)
-                    FolderListView(stateChangeObject: stateChangeObject,
-                                   pageFolder: pageFolder,
-                                   uiMode: uiMode, randomNum1: randomNum1, randomNum2: randomNum2,
-                                   isShowingSheet: $isShowingSheet,
-                                   isShowingPhotosPicker: $isShowingPhotosPicker,
-                                   isShowingReorderSheet: $isShowingReorderSheet,
-                                   isEditingMode: isEditingMode,
-                                   currentFolder: $currentFolder)
-                        .padding(.bottom, 30)
+                        FolderListView(
+                            stateChangeObject: stateChangeObject,
+                            pageFolder: pageFolder,
+                            isTopFolder: isTopFolder,
+                            uiMode: photoData.uiMode,
+                            secondaryWidth: secondaryWidth,
+                            randomNum1: photoData.randomNum1,
+                            randomNum2: photoData.randomNum2,
+                            isShowingSheet: $isShowingSheet,
+                            isShowingPhotosPicker: $isShowingPhotosPicker,
+                            isShowingReorderSheet: $isShowingReorderSheet,
+                            isEditingMode: isEditingMode,
+                            nameSpace: nameSpace,
+                            albumViewNameSpace: albumViewNameSpace,
+                            currentFolder: $currentFolder,
+                            isPhotosView: $isPhotosView
+                        )
+                        .padding(.bottom, tabbarHeight
+                                 + tabbarTopPadding
+                                 + tabbarBottomPadding)
                         .id(folderViewInScroll)
-                }
-                .onChange(of: pageFolder.countFolder) { [oldValue = pageFolder.countFolder] newValue in
-                    if oldValue < newValue {
-                        scrollToNewItem(proxy: proxy, at: .currenFolder)
                     }
-                }
-                .onChange(of: pageFolder.countAlbum) { [oldValue = pageFolder.countAlbum] newValue in
-                    if oldValue < newValue {
-                        scrollToNewItem(proxy: proxy, at: .currentAlbum)
+                    .onChange(of: pageFolder.countAlbum) { [oldValue = pageFolder.countAlbum] newValue in
+                        if oldValue < newValue {
+                            scrollToNewItem(proxy: proxy, at: .currentAlbum)
+                        }
                     }
+                    .onChange(of: pageFolder.countFolder) { [oldValue = pageFolder.countFolder] newValue in
+                        if oldValue < newValue {
+                            scrollToNewItem(proxy: proxy, at: .currenFolder)
+                        }
+                    }
+                    .onChange(of: stateChangeObject.isShowingAlert) { newValue in
+                        newName = !newValue
+                        ? "" : ((stateChangeObject.editType == .add
+                            ? "" :  (stateChangeObject.collectionToEdit?.localizedTitle ?? "")))
+                    }
+                    .onChange(of: photoData.scrollToTop) { bool in
+                        if bool {
+                            withAnimation {
+                                proxy.scrollTo(albumViewInScroll, anchor: .top)
+                            }
+                            DispatchQueue.main.async {
+                                photoData.scrollToTop = false
+                            }
+                        }
+                    }
+                    .onChange(of: geometry.size, perform: { new in
+                        if new.width > new.height {
+                            withAnimation {
+                                isPortrait = true
+                            }
+                        } else {
+                            withAnimation {
+                                isPortrait = false
+                            }
+                        }
+                    })
                 }
-                .onChange(of: stateChangeObject.isShowingAlert) { newValue in
-                    newName = !newValue ? "" : ((stateChangeObject.editType == .add ? ""
-                                                : (stateChangeObject.collectionToEdit?.localizedTitle ?? "")))
+                .onTapGesture {
+                    stateChangeObject.isShowingMenu = false
                 }
+                .simultaneousGesture(popOffCurrentPage)
+                .disabled(isShowingSettingView)
             }
-            .onTapGesture {
-                stateChangeObject.isShowingMenu = false
+            .overlay {
+                Rectangle()
+                    .foregroundStyle(Color.black)
+                    .opacity(isShowingSettingView ? 0.5 : 0)
+                    .ignoresSafeArea()
             }
-            .simultaneousGesture(popOffCurrentPage)
-        }
-        .navigationTitle(pageFolder.isHome ? title : pageFolder.title)
+            SettingView(isShowingSettingView: $isShowingSettingView)
+                .frame(width: device == .phone
+                       ? screenWidth : 400)
+                .position(x: isShowingSettingView
+                          ? (device == .phone
+                            ? (geometry.size.width / 2) : 220)
+                          : (device == .phone
+                               ? (-geometry.size.width)
+                               : (-geometry.size.width + 200)),
+                          y: geometry.size.height / 2)
+                .animation(isShowingSettingView
+                           ? .linear.delay(0.15) : .linear,
+                           value: isShowingSettingView)
+        })
+        .navigationTitle(
+            pageFolder.isHome ? title : pageFolder.title
+        )
         .navigationBarTitleDisplayMode(.inline)
-        .background {
-            FancyBackground()
-        }
-        .edgesIgnoringSafeArea(.trailing)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) { rightToolBarItems }
-            pageFolder.isHome ? ToolbarItem(placement: .navigationBarLeading) { leftHomeToolBarItem } : nil
+            ToolbarItem(placement: .navigationBarTrailing) { rightToolBarItems
+                .opacity(isShowingSettingView ? 0 : 1)
+                .offset(y: isShowingSettingView ? -100 : 0)
+            }
+            if pageFolder.isHome {
+                ToolbarItem(placement: .navigationBarLeading) { leftHomeToolBarItem }
+            }
         }
         .foregroundColor(.secondary)
-        .alert("", isPresented: $stateChangeObject.isShowingAlert, actions: {
+        .background { FancyBackground() }
+        .edgesIgnoringSafeArea(.trailing)
+        .alert("",
+               isPresented: $stateChangeObject.isShowingAlert,
+               actions: {
             TextField(text: $newName) {
                 let edit = stateChangeObject.editType == .add ? "추가":"변경"
                 let collection = stateChangeObject.collectionType == .album ? "앨범":"폴더"
@@ -118,13 +190,6 @@ struct AlbumView: View {
             // 1. 폴더/앨범 이동 시트
             MoveCollectionCategoryView(isShowingSheet: $isShowingSheet, currentFolder: $currentFolder, stateChangeObject: stateChangeObject)
         })
-        .fullScreenCover(isPresented: $isShowingReorderSheet, content: {
-            // 2. 폴더/앨범 재정렬 시트(풀커버)
-            ReorderCategoriView(pageFolder: $currentFolder,
-                                albumArray: $pageFolder.albumArray,
-                                folderArray: $pageFolder.folderArray,
-                                isShowingReorderSheet: $isShowingReorderSheet)
-        })
         .sheet(isPresented: $isShowingPhotosPicker, content: {
             // 3. 앨범 밖에서 사진 넣기 시트
             let albumToAdd = Album(album: stateChangeObject.collectionToEdit as! PHAssetCollection)
@@ -132,9 +197,18 @@ struct AlbumView: View {
                                stateChangeObject: stateChangeObject,
                                albumToEdit: albumToAdd)
         })
-
+        .fullScreenCover(isPresented: $isShowingReorderSheet, content: {
+            // 2. 폴더/앨범 재정렬 시트(풀커버)
+            ReorderCategoriView(pageFolder: $currentFolder,
+                                albumArray: $pageFolder.albumArray,
+                                folderArray: $pageFolder.folderArray,
+                                isShowingReorderSheet: $isShowingReorderSheet)
+        })
     }
-    
+}
+
+// MARK: - functions
+extension AlbumView {
     var popOffCurrentPage: some Gesture {
         DragGesture(minimumDistance: 10, coordinateSpace: .global)
             .onEnded({ value in
@@ -145,7 +219,6 @@ struct AlbumView: View {
                 }
             })
     }
-    
     
     func generateAlertSentence() -> String {
         let toEditedTitle = stateChangeObject.collectionToEdit?.localizedTitle ?? ""
@@ -165,7 +238,6 @@ struct AlbumView: View {
             }
         }
     }
-    
 }
 
 // MARK: - [툴바] 아이템 / context 메뉴
@@ -178,7 +250,6 @@ extension AlbumView {
             Button {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     isEditingMode = false
-//                    objectChange(type: .editingMode, bool: false)
                 }
             } label: {
                 ZStack {
@@ -196,15 +267,15 @@ extension AlbumView {
                 ZStack {
                     Rectangle()
                         .foregroundColor(.clear)
-                    imageWithScale(systemName: "folder.fill.badge.gearshape", scale: .large)
+                    imageWithScale(systemName: "folder.fill.badge.gearshape",
+                                   scale: .large)
                 }
             }
             .menuStyle(.borderlessButton)
             .frame(width: iconWidth, height: 20, alignment: .center)
             .onTapGesture {
-                objectChange(type: .menu, bool: stateChangeObject.isShowingMenu ? false : true)
-//                    stateChangeObject.isShowingMenu = stateChangeObject.isShowingMenu == true ? false : true
-//                    stateChangeObject.isEditingMode = false
+                objectChange(type: .menu,
+                             bool: stateChangeObject.isShowingMenu ? false : true)
             }
         }
     }
@@ -214,12 +285,15 @@ extension AlbumView {
         return Button {
             DispatchQueue.main.async {
                 withAnimation {
-                    isShowingSettingView = true
+                    isShowingSettingView.toggle()
                 }
             }
         } label: {
             ZStack {
                 imageWithScale(systemName: settingIcon, scale: .large)
+                    .rotationEffect(.degrees(isShowingSettingView ? -180 : 0))
+                    .animation(isShowingSheet ? .linear.delay(1.5) : .linear,
+                               value: isShowingSheet)
                 Rectangle()
                     .foregroundColor(.clear)
             }
@@ -228,7 +302,6 @@ extension AlbumView {
     }
     // 툴바 아이템 (Trailing) - contextMenu
     var contextMenu: some View {
-//        GeometryReader { proxy in
         let albumIcon = "rectangle.stack.fill.badge.plus"
         let folderIcon = "folder.fill.badge.plus"
         let deleteModeIcon = "pencil"
@@ -242,7 +315,6 @@ extension AlbumView {
             Button {
                 showingAlert(depth: .current, preesed: .folder, toAdd: .folder, edit: .add, collection: pageFolder.folder, index: 0)
                 objectChange(type: .menu, bool: false)
-//                    stateChangeObject.isShowingMenu = false
             } label: {
                 ContextMenuItem(title: "폴더 추가하기", image: folderIcon)
             }
@@ -262,10 +334,9 @@ extension AlbumView {
                 ContextMenuItem(title: "리스트 순서 조정하기", image: "arrow.up.arrow.down")
             }
         }
-//        }
     }
-    
 }
+
 // MARK: - [Funcs] 앨범 추가 / 수정 Alert
 extension AlbumView {
     enum ObjectType {
@@ -287,7 +358,12 @@ extension AlbumView {
     }
     
     // 알럿 띄우기 (현재 뎁스 & 세컨더리 / 추가 & 이름 수정)
-    func showingAlert(depth: DepthType, preesed: PressedType, toAdd: CollectionType, edit: EditType, collection: PHCollection!, index: Int) {
+    func showingAlert(depth: DepthType, 
+                      preesed: PressedType,
+                      toAdd: CollectionType,
+                      edit: EditType,
+                      collection: PHCollection!,
+                      index: Int) {
         stateChangeObject.isShowingAlert = true
         stateChangeObject.depthType = depth
         stateChangeObject.pressedType = preesed
@@ -369,7 +445,11 @@ extension AlbumView {
 
 struct AlbumView_Previews: PreviewProvider {
     static var previews: some View {
-        AlbumView(stateChangeObject: StateChangeObject(), pageFolder: Folder(isHome: true), isShowingSettingView: .constant(false))
+        AlbumView(pageFolder: Folder(isHome: true),
+                  isPhotosView: .constant(0),
+                  nameSpace: Namespace().wrappedValue,
+                  isShowingSettingView: .constant(false),
+                  stateChangeObject: StateChangeObject())
             .environmentObject(PhotoData())
     }
 }

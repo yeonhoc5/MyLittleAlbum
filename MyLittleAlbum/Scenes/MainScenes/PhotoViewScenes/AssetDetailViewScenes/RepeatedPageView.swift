@@ -26,8 +26,7 @@ struct RepeatedPageView<Content: View>: View {
     @Environment(\.scenePhase) var scenePhase
     
     init(count: Int, indexToView: Int, isExpanded: Binding<Bool>, isUserSwiping: Binding<Bool>,
-         pagingGesture: Binding<Bool>, toDismiss: Binding<Bool>, scale: CGFloat, isSeeking: Bool, offsetX: Binding<CGFloat>,
-         @ViewBuilder content: @escaping (_ page: Int, _ pageNum: Int) -> Content) {
+         pagingGesture: Binding<Bool>, toDismiss: Binding<Bool>, scale: CGFloat, isSeeking: Bool, offsetX: Binding<CGFloat>, @ViewBuilder content: @escaping (_ page: Int, _ pageNum: Int) -> Content) {
         self.count = count
         self.indexToView = indexToView
         self.content = content
@@ -86,7 +85,8 @@ extension RepeatedPageView {
     func contentFrame(offsetIndex: Int, pageIndex: Int, color: Color) -> some View {
         GeometryReader { geometry in
             content(offsetIndex, pageIndex)
-                .frame(width: geometry.size.width, height: geometry.size.height)
+                .frame(width: geometry.size.width, 
+                       height: geometry.size.height)
                 .background(content: {
 //                    color
                     Color.black
@@ -138,7 +138,7 @@ extension RepeatedPageView {
                     isUserSwiping = true
                     if !toDismiss && abs(value.translation.width) > abs(value.translation.height) {
                         self.pagingGesture = true
-                        self.offsetX =  value.translation.width
+                        self.offsetX = value.translation.width
                     } else {
                         offsetX = 0
                     }
@@ -214,6 +214,8 @@ extension RepeatedPageView {
 
 struct RepeatedPageView_Previews: PreviewProvider {
     static var previews: some View {
-        PhotosDetailView(indexToView: .constant(0), isExpanded: .constant(false), navigationTitle: "sample")
+        PhotosDetailView(indexToView: .constant(0), 
+                         isExpanded: .constant(false),
+                         navigationTitle: "sample")
     }
 }

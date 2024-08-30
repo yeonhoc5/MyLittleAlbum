@@ -9,187 +9,208 @@ import SwiftUI
 
 struct SettingView: View {
     @EnvironmentObject var photoData: PhotoData
-    @State var uiMode: UIMode = .modern
-    @State var uiModeChanged: Bool = false
     @Binding var isShowingSettingView: Bool
+    // 기능 설정 프라퍼티
+    @State var uiMode: UIMode = .modern
+    @State var useOpeningAni: Bool = true
+    @State var useKnock: Bool = true
+    @State var isRandomPlay: Bool = true
+    @State var transitionIndex: Int = 2
+    // 가이드 프라퍼티
+    @State var settingList: SettingList = .opening
+    @State var isShowingSettingGuide: Bool = false
     
     var body: some View {
-        let isVertical: Bool = screenSize.width < screenSize.height
-        let currentUI: UIMode = photoData.uiMode
-        let verticalWidth = min(screenSize.width, screenSize.height) - 40
-        let horizontalWidth = (screenSize.width - 40) / 2
-        NavigationView {
-            ZStack {
-                // 1. 백그라운드 뷰
-                FancyBackground()
-
-                // 2. 메인 - 세로모드 / 가로모드 뷰
-                if isVertical {
-                    VStack {
-                        formView
-                            .frame(width: verticalWidth - 50, height: 100)
-                        sampleView
-                            .frame(width: verticalWidth, height: screenSize.height / 2.5)
-                        settingDoneButton(currentUI: currentUI, verticalWidth: verticalWidth)
-                            .frame(width: verticalWidth - 50, height: 50)
-                    }
-                } else {
-                    HStack(spacing: 50) {
-                        sampleView
-                            .frame(width: verticalWidth, height: screenSize.height - 40)
-                        VStack {
-                            formView
-                                .frame(width: horizontalWidth - 50, height: 150)
-                            settingDoneButton(currentUI: currentUI, verticalWidth: verticalWidth)
-                            .frame(width: horizontalWidth, height: 50)
-                        }
-                    }
-                }
-                
-                // 3. 저장 시 프로그래스 뷰
-                if uiModeChanged {
-                    CustomProgressView(stateChangeObject: StateChangeObject(),
-                                       color: uiMode == .classic ? .orange : colorSet[0])
-                        .onAppear {
-                            saveUIMode(uiMode: uiMode)
-                        }
-                }
-            }
-            .navigationTitle("UI 세팅")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-        .edgesIgnoringSafeArea(.trailing)
-        .onAppear {
-            uiMode = photoData.uiMode
-        }
-        .onChange(of: currentUI) { newValue in
-            if newValue == uiMode {
-                uiModeChanged = false
-                withAnimation {
-                    isShowingSettingView = false
-                }
-            }
-        }
-    }
-    
-    
-    
-}
-    
-
-extension SettingView {
-    // subView 1. 선택 버튼 뷰
-    var formView: some View {
-        VStack(alignment: .leading) {
-            Section("레이아웃 선택") {
-                Picker("UI", selection: $uiMode) {
-                    ForEach(UIMode.allCases, id: \.self) {
-                        Text($0.rawValue).tag($0)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .background(content: {
-                    Color.white
+        VStack(spacing: 0, content: {
+//            if device != .phone {
+                titleViewForPAD
+//            }
+            Form(content: {
+                SectionFundamentalView(header: {
+                    headerText(str: "1. 기본 설정")
+                },
+                    uiMode: $uiMode,
+                    useOpeningAni: $useOpeningAni,
+                    settingList: $settingList,
+                    useKnock: $useKnock,
+                    isShowingSettingGuide: $isShowingSettingGuide
+                )
+                SectionDigitalView(header: {
+                    headerText(str: "2. 디지털 액자 설정")
+                },
+                    isRandom: $isRandomPlay,
+                    transitionIndex: $transitionIndex)
+            })
+            .foregroundStyle(Color.fancyBackground)
+            .scrollContentBackground(.hidden)
+            .clipped()
+            .shadow(radius: 3)
+        })
+        .overlay(alignment: .bottom, content: {
+            btnDone
+                .opacity(isShowingSettingGuide ? 0 : 1)
+        })
+        .background {
+            switch device {
+            case .phone:  Color.fancyBackground
+                    .ignoresSafeArea()
+            default:
+                ZStack(content: {
+                    Color.fancyBackground
+                    Color.white.opacity(0.7)
                 })
-                .onAppear{
-                    UISegmentedControl.appearance().backgroundColor = .clear
-                    UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(Color.fancyBackground)
-                    UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
-                    UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(Color.fancyBackground)], for: .normal)
-                }
-            }
-            .cornerRadius(6)
-            .foregroundColor(.white)
-        }
-    }
-    // subView 2. 샘플 뷰
-    var sampleView: some View {
-        VStack(spacing: 10) {
-            if uiMode == .fancy {
-                HStack {
-                    FancyCell(cellType: .album, title: "앨범1", colorIndex: 0, rprstPhoto1: nil, rprstPhoto2: nil, sampleCase: .overTwo)
-                    FancyCell(cellType: .album, title: "앨범2", colorIndex: 1, rprstPhoto1: nil, rprstPhoto2: nil, sampleCase: .one)
-                    FancyCell(cellType: .album, title: "앨범2", colorIndex: 2, rprstPhoto1: nil, rprstPhoto2: nil)
-                }
-                HStack(alignment: .bottom) {
-                    FancyCell(cellType: .folder, title: "폴더", colorIndex: 0, rprstPhoto1: nil, rprstPhoto2: nil)
-                    Group {
-                        FancyCell(cellType: .miniAlbum, title: "미니앨범1", colorIndex: 4, rprstPhoto1: nil, rprstPhoto2: nil, sampleCase: .one)
-                        FancyCell(cellType: .miniAlbum, title: "미니앨범2", colorIndex: 8, rprstPhoto1: nil, rprstPhoto2: nil)
-                    }
-                    .frame(height: 100)
-                }
-            } else if uiMode == .modern {
-                HStack {
-                    ModernCell(cellType: .album, title: "앨범1", sampleCase: .one)
-                    ModernCell(cellType: .album, title: "앨범2")
-                }
-                HStack(alignment: .bottom) {
-                    ModernCell(cellType: .folder, title: "폴더")
-                    Group {
-                        ModernCell(cellType: .miniAlbum, title: "미니앨범1", sampleCase: .one)
-                        ModernCell(cellType: .miniAlbum, title: "미니앨범2")
-                    }
-                    
-                }
-            } else if uiMode == .classic {
-                HStack {
-                    ClassicCell(cellType: .album, width: 100, height: 100, sampleCase: .one)
-                    ClassicCell(cellType: .album, width: 100, height: 100)
-                }
-                HStack {
-                    ClassicCell(cellType: .folder)
-                    ClassicCell(cellType: .album, width: 80, height: 60, sampleCase: .one)
-                    ClassicCell(cellType: .album, width: 80, height: 60)
-                }
+                .cornerRadius(20)
             }
         }
-        .padding(.bottom, 20)
+        .onAppear {
+            loadPreviousSetting()
+        }
+        .onChange(of: photoData.uiModeChanged) { newValue in
+            saveAndApplyUIChange(newValue)
+        }
     }
-    // subView 3. 저장 / 돌아가기 버튼 뷰
-    func settingDoneButton(currentUI: UIMode, verticalWidth: CGFloat) -> some View {
+}
+
+#Preview {
+    SettingView(isShowingSettingView: .constant(true))
+        .environmentObject(PhotoData())
+}
+
+// subViews
+extension SettingView {
+    
+    var titleViewForPAD: some View {
+        Text("앨범 세팅")
+            .font(.title2)
+            .foregroundStyle(device == .phone ? Color.white : Color.black)
+            .padding(.top, 20)
+    }
+    
+    func headerText(str: String) -> some View {
+        Text(str)
+            .foregroundStyle(device == .phone ? Color.white : Color.black)
+            .font(.caption )
+            .offset(x: -10)
+    }
+    
+    var btnDone: some View {
         Button {
-            if currentUI != uiMode {
-                uiModeChanged = true
-                DispatchQueue.main.async {
-                    saveUIMode(uiMode: uiMode)
-                }
-            } else {
-                withAnimation {
-                    isShowingSettingView = false
-                }
-            }
+            saveSetting()
         } label: {
-            BackButton(changed: uiMode == currentUI)
+            Capsule()
+                .fill(.white)
+                .frame(height: 50)
+                .frame(maxWidth: 600)
+                .padding(20)
+                .overlay {
+                    Text("완료")
+                        .foregroundStyle(changeChecker(
+                            self.uiMode,
+                            self.useOpeningAni,
+                            self.useKnock,
+                            self.isRandomPlay,
+                            self.transitionIndex)
+                                         ? .blue : .black)
+                }
+                .clipped()
+                .shadow(radius: 3)
         }
-        .buttonStyle(ClickScaleEffect())
     }
-    
-    // function - ui 저장하기
-    func saveUIMode(uiMode: UIMode) {
-        DispatchQueue.main.async {
-            photoData.setUIMode(uimode: uiMode)
-        }
-    }
-    
 }
 
-struct BackButton: View {
-    var changed: Bool
+// functions
+extension SettingView {
     
-    var body: some View {
-        Capsule()
-            .foregroundColor(.white)
-            .overlay {
-                Text(changed ? "돌아가기" : "레이아웃 바꾸기")
-                    .foregroundColor(.fancyBackground)
+    func loadPreviousSetting() {
+        uiMode = photoData.uiMode
+        useOpeningAni = photoData.useOpeningAni
+        useKnock = photoData.useKnock
+        isRandomPlay = photoData.digitalShowRandom
+        transitionIndex = photoData.transitionIndex
+    }
+    
+    func saveSetting() {
+        let userDefaults = UserDefaults.standard
+        // 1. 오프닝애니 사용 설정 체크
+        if photoData.useOpeningAni != self.useOpeningAni {
+            userDefaults
+                .setValue(self.useOpeningAni,
+                          forKey: UserDefaultsKey.useOpeningAni.rawValue)
+            photoData.useOpeningAni = self.useOpeningAni
+        }
+        // 2. 노크 기능 사용 설정 체크
+        if photoData.useKnock != self.useKnock {
+            userDefaults
+                .setValue(self.useKnock,
+                          forKey: UserDefaultsKey.useKnock.rawValue)
+            photoData.useKnock = self.useKnock
+        }
+        // 3. 디지털 액자 랜덤 플레이 체크
+        if photoData.digitalShowRandom != self.isRandomPlay {
+            userDefaults
+                .setValue(self.isRandomPlay,
+                          forKey: UserDefaultsKey.digitalShowRandom.rawValue)
+            photoData.digitalShowRandom = self.isRandomPlay
+        }
+        // 4. 디지털 액자 전환 시간 체크
+        if photoData.transitionIndex != self.transitionIndex {
+            userDefaults
+                .setValue(self.transitionIndex,
+                          forKey: UserDefaultsKey.transitionIndex.rawValue)
+            photoData.transitionIndex = self.transitionIndex
+        }
+        // 5. 최신 공지 체크
+        if !photoData.userReadDone {
+            userDefaults
+                .setValue(true,
+                          forKey: UserDefaultsKey.userReadDone.rawValue)
+            photoData.userReadDone = true
+        }
+        
+        //  uimode 설정 확인 및 뷰 전환
+        if photoData.uiMode != self.uiMode {
+            photoData.uiModeChanged = true
+        }
+        withAnimation {
+            isShowingSettingView = false
+        }
+    }
+    
+    func saveAndApplyUIChange(_ changed: Bool) {
+        if changed {
+            DispatchQueue.main.async {
+                photoData.setUIMode(uimode: uiMode)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    withAnimation {
+                        photoData.uiModeChanged = false
+                    }
+                }
             }
+        }
+    }
+    
+    func changeChecker(_ checker1: UIMode,
+                       _ checker2: Bool,
+                       _ checker3: Bool,
+                       _ checker4: Bool,
+                       _ checker5: Int) -> Bool {
+        let checker1 = checker1 != photoData.uiMode
+        let checker2 = checker2 != photoData.useOpeningAni
+        let checker3 = checker3 != photoData.useKnock
+        let checker4 = checker4 != photoData.digitalShowRandom
+        let checker5 = checker5 != photoData.transitionIndex
+        return checker1 || checker2 || checker3 || checker4 || checker5
     }
 }
 
-struct SettingView_Previews: PreviewProvider {
-    static var previews: some View {
-        SettingView(isShowingSettingView: .constant(false))
-            .environmentObject(PhotoData())
-    }
+
+enum SettingList: String {
+    case opening = "오프닝 애니메이션"
+    case knock = "노크 기능"
+}
+enum GuideList: String, CaseIterable {
+    case iphonPhoto = "아이폰 사진첩"
+    case myLittleAlbum = "마이리틀앨범"
+    case hiddenAssets = "가려진 사진 설정"
+    case recentlyUpdated = "최근 업데이트된 기능"
 }

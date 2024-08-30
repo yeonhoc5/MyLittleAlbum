@@ -14,6 +14,7 @@ struct PhotosCollectionView: UIViewRepresentable {
     @ObservedObject var stateChangeObject: StateChangeObject
     var albumType: AlbumType = .album
     @ObservedObject var album: Album
+    var hiddenAssets: Bool = false
     // 스크롤 관리 프라퍼티
     @State var scrollAtFirst: Bool = true
     @Binding var edgeToScroll: EdgeToScroll
@@ -35,14 +36,32 @@ struct PhotosCollectionView: UIViewRepresentable {
     @Binding var isSelectingBySwipe: Bool
     
     var animationID: Namespace.ID!
+    var geoProxy: GeometryProxy
+    @State var beforGeo = CGSize()
     
     @State var collectionView: UICollectionView!
     
     @State var lastSelectedCell = IndexPath()
     
     func makeUIView(context: Context) -> UICollectionView {
+        // setting layout (cell size)
+        let cellCount = device == .phone 
+            ? cellCount(type: .small)
+            : (albumType == .picker
+                ? cellCount(type: .middel2) 
+                : (geoProxy.size.width > geoProxy.size.height 
+                   ? cellCount(type: .big)
+                   : cellCount(type: .middle1)
+                  )
+            )
+        let cellWidth = (geoProxy.size.width - CGFloat(1 * (cellCount-1))) / CGFloat(cellCount)
         
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
+        let layout = UICollectionViewFlowLayout()
+        layout.itemSize = CGSize(width: cellWidth, height: cellWidth)
+        layout.minimumInteritemSpacing = 1.0
+        layout.minimumLineSpacing = 1.0
+        
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = UIColor(Color.fancyBackground)
         collectionView.register(GridCell.self, forCellWithReuseIdentifier: "ImageCell")
         collectionView.register(GridCell.self, forCellWithReuseIdentifier: "VideoCell")
@@ -73,28 +92,17 @@ struct PhotosCollectionView: UIViewRepresentable {
             self.collectionView = collectionView
         }
         return collectionView
-        
     }
     
-    
-    
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
-        
-//
-//        collectionView.isEditing = self.isSelectMode
-        
-//        if isSelectMode {
-//            collectionView.isEditing = true
-//            print("editingmode is True")
-//        }
-        
+                
         // 1. 첫 진입시 : [나의 앨범]에서는 맨 위 / 그 외(나의사진/피커뷰/스마트앨범)에서는 첫 진입 시 맨 아래로 스크롤
         if albumType != .album && scrollAtFirst {
             scrollToBottomAtFirst(collectionView: collectionView)
             print("updated 1. scrolled to bottom First")
         }
         // 2. (공통) 스크롤 위/아래 이동
-        if edgeToScroll != .none {
+        if edgeToScroll != .none && currentCount != 0 {
             moveToEdge(collectionView: collectionView)
         }
         
@@ -102,23 +110,31 @@ struct PhotosCollectionView: UIViewRepresentable {
         if filteringTypeChanged {
             reloadAllPhotos(collectionView: collectionView) { count in
                 DispatchQueue.main.async {
-                    self.filteringTypeChanged = false
+                    withAnimation {
+                        self.filteringTypeChanged = false
+                    }
                     print("updated 3. photos Are Filtered by you want are changed")
                 }
             }
         }
         // 4. 개별 셀 선택시 리로드는 각 셀에서 처리 / 취소 버튼에 의한 선택된 셀들의 리로드와 전체 선택 토글이 이루어지면 여기서 전체 셀 리로드는 여기서 처리
         if stateChangeObject.selectToggleAllPhotos {
-            reloadSelectedPhotos(all: true, collectionView: collectionView)
+            withAnimation {
+                reloadSelectedPhotos(all: true, collectionView: collectionView)
+            }
             print("updated 4-1. you pressed Cancel SelectMode at Selected All")
         } else if stateChangeObject.selectToggleSomePhotos {
-            reloadSelectedPhotos(all: false, collectionView: collectionView)
+            withAnimation {
+                reloadSelectedPhotos(all: false, collectionView: collectionView)
+            }
             print("updated 4-2. you pressed Cancel SelectMode at Selected some")
         }
         
         // 5. detilaview 완료 후 indextoview 재로딩
         if stateChangeObject.isSlideShowEnded {
-            collectionView.reloadItems(at: [IndexPath(item: indexToView, section: 0), selectedIndex])
+            if let index = selectedIndex {
+                collectionView.reloadItems(at: [IndexPath(item: indexToView, section: 0), index])
+            }
             DispatchQueue.main.async {
                 stateChangeObject.isSlideShowEnded = false
                 selectedIndex = nil
@@ -128,34 +144,34 @@ struct PhotosCollectionView: UIViewRepresentable {
         
         // 6. 사진 추가/삭제 후 리로딩
         // 6-1. assetArray 카운트 변화 있음 : [마이포토] nonalbum (album,all은 가리기 삭제시에만) / [마이앨범] / [사진관리] 가린 사진
-        if currentCount != album.count {
+        if currentCount != (hiddenAssets ? album.hiddenAssetsArray.count : album.count) {
             DispatchQueue.main.async {
-                // step 1. 리로드 전 준비
-                self.isSelectMode = false
-                if albumType == .album {
-                    stateChangeObject.showPickerButton = false
-                }
-                self.currentCount = album.count
-                // step 2. 리로드
-                reloadAllPhotos(collectionView: collectionView) { count in
-                    if currentCount == count {
-                // step 3. progressView뷰 종료
-                        DispatchQueue.main.async {
-//                            stateChangeObject.assetChanged = false
-                            withAnimation {
-                                stateChangeObject.assetChanged = .completed
+                withAnimation {
+                    // step 1. 리로드 전 준비
+                    self.isSelectMode = false
+                    if albumType == .album {
+                        stateChangeObject.showPickerButton = false
+                    }
+                    self.currentCount = hiddenAssets ? album.hiddenAssetsArray.count : album.count
+                    // step 2. 리로드
+                    reloadAllPhotos(collectionView: collectionView) { count in
+                        if currentCount == count {
+                    // step 3. progressView뷰 종료
+                            DispatchQueue.main.async {
+                                withAnimation {
+                                    stateChangeObject.assetChanged = .completed
+                                }
                             }
                         }
                     }
+                    selectedItemsIndex = []
+                    album.albumAssetsChanged = false
+                    album.removedIndexPath = []
+                    album.changedIndexPath = []
+                    album.insertedIndexPath = []
                 }
-                selectedItemsIndex = []
-                album.albumAssetsChanged = false
-                album.removedIndexPath = []
-                album.changedIndexPath = []
-                album.insertedIndexPath = []
             }
         // 6-2. 카운트 변화 없음: [마이포토] all / album에서 사진 추가
-//        } else if stateChangeObject.assetChanged
         } else if stateChangeObject.assetChanged == .changed
                     && albumType == .home
                     && album.belongingType != .nonAlbum
@@ -164,13 +180,13 @@ struct PhotosCollectionView: UIViewRepresentable {
             let index = selectedItemsIndex.map({ IndexPath(row: $0, section: 0) })
             DispatchQueue.main.async {
                 self.isSelectMode = false
-                self.currentCount = album.count
+                self.currentCount = hiddenAssets ? album.hiddenAssetsArray.count : album.count
             // step 2. 리로드
-                UIView.animate(withDuration: 0.35) {
+//                UIView.animate(withDuration: 0.35) {
+                withAnimation {
                     reloadAllPhotos(collectionView: collectionView, all: false, index: index) { count in
                         if currentCount == count {
             // step 3. progressView뷰 종료
-//                            stateChangeObject.assetChanged = false
                             withAnimation {
                                 stateChangeObject.assetChanged = .completed
                             }
@@ -253,8 +269,6 @@ struct PhotosCollectionView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-
-    
     
     // -> (1) scroll at first
     func scrollToBottomAtFirst(collectionView: UICollectionView) {
@@ -276,13 +290,14 @@ struct PhotosCollectionView: UIViewRepresentable {
             let contentSize = collectionView.contentSize
             if contentSize.height > collectionView.bounds.size.height {
                 let targetContentOffset = CGPointMake(0.0, contentSize.height - collectionView.bounds.size.height )
-                UIView.animate(withDuration: 1) {
+                withAnimation {
                     collectionView.setContentOffset(targetContentOffset, animated: true)
                 }
             }
         } else if collecitonEdge == .top {
-            UIView.animate(withDuration: 1) {
-                collectionView.scrollToItem(at: IndexPath(row: 0, section: 0), at: collecitonEdge, animated: true)
+            withAnimation {
+                collectionView.scrollToItem(at: IndexPath(row: 0, section: 0), 
+                                            at: collecitonEdge, animated: true)
             }
         }
         print("updated 2. scrolled to \(edgeToScroll) by Tab button")
@@ -295,25 +310,24 @@ struct PhotosCollectionView: UIViewRepresentable {
     func reloadAllPhotos(collectionView: UICollectionView, all: Bool = true, index: [IndexPath] = [], completion: @escaping (Int) -> Void) {
         if all {
             DispatchQueue.main.async {
-                UIView.animate(withDuration: 0.2) {
+                withAnimation {
                     collectionView.reloadData()
                 }
             }
         } else {
             DispatchQueue.main.async {
-                UIView.animate(withDuration: 0.2) {
+                withAnimation {
                     collectionView.reloadItems(at: index)
                 }
             }
         }
-        
         completion(album.count)
     }
     
     // -> (6) selectedCell change
     func reloadSelectedPhotos(all: Bool, collectionView: UICollectionView) {
         if all {
-            UIView.animate(withDuration: 0.1) {
+            withAnimation {
                 collectionView.reloadData()
             }
             DispatchQueue.main.async {
@@ -331,7 +345,7 @@ struct PhotosCollectionView: UIViewRepresentable {
             }
             
             let indexPaths = selectedItemsIndex.map{IndexPath(item: $0, section: 0)}
-            UIView.animate(withDuration: 0.1) {
+            withAnimation {
                 collectionView.reloadItems(at: indexPaths )
                 collectionView.reloadItems(at: [IndexPath(row: count, section: 0)])
             }
@@ -404,7 +418,6 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
             return true
     }
     
-    
     @objc func didPan(toSelectCells panGesture: UIPanGestureRecognizer) {
         if parent.isSelectMode {
             if let collectionView = self.parent.collectionView {
@@ -461,7 +474,7 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
     }
     
     func selectCell(_ indexPath: IndexPath, selected: Bool) {
-        if let cell = parent.collectionView.cellForItem(at: indexPath) {
+        if let _ = parent.collectionView.cellForItem(at: indexPath) {
             if parent.selectedItemsIndex.contains(indexPath.row) {
                 parent.collectionView.deselectItem(at: indexPath, animated: true)
                 
@@ -490,25 +503,35 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
         let additional = self.parent.albumType == .album ? 1 : 0
         switch self.parent.album.filteringType {
         case .all:
-            return album.count + additional
+            return parent.hiddenAssets ? album.hiddenAssetsArray.count : album.count + additional
         case .image:
-            return album.photosArray.filter{ $0.mediaType == .image }.count + additional
+            return parent.hiddenAssets ? album.hiddenAssetsArray.filter{ $0.mediaType == .image }.count : album.photosArray.filter{ $0.mediaType == .image }.count + additional
         case .video:
-            return  album.photosArray.filter{ $0.mediaType == .video }.count + additional
+            return parent.hiddenAssets ? album.hiddenAssetsArray.filter{ $0.mediaType == .video }.count : album.photosArray.filter{ $0.mediaType == .video }.count + additional
         }
         
     }
      
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
-        return 1
-    }
+//    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
+//        return 1
+//    }
+//    
+//    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
+//        return 1
+//    }
     
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
-        return 1
-    }
+//    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForFooterInSection section: Int) -> CGSize {
+//        return CGSize(width: screenWidth, height: tabbarHeight + tabbarHeight)
+//    }
     
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForFooterInSection section: Int) -> CGSize {
-        return CGSize(width: 60, height: 100)
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
+        return UIEdgeInsets(top: 0, left: 0,
+                            bottom: tabbarHeight 
+                                + tabbarTopPadding
+                                + tabbarBottomPadding
+                                + tabbarTopPadding
+                                + tabbarHeight,
+                            right: 0)
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -517,12 +540,13 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
         var count: Int
         switch album.filteringType {
         case .all:
-            count = album.count
+            count = parent.hiddenAssets ? album.hiddenAssetsArray.count : album.count
         case .image:
-            count = album.photosArray.filter{ $0.mediaType == .image }.count
+            count = parent.hiddenAssets ? album.hiddenAssetsArray.filter{ $0.mediaType == .image }.count : album.photosArray.filter{ $0.mediaType == .image }.count
         case .video:
-            count = album.photosArray.filter{ $0.mediaType == .video }.count
+            count = parent.hiddenAssets ? album.hiddenAssetsArray.filter{ $0.mediaType == .video }.count : album.photosArray.filter{ $0.mediaType == .video }.count
         }
+
         
         // step 1. cell별 identifier 구분
         var identifier = String()
@@ -534,7 +558,7 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
                 switch self.parent.album.filteringType {
                 case .image: identifier = "ImageCell"
                 case .video: identifier = "VideoCell"
-                default: identifier = self.parent.album.photosArray[indexPath.row].mediaType == .image ? "ImageCell" : "VideoCell"
+                default: identifier = (parent.hiddenAssets ? (self.parent.album.hiddenAssetsArray) : (self.parent.album.photosArray))[indexPath.row].mediaType == .image ? "ImageCell" : "VideoCell"
                 }
             }
         case count: identifier = self.parent.albumType == .album && self.parent.isSelectMode ? "SpaceCell" : "PickerCell"
@@ -546,15 +570,16 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
         if indexPath.row < count {
             var asset = PHAsset()
             switch self.parent.album.filteringType {
-            case .all: asset = parent.album.photosArray[indexPath.row]
-            case .image: asset = parent.album.photosArray.filter{ $0.mediaType == .image }[indexPath.row]
-            case .video: asset = parent.album.photosArray.filter{ $0.mediaType == .video }[indexPath.row]
+            case .all: asset = (parent.hiddenAssets ? (self.parent.album.hiddenAssetsArray) : (self.parent.album.photosArray))[indexPath.row]
+            case .image: asset = (parent.hiddenAssets ? (self.parent.album.hiddenAssetsArray) : (self.parent.album.photosArray)).filter{ $0.mediaType == .image }[indexPath.row]
+            case .video: asset = (parent.hiddenAssets ? (self.parent.album.hiddenAssetsArray) : (self.parent.album.photosArray)).filter{ $0.mediaType == .video }[indexPath.row]
             }
             cell.representedAssetIdentifier = asset.localIdentifier
             cell.asset = asset
             cell.width = collectionView.contentSize.width
             
-            let checkSelected = self.parent.isSelectMode && self.parent.selectedItemsIndex.contains(indexPath.row)
+            let checkSelected = self.parent.isSelectMode 
+                                && self.parent.selectedItemsIndex.contains(indexPath.row)
             
             cell.cellSelected = checkSelected
             if self.parent.indexToView == indexPath.row && self.parent.isExpanded {
@@ -579,7 +604,6 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
         }
         cell.animationID = self.parent.animationID
         
-        
         cell.showsLargeContentViewer = true
         return cell
     }
@@ -589,11 +613,11 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
         var count: Int
         switch album.filteringType {
         case .all:
-            count = album.count
+            count = parent.hiddenAssets ? album.hiddenAssetsArray.count : album.count
         case .image:
-            count = album.photosArray.filter{ $0.mediaType == .image }.count
+            count = parent.hiddenAssets ? album.hiddenAssetsArray.count : album.photosArray.filter{ $0.mediaType == .image }.count
         case .video:
-            count = album.photosArray.filter{ $0.mediaType == .video }.count
+            count = parent.hiddenAssets ? album.hiddenAssetsArray.count : album.photosArray.filter{ $0.mediaType == .video }.count
         }
         switch indexPath.row {
         case 0..<count:
@@ -624,7 +648,6 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
                 }
             }
         case count:
-            print(parent.isSelectMode)
             if self.parent.albumType == .album {
                 if !self.parent.isSelectMode {
                     self.parent.isShowingPhotosPicker = true
@@ -637,10 +660,11 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
     }
     
     
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let width = (min(screenSize.width, screenSize.height) - 4) / 5
-        return CGSize(width: width, height: width)
-    }
+//    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+//        let numberOfCell = device == .phone ? 4.0 : 10.0
+//        let width = (min(screenSize.width, screenSize.height) - (numberOfCell - 1)) / numberOfCell
+//        return CGSize(width: width, height: width)
+//    }
     
 //    func loadImage(asset: PHAsset) -> UIImage? {
 //        let imageManager = PHCachingImageManager()

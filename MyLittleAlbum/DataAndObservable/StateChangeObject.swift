@@ -67,8 +67,6 @@ class StateChangeObject: ObservableObject {
     @Published var tabBarbtnScroll: Bool = false
     
     @Published var photosPickerCanceled: Bool = false
-    
-    
 }
 
 

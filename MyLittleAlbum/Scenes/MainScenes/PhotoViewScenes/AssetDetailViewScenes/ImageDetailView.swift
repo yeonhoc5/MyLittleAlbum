@@ -13,12 +13,12 @@ struct ImageDetailView: View {
     
     @Binding var isExpanded: Bool
     let asset: PHAsset
-//    let navigationTitle: String
     let imageManager = PHCachingImageManager()
     @Binding var variableScale: CGFloat
     @Binding var currentScale: CGFloat
     @State var fetchtedImage: UIImage!
     @Binding var offsetY: CGFloat
+    @State var widthIsCreteria: Bool = false
     
     var body: some View {
         if fetchtedImage == nil {
@@ -39,37 +39,14 @@ struct ImageDetailView: View {
                     Image(uiImage: (fetchtedImage))
                         .resizable()
                         .scaledToFit()
-                        .frame(width: proxy.size.width * variableScale)
+                        .frame(width: proxy.size.width * variableScale,
+                               height: proxy.size.height * variableScale)
                         .simultaneousGesture(zoomGestureByTab)
                 }
                 .scrollDisabled(variableScale == 1)
             }
         }
     }
-    
-    
-//    var titleView: some View {
-//        HStack(alignment: .center) {
-//            Button {
-//                withAnimation {
-//                    isExpanded = false
-//                }
-//            } label: {
-//                Image(systemName: "xmark")
-//                    .imageScale(.large)
-//                    .foregroundColor(.white)
-//                    .bold()
-//                    .frame(width: 50, height: 40, alignment: .center)
-//            }
-//            Text(navigationTitle)
-//                .foregroundColor(.white)
-//                .font(Font.system(size: 17, weight: .bold))
-//                .frame(width: screenSize.width - 100, height: 40, alignment: .center)
-//            Spacer(minLength: 50)
-//        }
-//        .frame(width: screenSize.width, height: 85, alignment: .bottom)
-//    }
-    
     
     var zoomGestureByTab: some Gesture {
         TapGesture(count: 2)
@@ -91,13 +68,20 @@ struct ImageDetailView: View {
 //
 extension ImageDetailView {
     func fetchingImage(asset: PHAsset) -> UIImage {
+        let assetRatio = CGFloat(asset.pixelHeight) / CGFloat(asset.pixelWidth)
+        let screenRatio = screenSize.height / screenSize.width
+        widthIsCreteria = assetRatio <= screenRatio
         var returnImage: UIImage!
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isSynchronous = true
         options.isNetworkAccessAllowed = true
-        let width = screenSize.width * scale
-        let size = CGSize(width: width, height: .infinity)
+        options.resizeMode = .exact
+        let creteriaSize = (widthIsCreteria
+                     ? screenSize.width
+                     : screenSize.height) * scale
+        let size = CGSize(width: widthIsCreteria ? creteriaSize : .infinity,
+                          height: widthIsCreteria ? .infinity : creteriaSize)
         
         imageManager.requestImage(for: asset,
                                   targetSize: size,
@@ -115,7 +99,7 @@ extension ImageDetailView {
 
 struct ImageDetailView_Previews: PreviewProvider {
     static var previews: some View {
-        TabBarView()
+        ContentView()
             .environmentObject(PhotoData())
     }
 }

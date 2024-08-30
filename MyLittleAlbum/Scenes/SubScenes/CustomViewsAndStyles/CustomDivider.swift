@@ -14,7 +14,6 @@ struct CustomDivider: View {
         Rectangle()
             .frame(height: 0.7)
             .foregroundColor(color)
-            .padding(.leading, 15)
             .padding(.bottom, 5)
     }
 }

@@ -14,6 +14,7 @@ struct CustomSeekBar: UIViewRepresentable {
     @Binding var play: Bool
     @Binding var isSeeking: Bool
     @Binding var slider: UISlider
+    @Binding var currentTime: Double
     
     func makeUIView(context: UIViewRepresentableContext<CustomSeekBar>) -> UISlider {
         
@@ -25,7 +26,9 @@ struct CustomSeekBar: UIViewRepresentable {
         slider.addTarget(context.coordinator,
                          action: #selector(context.coordinator.changed(slider:)),
                          for: .valueChanged)
-        slider.isContinuous = false
+        slider.layer.cornerRadius = 1
+        slider.clipsToBounds = true
+        slider.isContinuous = true
         DispatchQueue.main.async {
             self.slider = slider
         }
@@ -56,6 +59,7 @@ struct CustomSeekBar: UIViewRepresentable {
                 parent.avPlayer.pause()
                 parent.avPlayer.seek(to: CMTime(seconds: Double(sec), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
             } else {
+                parent.currentTime = Double(sec)
                 parent.avPlayer?.seek(to: CMTime(seconds: Double(sec), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
                 if parent.play {
                     parent.avPlayer.play()
