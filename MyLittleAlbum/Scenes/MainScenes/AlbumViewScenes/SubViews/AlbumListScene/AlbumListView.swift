@@ -33,7 +33,7 @@ struct AlbumListView: View {
     var albumViewNameSpace: Namespace.ID
     // 앨범 / 폴더 위치 이동 시 현재 폴더 나타내기용 프라퍼티
     @Binding var currentFolder: Folder!
-    @Binding var isPhotosView: Bool
+    @Binding var isPhotosView: Int
     
     var body: some View {
         let albumList = albumList(pageFolder: pageFolder,
@@ -175,7 +175,6 @@ extension AlbumListView {
             } label: {
                 ContextMenuItem(title: "앨범 이름 변경하기", image: "pencil")
             }
-            Divider()
             Button {
                 showingSheet(sheetType: .moveCollection, folder: pageFolder, collection: album)
             } label: {
@@ -226,7 +225,7 @@ extension AlbumListView {
 struct AlbumListView_Previews: PreviewProvider {
     static var previews: some View {
         AlbumView(pageFolder: Folder(isHome: true),
-                  isPhotosView: .constant(false),
+                  isPhotosView: .constant(0),
                   nameSpace: Namespace().wrappedValue,
                   isShowingSettingView: .constant(false),
                   stateChangeObject: StateChangeObject())

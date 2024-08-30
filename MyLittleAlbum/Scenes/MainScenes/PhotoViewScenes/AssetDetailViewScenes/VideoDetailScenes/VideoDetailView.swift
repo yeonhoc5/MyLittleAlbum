@@ -14,8 +14,6 @@ struct VideoDetailView: View {
     @Binding var isExpanded: Bool
     var offsetIndex: Int
     var asset: PHAsset
-//    let navigationTitle: String
-//    var isPaging: Bool = false
     
     // video properties
     @State var avPlayer: AVPlayer!
@@ -338,7 +336,7 @@ extension VideoDetailView {
         print("옵저버 ADDed")
         guard let _ = self.avPlayer.currentItem else { return }
         self.timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: time, queue: .main) { time in
-            DispatchQueue.global(qos: .background).async {
+            DispatchQueue.main.async {
                 self.value = Float(time.seconds / runningTime)
             }
         }

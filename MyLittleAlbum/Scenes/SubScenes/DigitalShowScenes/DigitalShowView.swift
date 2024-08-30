@@ -8,8 +8,15 @@
 import SwiftUI
 import Photos
 
+enum DigitalShowStatus {
+    case ready
+    case playing
+    case ended
+}
+
 struct DigitalShowView: View {
     @EnvironmentObject var photoData: PhotoData
+    @State var title: String = ""
     @State var photosArray: [PHAsset] = []
     @State var digitalShowNumber: Int = 0
     @State var timer: Timer!
@@ -18,7 +25,7 @@ struct DigitalShowView: View {
     
     @State var guideScale = 1.0
     @State var guideOpacity = 1.0
-    @State var stopShow: Bool = false
+    @State var showStatus: DigitalShowStatus = .ready
     @State var startString = "의 디지털 액자 모드를 실행합니다."
     @State var endString = "디지털 액자 모드를 종료합니다."
     
@@ -27,13 +34,16 @@ struct DigitalShowView: View {
     var body: some View {
         ZStack {
             backgroundView(nameSpace: nameSpace)
-            if photosArray.count > 0 {
-                DigitalView(asset: self.photosArray[digitalShowNumber],
-                            stopShow: stopShow)
+            if showStatus == .playing {
+                DigitalImageView(asset: self.photosArray[digitalShowNumber],
+                                 showStatus: showStatus)
                     .onAppear(perform: {
                         self.startDigitalShow()
                         self.showDigitalShowGuide()
                     })
+            }
+            if showStatus != .ended {
+                startMessageView
             }
         }
         .overlay(alignment: .bottom) {
@@ -42,7 +52,7 @@ struct DigitalShowView: View {
                 .offset(y: isShowingDigitalShowGuide ? 0 : 200)
         }
         .gesture(TapGesture(count: 2).onEnded({ _ in
-            if !stopShow {
+            if showStatus != .ended {
                 withAnimation {
                     self.endDigitalShow()
                 }
@@ -69,65 +79,6 @@ struct DigitalShowView: View {
     }
 }
 
-struct DigitalView: View {
-    var asset: PHAsset
-    var stopShow: Bool = false
-    @State var widthIsCreteria: Bool = false
-    
-    var body: some View {
-        if !stopShow {
-            GeometryReader { proxy in
-                let fetchedImage = self.fetchingImage(asset: asset, size: proxy.size)
-                ZStack {
-                    Image(uiImage: fetchedImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .blur(radius: 30.0)
-                    Image(uiImage: fetchedImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: proxy.size.width,
-                               height: proxy.size.height)
-                        .transition(.slide)
-                }
-            }
-            .ignoresSafeArea()
-        } else {
-            Color.clear
-        }
-        
-    }
-    
-    func fetchingImage(asset: PHAsset, size: CGSize) -> UIImage {
-        let imageManager = PHCachingImageManager()
-        let assetRatio = CGFloat(asset.pixelHeight) / CGFloat(asset.pixelWidth)
-        let screenRatio = size.height / size.width
-        widthIsCreteria = assetRatio <= screenRatio
-        var returnImage: UIImage!
-        let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
-        options.isSynchronous = true
-        options.isNetworkAccessAllowed = true
-        options.resizeMode = .exact
-        let creteriaSize = (widthIsCreteria
-                     ? size.width
-                     : size.height) * scale
-        let size = CGSize(width: widthIsCreteria ? creteriaSize : .infinity,
-                          height: widthIsCreteria ? .infinity : creteriaSize)
-        
-        imageManager.requestImage(for: asset,
-                                  targetSize: size,
-                                  contentMode: .aspectFit,
-                                  options: options) { assetImage, _ in
-            if let image = assetImage {
-                returnImage = image
-            }
-        }
-        return returnImage
-    }
-}
-
 extension DigitalShowView {
     func backgroundView(nameSpace: Namespace.ID) -> some View {
         RoundedRectangle(cornerRadius: 20.0)
@@ -135,42 +86,16 @@ extension DigitalShowView {
             .ignoresSafeArea()
             .matchedGeometryEffect(id: "digitalShow", in: nameSpace)
             .overlay {
-                if !stopShow {
-                    VStack(spacing: 20) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("앨범")
-                            Text("\"\(photoData.digitalPhotoAlbums.first?.title ?? "")\"")
-                                .font(.system(size: 30, weight: .bold))
-                        }
-                        Text(!stopShow ? startString : endString)
-                    }
-                    .scaleEffect(guideScale)
-                    .opacity(guideOpacity)
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                            makePhotosArray()
-                            withAnimation {
-                                if !stopShow {
-                                    guideScale = 4.0
-                                }
-                            }
-                        }
-                        if !stopShow {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                                guideScale = 1.0
-                                guideOpacity = 0.0
-                            }
-                        }
-                    }
-                } else {
+                if showStatus == .ended {
                     Text(endString)
+                        .foregroundStyle(.white)
                 }
             }
     }
     
     var btnEndShow: some View {
         Button {
-            if !stopShow {
+            if showStatus != .ended {
                 withAnimation {
                     self.endDigitalShow()
                 }
@@ -182,6 +107,55 @@ extension DigitalShowView {
                     .frame(width: 50, height: 40)
                 Text("종료")
                     .foregroundStyle(.white)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    var startMessageView: some View {
+        Group {
+            if device == .phone {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("ALBUM")
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text("\"\(photoData.digitalShowTitle)\"")
+                        .font(.system(size: 30, weight: .heavy))
+                        .foregroundStyle(Color.color3)
+                        .shadow(color: .black, radius: 4, x: 1, y: 1)
+                    Text(showStatus == .ready ? startString : endString)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            } else {
+                HStack(alignment: .bottom, spacing: 5) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Text("ALBUM")
+                            .foregroundStyle(.white.opacity(0.7))
+                        Text("\"\(photoData.digitalShowTitle)\"")
+                            .font(.system(size: 30, weight: .heavy))
+                            .foregroundStyle(Color.color3)
+                            .shadow(color: .black, radius: 4, x: 1, y: 1)
+                    }
+                    Text(showStatus == .ready ? startString : endString)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            }
+        }
+        .scaleEffect(guideScale)
+        .opacity(guideOpacity)
+        .onAppear {
+            makePhotosArray()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation {
+                    if showStatus == .ready {
+                        guideScale = 5.0
+                        guideOpacity = 0
+                        showStatus = .playing
+                    }
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                guideScale = 1.0
+                guideOpacity = 0.0
             }
         }
     }
@@ -203,12 +177,13 @@ extension DigitalShowView {
     }
     
     func makePhotosArray() {
-        for i in photoData.digitalPhotoAlbums {
-            self.photosArray += photoData.isHiddenAsset
-                    ? i.hiddenAssetsArray : i.photosArray
+        self.photosArray = photoData.digitalPhotoAlbums.compactMap {
+            photoData.isHiddenAsset
+            ? $0.hiddenAssetsArray : $0.photosArray
+        }.flatMap { $0 }
+        if photoData.digitalShowRandom {
+            self.photosArray = self.photosArray.shuffled()
         }
-        self.photosArray = photoData.digitalShowRandom 
-        ? self.photosArray.shuffled() : self.photosArray
     }
 }
 
@@ -216,8 +191,8 @@ extension DigitalShowView {
     func startDigitalShow() {
         self.timer = Timer.scheduledTimer(withTimeInterval: Double(transitionRange[photoData.transitionIndex]),
                                           repeats: true) { _ in
-            withAnimation {
-                if self.photosArray.count > 1 {
+            if self.photosArray.count > 1 {
+                withAnimation {
                     self.digitalShowNumber
                     = (self.digitalShowNumber + 1)
                     % self.photosArray.count
@@ -227,15 +202,17 @@ extension DigitalShowView {
     }
     
     func endDigitalShow() {
-        withAnimation {
-            self.stopShow = true
-            self.isShowingDigitalShowGuide = false
-            self.photosArray = []
-            photoData.digitalPhotoAlbums = []
+        DispatchQueue.main.async {
+            withAnimation {
+                self.showStatus = .ended
+                self.isShowingDigitalShowGuide = false
+                self.title = ""
+                self.photosArray = []
+            }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             withAnimation {
-                photoData.isShowingDigitalShow = false
+                photoData.endDisitalShow()
             }
         }
         

@@ -20,7 +20,7 @@ struct FancyFolderLineView: View {
     var randomNum1: Int = 0
     var randomNum2: Int = 0
     var width: CGFloat
-    @Binding var isPhotosView: Bool
+    @Binding var isPhotosView: Int
     var nameSpace: Namespace.ID
     var albumViewNameSpace: Namespace.ID
     
@@ -264,7 +264,6 @@ extension FancyFolderLineView {
             } label: {
                 ContextMenuItem(title: "폴더 이름 변경하기", image: "pencil")
             }
-            Divider()
             Button {
                 showingSheet(type: .moveCollection, currentFolder: pageFolder, selectedCollection: folder)
             } label: {
@@ -302,7 +301,6 @@ extension FancyFolderLineView {
             } label: {
                 ContextMenuItem(title: "앨범 이름 변경하기", image: "pencil")
             }
-            Divider()
             Button {
                 DispatchQueue.main.async {
                     showingSheet(type: .moveCollection,

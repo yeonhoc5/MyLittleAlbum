@@ -15,21 +15,16 @@ struct CustomTabBarView: View {
     @StateObject var launchScreenManager: LaunchScreenManager
     @Binding var isOpen: Bool
     @Binding var maskingScale: CGFloat
-    var isPhotosView: Bool
+    var isPhotosView: Int
     
     var body: some View {
-//        let width = device == .phone 
-//        ? screenWidth
-//        : (!isPhotosView ? screenWidth * 0.5 : (screenWidth / 4))
         GeometryReader { geoProxy in
             let width = geoProxy.size.width
             HStack {
-                if device != .phone && !isPhotosView{
+                if device != .phone && isPhotosView == 0 {
                     Rectangle()
                         .fill(.clear)
                         .frame(width: width / 5)
-                        .clipped()
-                        .shadow(color: Color.fancyBackground.opacity(0.5), radius: 2, x: 0, y: 0)
                 }
                 ZStack {
                     // 기기별 백그라운드
@@ -58,7 +53,7 @@ struct CustomTabBarView: View {
                 if device != .phone {
                     Rectangle()
                         .fill(.clear)
-                        .frame(width: !isPhotosView ? width / 5 : (width / 4) * 3)
+                        .frame(width: isPhotosView == 0 ? width / 5 : (width / 4) * 3)
                 }
             }
         }
@@ -77,6 +72,8 @@ extension CustomTabBarView {
                 Rectangle()
             default:
                 RoundedRectangle(cornerRadius: 10)
+                    .clipped()
+                    .shadow(color: Color.fancyBackground.opacity(0.5), radius: 2, x: 0, y: 0)
             }
         }
         .foregroundStyle(color)
@@ -150,8 +147,7 @@ struct CustomTabBarView_Previews: PreviewProvider {
                              launchScreenManager: LaunchScreenManager(),
                              isOpen: .constant(true),
                              maskingScale: .constant(4),
-                             isPhotosView: false
-            )
+                             isPhotosView: 0)
             .environmentObject(PhotoData())
         })
         .ignoresSafeArea(edges: .bottom)

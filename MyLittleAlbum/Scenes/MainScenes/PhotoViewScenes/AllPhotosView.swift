@@ -33,7 +33,7 @@ struct AllPhotosView: View {
     
     // 네비게이션 타이틀 (앨범을 여기 넘어와서 로딩할 수 있으므로 album.title을 쓸 수 없음)
     @State var title = ""
-    @Binding var isPhotosView: Bool
+    @Binding var isPhotosView: Int
     
     var nameSpace: Namespace.ID
     // ui에 영향 있는 프라퍼티 -> 바인딩 처리
@@ -105,6 +105,7 @@ struct AllPhotosView: View {
                             isSelectingBySwipe: $isSelectingBySwipe,
                             animationID: nameSpace,
                             geoProxy: geoProxy)
+                        
                     }
                     .navigationDestination(isPresented: $showHiddenAssets) {
                         AllPhotosView(album: album,
@@ -155,9 +156,16 @@ struct AllPhotosView: View {
                         .frame(width: geoProxy.size.width)
                         .opacity(photoData.isShowingDigitalShow ? 0 : 1)
                         .onAppear {
-                            if device != .phone && !isPhotosView {
+                            if device != .phone {
                                 withAnimation {
-                                    isPhotosView = true
+                                    isPhotosView += 1
+                                }
+                            }
+                        }
+                        .onDisappear {
+                            if device != .phone {
+                                withAnimation {
+                                    isPhotosView -= 1
                                 }
                             }
                         }
@@ -174,6 +182,14 @@ struct AllPhotosView: View {
                 }
             }
         }
+        .overlay(content: {
+            if photoData.isShowingDigitalShow {
+                RoundedRectangle(cornerRadius: 20.0)
+                    .fill(.ultraThinMaterial)
+                    .ignoresSafeArea()
+                    .matchedGeometryEffect(id: "digitalShow", in: nameSpace)
+            }
+        })
         .ignoresSafeArea()
         .onAppear(perform: {
             newName = album != nil ? album.title : ""
@@ -187,6 +203,13 @@ struct AllPhotosView: View {
                 }
             }
         }
+        .onChange(of: scenePhase, perform: { value in
+            if isHiddenAssets || albumType == .smartAlbum {
+                if value == .background {
+                    isPrivacy = true
+                }
+            }
+        })
         .onChange(of: self.belongingType, perform: { value in
             self.settingDone = false
             readyToShowMyPhotos(type: value)
@@ -293,7 +316,7 @@ struct AllPhotosView: View {
             }
         })
         .navigationBarHidden(albumType == .home)
-        .navigationTitle("\(isHiddenAssets ? "🫣" : album?.title ?? "")")
+        .navigationTitle("\(isHiddenAssets ? "🫣" : "")\(album?.title ?? "")\(isHiddenAssets ? "🫣" : "")")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(content: {
             if albumType == .album{
@@ -389,12 +412,12 @@ extension AllPhotosView {
     
     func btnRomoveAssetFromAlbum() -> some View {
         Button("앨범에서 빼기") {
-            album.removeAssetFromAlbum(indexSet: selectedItemsIndex)
+            album.removeAssetFromAlbum(indexSet: selectedItemsIndex,
+                                       isHidden: isHiddenAssets)
             resetEditStatus()
-//            stateChangeObject.assetChanged = true
-//            withAnimation {
+            withAnimation {
                 stateChangeObject.assetChanged = .changed
-//            }
+            }
         }
     }
 }
@@ -510,7 +533,7 @@ extension AllPhotosView {
             let imageManger = PHCachingImageManager()
             imageManger.stopCachingImagesForAllAssets()
             // 다른 탭으로 이동 시 포토그리드 뷰 벗어나기
-            isPresented.wrappedValue.dismiss()
+//            isPresented.wrappedValue.dismiss()
         }
     }
     
@@ -535,7 +558,7 @@ struct AllPhotosView_Previews: PreviewProvider {
         AllPhotosView(stateChangeObject: StateChangeObject(),
                       album: Album(assetArray: [], title: "샘플"),
                       title: "마이 리틀 앨범",
-                      isPhotosView: .constant(false),
+                      isPhotosView: .constant(0),
                       nameSpace: Namespace().wrappedValue)
         .environmentObject(PhotoData())
     }
