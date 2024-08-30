@@ -32,7 +32,7 @@ struct FancyCell: View {
     var body: some View {
         switch cellType {
         case .folder: folderCell(width: width)
-        case .album: albumCell(width: width)
+        case .album: albumCell(width: abs(width))
         case .miniAlbum: miniAlbumCell(width: width)
         }
     }
@@ -47,8 +47,8 @@ extension FancyCell {
                 titleText(title, font: .footnote.bold(), color: .white)
                     .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
-                    .frame(width:  width > 0
-                           ? (width - (2.0 * spacing)) : 0,
+                    .frame(width:  abs(width) > 0
+                           ? abs(width - (2.0 * spacing)) : 0,
                            alignment: .topLeading)
                 GeometryReader(content: { geometry in
                     let innerWidth = geometry.size.width
@@ -87,8 +87,14 @@ extension FancyCell {
                                                 height: innerHeight)
                             }
                         } else if rprstPhoto1 != nil {
-                            if let imageFirst = loadImage(asset: rprstPhoto1, thumbNailSize: CGSize(width: innerWidth * scale, height: innerHeight * scale)) {
-                                imageScaledFill(uiImage: imageFirst, width: innerWidth, height: innerHeight, radius: radius)
+                            if let imageFirst = loadImage(asset: rprstPhoto1, 
+                                                          thumbNailSize: CGSize(
+                                                            width: innerWidth * scale,
+                                                            height: innerHeight * scale)) {
+                                imageScaledFill(uiImage: imageFirst, 
+                                                width: innerWidth,
+                                                height: innerHeight,
+                                                radius: radius)
                             } else {
                                 spacerRectangle(color: .clear,
                                                 height: innerHeight)
@@ -96,7 +102,7 @@ extension FancyCell {
                         } else {
                             Text(emptyLabel[colorIndex % emptyLabel.count])
                                 .foregroundColor(.white.opacity(0.5))
-                                .frame(width: width - (2.0 * spacing),
+                                .frame(width: abs(width - (2.0 * spacing)),
                                        height: innerHeight)
                         }
                     } else if sampleCase == .overTwo {
