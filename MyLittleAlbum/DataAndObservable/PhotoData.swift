@@ -87,6 +87,7 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
     var digitalShowRandom: Bool = true
     var transitionIndex: Int = 2
     var digitalPhotoAlbums: [Album] = []
+    var digitalShowTitle: String = ""
     var isHiddenAsset: Bool = false
     @Namespace var digitalView
     
@@ -252,6 +253,32 @@ extension PhotoData {
                 self.setAllPhotos.subtracting(self.setPhotosInAllAlbums)
             ).sorted{ $0.creationDate! < $1.creationDate! }
         }
+    }
+    // digitalShow
+    func startDigitalShow(folder: Folder! = nil,
+                         album: Album! = nil,
+                         isHiddenAsset: Bool! = false) {
+        if let onlyAlbum = album {
+            digitalShowTitle = onlyAlbum.title
+            digitalPhotoAlbums = [onlyAlbum]
+            self.isHiddenAsset = isHiddenAsset
+        } else if let foldersAllAlbums = folder {
+            digitalShowTitle = foldersAllAlbums.title
+            digitalPhotoAlbums = foldersAllAlbums.albumArray.map { Album(album: $0) }
+        }
+        withAnimation(.easeInOut) {
+            isShowingDigitalShow = true
+        }
+        UIApplication.shared.isIdleTimerDisabled = true
+    }
+    func endDisitalShow() {
+        digitalShowTitle = ""
+        digitalPhotoAlbums = []
+        self.isHiddenAsset = false
+        withAnimation(.easeInOut) {
+            isShowingDigitalShow = false
+        }
+        UIApplication.shared.isIdleTimerDisabled = false
     }
 }
 

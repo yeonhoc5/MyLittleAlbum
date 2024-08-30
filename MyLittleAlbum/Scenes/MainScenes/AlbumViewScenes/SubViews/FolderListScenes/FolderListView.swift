@@ -29,7 +29,7 @@ struct FolderListView: View {
     var nameSpace: Namespace.ID
     var albumViewNameSpace: Namespace.ID
     @Binding var currentFolder: Folder!
-    @Binding var isPhotosView: Bool
+    @Binding var isPhotosView: Int
 
     
     var body: some View {
@@ -63,7 +63,7 @@ extension FolderListView {
                             pageFolder: nextFolder,
                             randomNum1: randomNum1,
                             randomNum2: randomNum2,
-                            width: secondaryWidth,
+                            width: abs(secondaryWidth),
                             isPhotosView: $isPhotosView,
                             isShowingSheet: $isShowingSheet,
                             isShowingPhotosPicker: $isShowingPhotosPicker,
@@ -76,7 +76,7 @@ extension FolderListView {
                         fancySecondaryFolderLineView(
                             folder: nextFolder,
                             animationID: nameSpace,
-                            width: secondaryWidth)
+                            width: abs(secondaryWidth))
                     }
                 }
                 .overlay(alignment: .topLeading) {
@@ -127,9 +127,6 @@ extension FolderListView {
                         .multilineTextAlignment(.center)
                         .foregroundColor(.white)
                         .padding(.all, 5)
-                        .onSubmit {
-                            print(width * 0.6, secondaryHeight)
-                        }
                 }
                 .frame(width: width * 0.6, height: secondaryHeight)
                 .padding(.vertical, 5)
@@ -255,7 +252,7 @@ enum SheetType {
 struct CollectionLineView_Previews: PreviewProvider {
     static var previews: some View {
         AlbumView(pageFolder: Folder(isHome: true),
-                  isPhotosView: .constant(false),
+                  isPhotosView: .constant(0),
                   nameSpace: Namespace().wrappedValue,
                   isShowingSettingView: .constant(false),
                   stateChangeObject: StateChangeObject())

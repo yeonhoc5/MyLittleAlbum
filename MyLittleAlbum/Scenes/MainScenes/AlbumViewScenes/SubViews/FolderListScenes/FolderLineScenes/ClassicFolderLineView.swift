@@ -16,7 +16,7 @@ struct ClassicFolderLineView: View {
     var randomNum1: Int = 0
     var randomNum2: Int = 0
     var width: CGFloat
-    @Binding var isPhotosView: Bool
+    @Binding var isPhotosView: Int
 
     @State private var showingLine: Bool = false
     @Binding var isShowingSheet: Bool
@@ -89,6 +89,7 @@ struct SecondaryListView: View {
     let randomNum2: Int
     var nameSpace: Namespace.ID
     var albumViewNameSpace: Namespace.ID
+    @Binding var isPhotosView: Int
     
     var isEditingMode: Bool
     
@@ -116,7 +117,7 @@ struct SecondaryListView: View {
     func viewForEachfolder(folder: Folder, width: CGFloat) -> some View {
         NavigationLink {
             AlbumView(pageFolder: folder,
-                      isPhotosView: .constant(false),
+                      isPhotosView: $isPhotosView,
                       nameSpace: nameSpace,
                       isShowingSettingView: .constant(false),
                       stateChangeObject: StateChangeObject())
@@ -142,7 +143,7 @@ struct SecondaryListView: View {
     func viewForEachAlbum(album: Album, width: CGFloat) -> some View {
         NavigationLink {
             AllPhotosView(album: album,
-                          isPhotosView: .constant(false),
+                          isPhotosView: $isPhotosView,
                           nameSpace: nameSpace)
         } label: {
             ClassicCell(cellType: .miniAlbum,
