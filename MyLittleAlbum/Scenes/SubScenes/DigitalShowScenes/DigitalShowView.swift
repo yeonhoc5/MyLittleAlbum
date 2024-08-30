@@ -120,7 +120,8 @@ extension DigitalShowView {
                         .foregroundStyle(.white.opacity(0.7))
                     Text("\"\(photoData.digitalShowTitle)\"")
                         .font(.system(size: 30, weight: .heavy))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.color3)
+                        .shadow(color: .black, radius: 4, x: 1, y: 1)
                     Text(showStatus == .ready ? startString : endString)
                         .foregroundStyle(.white.opacity(0.7))
                 }
@@ -131,7 +132,8 @@ extension DigitalShowView {
                             .foregroundStyle(.white.opacity(0.7))
                         Text("\"\(photoData.digitalShowTitle)\"")
                             .font(.system(size: 30, weight: .heavy))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.color3)
+                            .shadow(color: .black, radius: 4, x: 1, y: 1)
                     }
                     Text(showStatus == .ready ? startString : endString)
                         .foregroundStyle(.white.opacity(0.7))
