@@ -10,8 +10,8 @@ import Photos
 
 // MARK: - 1. [Folder] Class
 class Folder: NSObject, Identifiable, ObservableObject {
-    
     var isHome: Bool = false
+    var isNotThirdFolder: Bool = true
     var folder: PHCollectionList!
     let id: UUID = UUID()
     var identifier: String = ""
@@ -92,7 +92,6 @@ class Folder: NSObject, Identifiable, ObservableObject {
         self.folderArray = Array(folderFetcth.map{$0 as! PHCollectionList})
         self.countFolder = self.folderArray.count
     }
-    
 }
 
 // MARK: - 2. extenstion [Folder] 폴더 함수
@@ -104,8 +103,8 @@ extension Folder {
             PHPhotoLibrary.shared().performChanges {
                 let createFolderRequest = PHCollectionListChangeRequest.creationRequestForCollectionList(withTitle: name)
                 self.placeholder = createFolderRequest.placeholderForCreatedCollectionList
-    //            guard let placeholder = self.placeholder else { return }
-    //            let fetchResult = PHCollectionList.fetchCollectionLists(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
+                //            guard let placeholder = self.placeholder else { return }
+                //            let fetchResult = PHCollectionList.fetchCollectionLists(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
                 switch depth {
                 case .current:
                     if self.isHome {
@@ -136,9 +135,9 @@ extension Folder {
                 addRequest.addChildCollections([self.placeholder] as NSFastEnumeration)
             } completionHandler: { (success, error) in
                 print("Finished Adding the folder. \(success ? "Success" : String(describing: error))")
-    //            guard let placeholder = self.placeholder else { return }
-    //            let fetchResult = PHCollectionList.fetchCollectionLists(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
-    //            guard let folder = fetchResult.firstObject else { return }
+                //            guard let placeholder = self.placeholder else { return }
+                //            let fetchResult = PHCollectionList.fetchCollectionLists(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
+                //            guard let folder = fetchResult.firstObject else { return }
                 self.changeRequest = nil
                 completion(success)
             }
@@ -220,19 +219,20 @@ extension Folder {
                         self.renewFetchResult()
                     }
                     
-//                    if let folder = self.folder {
-//                        PHCollectionList.fetchCollections(in: folder, options: nil)
-//                    } else {
-//                        PHCollectionList.fetchTopLevelUserCollections(with: nil)
-//                    }
-//                    completion(newFetchResult)
+                    //                    if let folder = self.folder {
+                    //                        PHCollectionList.fetchCollections(in: folder, options: nil)
+                    //                    } else {
+                    //                        PHCollectionList.fetchTopLevelUserCollections(with: nil)
+                    //                    }
+                    //                    completion(newFetchResult)
                 }
                 
             }
         }
     }
-    
 }
+
+
 // MARK: - 3. extenstion [Folder] change observer
 extension Folder: PHPhotoLibraryChangeObserver {
     
@@ -274,7 +274,9 @@ extension Folder: PHPhotoLibraryChangeObserver {
             || detail.changedObjects.first?.isKind(of: PHAssetCollection.self) == true {
             print("Change 옵저버 [FOLDER] 3")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.6, blendDuration: 0.8)) {
+                withAnimation(.spring(response: 0.35, 
+                                      dampingFraction: 0.6,
+                                      blendDuration: 0.8)) {
                     self.refreshAlbumList(newFetchResult)
                 }
             }

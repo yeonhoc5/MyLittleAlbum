@@ -22,17 +22,7 @@ class Album: NSObject, Identifiable, ObservableObject {
     @Published var colorIndex: Int = 0
     @Published var rprsttivePhoto1: PHAsset!
     @Published var rprsttivePhoto2: PHAsset!
-    @Published var albumFetchResult = PHFetchResult<PHAsset>() //{
-//        didSet {
-//            DispatchQueue.main.async {
-//                self.count = self.albumFetchResult.count
-//                self.photosArray = Array(self.albumFetchResult.objects(at: IndexSet(integersIn: 0..<self.count)))
-//                self.countOfImage = self.photosArray.filter{$0.mediaType == .image}.count
-//                self.countOfVidoe = self.photosArray.filter{$0.mediaType == .video}.count
-//                print("album [\(self.title)] Step 20. album is REFRESHED by fetchResult DIDset")
-//            }
-//        }
-//    }
+    @Published var albumFetchResult = PHFetchResult<PHAsset>()
     
 // MARK: - 프라퍼티 2. 전체 사진 / 앨범없는 사진 / 앨범 있는 사진용
     @Published var belongingType: BelongingType = .all
@@ -47,14 +37,8 @@ class Album: NSObject, Identifiable, ObservableObject {
 //    @State var isChaneged: Bool = false
     
 // MARK: - 프라퍼티 3. 공용 -> asset collectionView 구성 요소
-    @Published var photosArray = [PHAsset]() //{
-//        didSet {
-//            self.count = photosArray.count
-//            self.countOfImage = photosArray.filter{$0.mediaType == .image}.count
-//            self.countOfVidoe = photosArray.filter{$0.mediaType == .video}.count
-//            print("album [\(self.title)] Step 30. album is REFRESHED by photosArray DIDset")
-//        }
-//    }
+    @Published var photosArray = [PHAsset]() 
+    @Published var hiddenAssetsArray = [PHAsset]()
     @Published var count: Int = 0 {
         willSet {
             objectWillChange.send()
@@ -147,6 +131,24 @@ class Album: NSObject, Identifiable, ObservableObject {
 
 // MARK: - 익스텐션 1. 앨범 처리 함수
 extension Album {
+    func fetchOnlyHiddenAssets(_ reFetchResult: PHFetchResult<PHAsset>! = nil) {
+        var allArray = [PHAsset]()
+        if reFetchResult == nil {
+            let options = PHFetchOptions()
+            options.wantsIncrementalChangeDetails = true
+            options.includeHiddenAssets = true
+            let allAssets = PHAsset.fetchAssets(in: album, options: options)
+            allArray = Array(allAssets.objects(at: IndexSet(integersIn: 0..<allAssets.count)))
+        } else {
+            allArray = Array(reFetchResult.objects(at: IndexSet(integersIn: 0..<reFetchResult.count)))
+        }
+                
+        DispatchQueue.main.async {
+            withAnimation {
+                self.hiddenAssetsArray = allArray.filter{ $0.isHidden == true }
+            }
+        }
+    }
     
     func generateAllAlbumPhotos(allAlbumPhotosArray: [PHFetchResult<PHAsset>]) -> Set<PHAsset> {
         var resultSet = Set<PHAsset>()
@@ -181,43 +183,50 @@ extension Album {
         withAnimation {
             self.filteringType = type
         }
+        
     }
     
     
     // 앨범에 asset 넣기
     func addAsset(assets: [PHAsset], stateObject: StateChangeObject) {
-        DispatchQueue.main.async {
-            PHPhotoLibrary.shared().performChanges {
-                PHAssetCollectionChangeRequest(for: self.album, assets: self.albumFetchResult)?.addAssets(assets as NSFastEnumeration)
-            } completionHandler: { bool, _ in
-                if bool {
-                    DispatchQueue.main.async {
-//                        stateObject.assetChanged = true
+        PHPhotoLibrary.shared().performChanges {
+            PHAssetCollectionChangeRequest(for: self.album, assets: self.albumFetchResult)?.addAssets(assets as NSFastEnumeration)
+        } completionHandler: { bool, _ in
+            if bool {
+                DispatchQueue.main.async {
+                    withAnimation {
                         stateObject.assetChanged = .changed
                     }
-                    print("album [\(self.title)] Step 2. assets are INSERTED")
                 }
+                print("album [\(self.title)] Step 2. assets are INSERTED")
             }
         }
     }
     
     // 앨범에서 asset 빼기
-    func removeAssetFromAlbum(indexSet: [Int]) {
-        var assetArray: [PHAsset] = []
-        switch filteringType {
-        case .all:
-            assetArray = self.photosArray
-        case .image:
-            assetArray = self.photosArray.filter({$0.mediaType == .image})
-        case .video:
-            assetArray = self.photosArray.filter({$0.mediaType == .video})
+    func removeAssetFromAlbum(indexSet: [Int], isHidden: Bool = false) {
+        var assetArray: [PHAsset] = isHidden ? self.hiddenAssetsArray : self.photosArray
+        switch self.filteringType {
+        case .image: assetArray = assetArray.filter{ $0.mediaType == .image }
+        case .video: assetArray = assetArray.filter{ $0.mediaType == .video }
+        default: break
         }
         let assets: [PHAsset] = indexSet.map({assetArray[$0]})
+        
+        var checkFetchResult = PHFetchResult<PHAsset>()
+        
         DispatchQueue.main.async {
             PHPhotoLibrary.shared().performChanges {
-                PHAssetCollectionChangeRequest(for: self.album, assets: self.albumFetchResult)?.removeAssets(assets as NSFastEnumeration)
+                let options = PHFetchOptions()
+                options.includeHiddenAssets = isHidden
+                checkFetchResult = PHAsset.fetchAssets(in: self.album, options: options)
+                PHAssetCollectionChangeRequest(for: self.album, assets: checkFetchResult)?.removeAssets(assets as NSFastEnumeration)
             } completionHandler: {bool, _ in
                 if bool {
+                    if isHidden {
+                        self.fetchOnlyHiddenAssets()
+                        print("hidden asset array refetched")
+                    }
                     print("album [\(self.title)] Step 3. assets are REMOVED")
                 }
             }
@@ -249,7 +258,7 @@ extension Album {
     }
 
     // 가리기 {
-    func hideAsset(indexSet: [Int], stateObject: StateChangeObject) {
+    func hideAsset(indexSet: [Int], stateObject: StateChangeObject, isSeperated: Bool! = false) {
         var assetArray: [PHAsset] = []
         switch self.filteringType {
         case .all: assetArray = self.photosArray
@@ -264,23 +273,25 @@ extension Album {
                     request.isHidden = true
             }
         } completionHandler: {bool, _ in
-            if bool {
-                DispatchQueue.main.async {
-//                    stateObject.assetChanged = true
-                    stateObject.assetChanged = .changed
-                    self.albumAssetsChanged = true
+            if !isSeperated {
+                if bool {
+                    DispatchQueue.main.async {
+    //                    stateObject.assetChanged = true
+                        stateObject.assetChanged = .changed
+                        self.albumAssetsChanged = true
+                    }
                 }
             }
         }
     }
     
     // 가리기 해제
-    func unHideAsset(indexSet: [Int], stateObject: StateChangeObject) {
-        var assetArray = [PHAsset]()
+    func unHideAsset(indexSet: [Int], stateObject: StateChangeObject, isAlbum: Bool = false, isSeperated: Bool! = false) {
+        var assetArray = isAlbum ? self.hiddenAssetsArray : self.photosArray
         switch self.filteringType {
-        case .all: assetArray = self.photosArray
-        case .image: assetArray = self.photosArray.filter{ $0.mediaType == .image }
-        case .video: assetArray = self.photosArray.filter{ $0.mediaType == .video }
+        case .image: assetArray = assetArray.filter{ $0.mediaType == .image }
+        case .video: assetArray = assetArray.filter{ $0.mediaType == .video }
+        default: break
         }
         let assets = indexSet.map{assetArray[$0]}
         PHPhotoLibrary.shared().performChanges {
@@ -291,22 +302,31 @@ extension Album {
                 }
             }
         } completionHandler: {bool, _ in
-            if bool {
-                DispatchQueue.main.async {
-//                    stateObject.assetChanged = true
-                    stateObject.assetChanged = .changed
+            if !isSeperated {
+                if bool {
+                    if isAlbum {
+                        DispatchQueue.main.async {
+                            withAnimation {
+                                self.hiddenAssetsArray.remove(atOffsets: IndexSet(indexSet))
+                            }
+                        }
+                    }
+                    DispatchQueue.main.async {
+                        stateObject.assetChanged = .changed
+                    }
+                    print("album [\(self.title)] Step 6. assets are CANCEL HIDDEN")
+    //                if self.album != nil {
+    //                    let fetchOptions = PHFetchOptions()
+    //                    fetchOptions.includeHiddenAssets = false
+    //                    fetchOptions.wantsIncrementalChangeDetails = true
+    //                    let newFetchResult = PHAsset.fetchAssets(in: self.album, options: fetchOptions)
+    //                    self.albumFetchResult = newFetchResult
+    //                    self.refreshAlbumModel(newFetchResult)
+    //
+    //                }
                 }
-                print("album [\(self.title)] Step 6. assets are CANCEL HIDDEN")
-//                if self.album != nil {
-//                    let fetchOptions = PHFetchOptions()
-//                    fetchOptions.includeHiddenAssets = false
-//                    fetchOptions.wantsIncrementalChangeDetails = true
-//                    let newFetchResult = PHAsset.fetchAssets(in: self.album, options: fetchOptions)
-//                    self.albumFetchResult = newFetchResult
-//                    self.refreshAlbumModel(newFetchResult)
-//
-//                }
             }
+            
         }
     }
     
@@ -387,6 +407,7 @@ extension Album: PHPhotoLibraryChangeObserver {
                     
                     self.albumFetchResult = newFetchResult
                     self.refreshAlbumModel(self.albumFetchResult)
+                    
                 }
                 if changes.hasIncrementalChanges {
                     if let inserted = changes.insertedIndexes, inserted.count > 0 {

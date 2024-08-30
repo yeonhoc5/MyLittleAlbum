@@ -49,17 +49,22 @@ struct VideoDetailView: View {
                 AVPlayerController(player: avPlayer)
                     .simultaneousGesture(hideGesture)
                     .overlay(alignment: .bottom) {
-                        customPlayBack
-                            .padding(.bottom, 80)
-                            .opacity(self.hidden ? 0 : 1)
-                            .simultaneousGesture(seekGesture(current: currentTime))
+                        GeometryReader { geoproxy in
+                            customPlayBack(geo: geoproxy)
+                                .simultaneousGesture(seekGesture(current: currentTime))
+                        }
+                        .frame(width: device == .phone 
+                               ? screenWidth - 50 : screenWidth * 0.5,
+                               height: 130)
+                        .opacity(self.hidden ? 0 : 1)
+                        .padding(.bottom, 50)
                     }
-                    .onChange(of: play, perform: { newValue in
-                        if newValue {
+                    .onChange(of: play, perform: { bool in
+                        if bool {
                             if self.timeObserver == nil {
                                 addObserverToPlayer()
                             }
-                            // play&pasue by button
+                            // play & pasue by button
                             if avPlayer.status == .readyToPlay {
                                 avPlayer.play()
                             }
@@ -83,8 +88,8 @@ struct VideoDetailView: View {
                         }
                     }
                     .onChange(of: value) { newValue in
-                        DispatchQueue.main.async {
-                            if newValue == 1.0 {
+                        if newValue == 1.0 {
+                            DispatchQueue.main.async {
                                 removeObserver()
                                 resetVideo()
                             }
@@ -115,11 +120,11 @@ struct VideoDetailView: View {
 // MARK: - 2. subViews
 extension VideoDetailView {
     // 커스텀 비디오 컨트롤러
-    var customPlayBack: some View {
+    func customPlayBack(geo: GeometryProxy) -> some View {
         let iconSize: CGFloat = 30
+        let innerPadding = 25.0
         return ZStack {
             BlurView(style: .prominent)
-                .frame(width: screenSize.width - 50, height: 130)
                 .cornerRadius(20)
             VStack(spacing: 25) {
                 VStack(spacing: 5) {
@@ -132,28 +137,34 @@ extension VideoDetailView {
                     }
                     .font(.subheadline)
                     .foregroundColor(.gray)
-                    CustomSeekBar(value: self.$value, avPlayer: $avPlayer, play: $play, isSeeking: $isSeeking, slider: $slider)
-                        .frame(width: screenSize.width - 100)
+                    CustomSeekBar(value: self.$value, 
+                                  avPlayer: $avPlayer, 
+                                  play: $play,
+                                  isSeeking: $isSeeking,
+                                  slider: $slider,
+                                  currentTime: $currentTime)
                 }
-                .frame(width: screenSize.width - 100)
                 HStack {
+                    if play {
+                        btnStopPlay(iconSize: iconSize)
+                            .animation(.interactiveSpring(), value: play)
+                    } else {
+                        Rectangle()
+                            .foregroundStyle(.clear)
+                            .frame(width: iconSize, height: iconSize)
+                    }
+                    Spacer()
                     btnBackward(iconSize: iconSize)
+                    Spacer()
                     btnPlayToggle(play: play, iconSize: iconSize)
-                        .padding(.horizontal, 20)
+                    Spacer()
                     btnForward(iconSize: iconSize)
+                    Spacer()
+                    btnMuteToggle(mute: mute, iconSize: iconSize)
                 }
+                .scaleEffect(0.8)
             }
-            .overlay(alignment: .bottomTrailing) {
-                btnMuteToggle(mute: mute, iconSize: iconSize)
-                    .scaleEffect(0.8)
-            }
-            .overlay(alignment: .bottomLeading) {
-                if play {
-                    btnStopPlay(iconSize: iconSize)
-                        .scaleEffect(0.8)
-                        .animation(.interactiveSpring(), value: play)
-                }
-            }
+            .padding(innerPadding)
         }
         .foregroundColor(.white)
         

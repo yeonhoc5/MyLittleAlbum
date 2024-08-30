@@ -27,20 +27,18 @@ extension View {
     }
     @ViewBuilder
     func imageScaledFill(uiImage: UIImage?, width: CGFloat, height: CGFloat, radius: CGFloat! = 0) -> some View {
-        if let uiImage = uiImage {
-            Image(uiImage: uiImage)
-                .resizable()
-                .scaledToFill()
-                .frame(width: width, height: height)
-                .clipped()
-                .cornerRadius(radius)
-        } else {
-            Color.gray.opacity(0.3)
-                .frame(width: width, height: width)
-                .clipped()
-                .cornerRadius(radius)
+        Group {
+            if let uiImage = uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Color.gray.opacity(0.3)
+            }
         }
-        
+        .frame(width: width, height: height)
+        .clipped()
+        .cornerRadius(radius)
     }
     
     func imageScaledFit(_ name: String, width: CGFloat, height: CGFloat) -> some View {

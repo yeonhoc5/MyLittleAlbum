@@ -11,19 +11,44 @@ import Foundation
 // ui 체인지용
 enum UIMode: String, CaseIterable {
     case classic, modern, fancy
+    
+    enum Axis {
+        case horizontal, vertical
+    }
+    
+    static func axis(uiMode: UIMode) -> Axis {
+        switch uiMode {
+        case .classic:
+            return .vertical
+        case .modern, .fancy:
+            return .horizontal
+        }
+    }
 }
-enum SampleCase {
-    case overTwo, one, none
+
+enum SampleCase: Int {
+    case overTwo
+    case one
+    case none
+    
+    static func returnType(int: Int) -> Self {
+        switch int {
+        case 2: return .overTwo
+        case 1: return .one
+        default: return .none
+        }
+    }
 }
 
 // 탭바용
-enum Tabs: String, CaseIterable {
-    case photo, album, smart
+enum Tabs: String, CaseIterable, Identifiable {
+    var id: Self { self }
+    
+    case photo = "나의 사진"
+    case album = "나의 앨범"
+    case other = "사진 관리"
 }
-// 커스텀 네비게이션용
-enum TypeView {
-    case photo, album, other
-}
+
 // cell별 ui 구분
 enum CellType {
     case folder, album, miniAlbum

@@ -13,7 +13,7 @@ struct AllPhotosAreInAlbumsView: View {
             FancyBackground()
             Image("arrangeKing")
                 .resizable()
-                .scaledToFill()
+                .scaledToFit()
                 .opacity(0.9)
         }
     }

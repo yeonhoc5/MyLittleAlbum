@@ -187,9 +187,6 @@ struct PhotosDetailView: View {
 }
 
 
-
-
-
 struct detailPageView<Content: View>: View {
     @Binding var indexToView: Int
     let countSum: Int
@@ -257,7 +254,6 @@ extension PhotosDetailView {
         if currentAsset.mediaType == .image {
             ImageDetailView(isExpanded: $isExpanded,
                             asset: currentAsset,
-//                            navigationTitle: navigationTitle,
                             variableScale: $variableScale,
                             currentScale: $currentScale,
                             offsetY: $offsetY)
@@ -270,8 +266,6 @@ extension PhotosDetailView {
             VideoDetailView(isExpanded: $isExpanded,
                             offsetIndex: offsetIndex,
                             asset: currentAsset,
-//                            navigationTitle: navigationTitle,
-//                            isPaging: pagingGesture,
                             hidden: $hidden,
                             isSeeking: $isSeeking,
                             offsetY: $offsetY,
@@ -351,7 +345,9 @@ extension PhotosDetailView {
 
 struct PhotosDetailView_Previews: PreviewProvider {
     static var previews: some View {
-        PhotosDetailView(indexToView: .constant(0), isExpanded: .constant(true), navigationTitle: "photos")
+        PhotosDetailView(indexToView: .constant(0),
+                         isExpanded: .constant(true),
+                         navigationTitle: "photos")
             .preferredColorScheme(.dark)
     }
 }
