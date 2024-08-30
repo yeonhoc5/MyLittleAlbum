@@ -19,7 +19,7 @@ struct AlbumView: View {
     var isTopFolder: Bool! = true
     var color: Color! = .orange
     @State var isPortrait: Bool = true
-    @Binding var isPhotosView: Bool
+    @Binding var isPhotosView: Int
     // 애니메이션 프라퍼티
     var nameSpace: Namespace.ID
     @Namespace var albumViewNameSpace
@@ -120,12 +120,10 @@ struct AlbumView: View {
                         if new.width > new.height {
                             withAnimation {
                                 isPortrait = true
-                                print(isPortrait)
                             }
                         } else {
                             withAnimation {
                                 isPortrait = false
-                                print(isPortrait)
                             }
                         }
                     })
@@ -206,13 +204,6 @@ struct AlbumView: View {
                                 folderArray: $pageFolder.folderArray,
                                 isShowingReorderSheet: $isShowingReorderSheet)
         })
-        .onAppear {
-            if isPhotosView {
-                withAnimation {
-                    isPhotosView = false
-                }
-            }
-        }
     }
 }
 
@@ -455,7 +446,7 @@ extension AlbumView {
 struct AlbumView_Previews: PreviewProvider {
     static var previews: some View {
         AlbumView(pageFolder: Folder(isHome: true),
-                  isPhotosView: .constant(false),
+                  isPhotosView: .constant(0),
                   nameSpace: Namespace().wrappedValue,
                   isShowingSettingView: .constant(false),
                   stateChangeObject: StateChangeObject())
