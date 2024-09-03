@@ -19,7 +19,7 @@ struct MyLittleAlbum: App {
         UserDefaults.standard
             .register(defaults: [UserDefaultsKey.useKnock.rawValue: true])
         UserDefaults.standard
-            .register(defaults: [UserDefaultsKey.transitionIndex.rawValue: 2])
+            .register(defaults: [UserDefaultsKey.transitionIndex.rawValue: 2]) // 5초
         UserDefaults.standard
             .register(defaults: [UserDefaultsKey.digitalShowRandom.rawValue: true])
         UserDefaults.standard
@@ -44,7 +44,8 @@ struct MyLittleAlbum: App {
         naviAppearance.scrollEdgeAppearance = appearanceScroll
         
         // 알럿 컬러 설정 : dark로
-        UIView.appearance(whenContainedInInstancesOf: [UIAlertController.self])
+        UIView
+            .appearance(whenContainedInInstancesOf: [UIAlertController.self])
             .overrideUserInterfaceStyle = .dark
     }
     

@@ -181,6 +181,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1A0128872C869BAE002EEBAA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				1A3EA90828F6A3860071CB25 /* Assets.xcassets */,
+				1AA4B4462C3D17FA0006D445 /* Loading1.json */,
+				1A84CD882C5C9108004C260A /* Loading2.json */,
+				1AA4B4482C3D1A880006D445 /* Loading3.json */,
+				1A84CD8E2C5CC268004C260A /* Loading4.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		1A18072D29820613005117D2 /* Model */ = {
 			isa = PBXGroup;
 			children = (
@@ -249,14 +261,10 @@
 				1ADFD66C295D530D00418042 /* Scenes */,
 				1A18072D29820613005117D2 /* Model */,
 				1ADD56F5290A679D00755989 /* DataAndObservable */,
+				1A0128872C869BAE002EEBAA /* Resources */,
 				1A6E4375292B8C6500D0873B /* Extension */,
 				1A8C5CEA2A0279910028CF20 /* Lazypop */,
 				1A8DEA6E29E00C7200EEA9B7 /* Developing */,
-				1A3EA90828F6A3860071CB25 /* Assets.xcassets */,
-				1AA4B4462C3D17FA0006D445 /* Loading1.json */,
-				1A84CD882C5C9108004C260A /* Loading2.json */,
-				1AA4B4482C3D1A880006D445 /* Loading3.json */,
-				1A84CD8E2C5CC268004C260A /* Loading4.json */,
 				1A3EA90A28F6A3860071CB25 /* Preview Content */,
 			);
 			path = MyLittleAlbum;
@@ -823,6 +831,7 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "\"마이리틀앨범\"으로 사용자의 앨범/폴더/사진을 관리하려면 사진 보관함에 대한 접근을 허용해 주세요.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "Launch Screen.storyboard";
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDarkContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -861,6 +870,7 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "\"마이리틀앨범\"으로 사용자의 앨범/폴더/사진을 관리하려면 사진 보관함에 대한 접근을 허용해 주세요.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = "Launch Screen.storyboard";
+				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDarkContent;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				LD_RUNPATH_SEARCH_PATHS = (
