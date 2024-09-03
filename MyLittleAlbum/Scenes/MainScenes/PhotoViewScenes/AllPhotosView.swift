@@ -305,9 +305,12 @@ struct AllPhotosView: View {
         }
         .sheet(isPresented: $isShowingPhotosPicker) {
             if albumType == .album {
-                CustomPhotosPicker(isShowingPhotosPicker: $isShowingPhotosPicker,
-                                   stateChangeObject: stateChangeObject,
-                                   albumToEdit: album)
+                GeometryReader { geoProxy in
+                    CustomPhotosPicker(isShowingPhotosPicker: $isShowingPhotosPicker,
+                                       stateChangeObject: stateChangeObject,
+                                       size: geoProxy.size,
+                                       albumToEdit: album)
+                }
             }
         }
         .overlay(content: {

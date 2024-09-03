@@ -99,6 +99,7 @@ extension PhotosGridMenu {
                 }
             }
         }
+        .transition(.slide)
     }
     func btnLeftBottom(albumType: AlbumType, isSelectMode: Bool) -> some View {
         Group {
@@ -369,7 +370,6 @@ extension PhotosGridMenu {
         case .video: image = "video.fill"
         default: image = "line.3.horizontal.decrease"
         }
-        let textColor: Color = selectedItemsIndex.count > 0 ? .gray.opacity(0.5):.black
         return Menu {
             filteringMenu
         } label: {

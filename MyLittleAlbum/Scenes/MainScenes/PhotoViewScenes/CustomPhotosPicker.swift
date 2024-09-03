@@ -15,6 +15,7 @@ struct CustomPhotosPicker: View {
     @ObservedObject var stateChangeObject: StateChangeObject
     
     @State var album: Album!
+    let size: CGSize
     
     //    @State var assetArray: [PHAsset]!
     @State var title: String = "앨범 없는 사진함"
@@ -63,19 +64,19 @@ extension CustomPhotosPicker {
     }
     
     var photoPickerView: some View {
-        VStack {
-            HStack {
-                Text(title)
-                    .foregroundColor(.white)
-                Text("(\(assetCount)개 항목)")
-                    .foregroundColor(.gray)
-            }
-            .font(Font.system(size: 20, weight: .semibold, design: .rounded))
-            .bold()
-            .padding(.top, 40)
-            .padding(.bottom, 20)
-            ZStack(alignment: .bottom) {
-                GeometryReader { geoProxy in
+        GeometryReader(content: { geoProxy in
+            VStack {
+                HStack {
+                    Text(title)
+                        .foregroundColor(.white)
+                    Text("(\(assetCount)개 항목)")
+                        .foregroundColor(.gray)
+                }
+                .font(Font.system(size: 20, weight: .semibold, design: .rounded))
+                .bold()
+                .padding(.top, 40)
+                .padding(.bottom, 20)
+                ZStack(alignment: .bottom) {
                     PhotosCollectionView(stateChangeObject: stateChangeObject,
                                          albumType: .picker,
                                          album: album,
@@ -93,33 +94,34 @@ extension CustomPhotosPicker {
                                          isSelectingBySwipe: .constant(false),
                                          geoProxy: geoProxy
                     )
+                    .frame(width: size.width)
+                    GeometryReader { geoProxy in
+                        PhotosGridMenu(stateChangeObject: stateChangeObject,
+                                       albumType: .picker,
+                                       album: album,
+                                       albumToEdit: albumToEdit,
+                                       settingDone: $settingDone,
+                                       belongingType: $belongingType,
+                                       filteringType: $filteringType,
+                                       filteringTypeChanged: $filteringTypeChanged,
+                                       isSelectMode: .constant(true),
+                                       selectedItemsIndex: $selectedItemsIndex,
+                                       edgeToScroll: $edgeToScroll,
+                                       isShowingSheet: .constant(false),
+                                       isShowingShareSheet: .constant(false),
+                                       isShowingPhotosPicker: $isShowingPhotosPicker,
+                                       nameSpace: nameSpace,
+                                       width: geoProxy.size.width)
+                    }
+                    .clipped()
+                    .shadow(color: Color.fancyBackground.opacity(0.5),
+                            radius: 2, x: 0, y: 0)
+                    .padding(.horizontal, tabbarTopPadding)
+                    .frame(width: size.width, height: tabbarHeight)
+                    .padding(.bottom, 20)
                 }
-                GeometryReader { geoProxy in
-                    PhotosGridMenu(stateChangeObject: stateChangeObject,
-                                   albumType: .picker,
-                                   album: album,
-                                   albumToEdit: albumToEdit,
-                                   settingDone: $settingDone,
-                                   belongingType: $belongingType,
-                                   filteringType: $filteringType,
-                                   filteringTypeChanged: $filteringTypeChanged,
-                                   isSelectMode: .constant(true),
-                                   selectedItemsIndex: $selectedItemsIndex,
-                                   edgeToScroll: $edgeToScroll,
-                                   isShowingSheet: .constant(false),
-                                   isShowingShareSheet: .constant(false),
-                                   isShowingPhotosPicker: $isShowingPhotosPicker,
-                                   nameSpace: nameSpace,
-                                   width: geoProxy.size.width)
-                }
-                .clipped()
-                .shadow(color: Color.fancyBackground.opacity(0.5), radius: 2, x: 0, y: 0)
-                .padding(.horizontal,
-                         device == .phone ? tabbarTopPadding : 0)
-                .frame(width: device == .phone ? screenWidth : (screenWidth / 4) * 3, height: tabbarHeight)
-                .padding(.bottom, 20)
             }
-        }
+        })
     }
     
     var toolbarLeading: some View {
@@ -204,6 +206,7 @@ struct CustomPhotosPicker_Previews: PreviewProvider {
         CustomPhotosPicker(isShowingPhotosPicker: .constant(true),
                            stateChangeObject: StateChangeObject(),
                            album: nil,
+                           size: .zero,
                            title: "Not in any Album",
                            albumToEdit: Album(assetArray: [], title: "sample"))
         .environmentObject(PhotoData())

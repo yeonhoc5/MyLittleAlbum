@@ -193,9 +193,12 @@ struct AlbumView: View {
         .sheet(isPresented: $isShowingPhotosPicker, content: {
             // 3. 앨범 밖에서 사진 넣기 시트
             let albumToAdd = Album(album: stateChangeObject.collectionToEdit as! PHAssetCollection)
-            CustomPhotosPicker(isShowingPhotosPicker: $isShowingPhotosPicker,
-                               stateChangeObject: stateChangeObject,
-                               albumToEdit: albumToAdd)
+            GeometryReader { geoProxy in
+                CustomPhotosPicker(isShowingPhotosPicker: $isShowingPhotosPicker,
+                                   stateChangeObject: stateChangeObject,
+                                   size: geoProxy.size,
+                                   albumToEdit: albumToAdd)
+            }
         })
         .fullScreenCover(isPresented: $isShowingReorderSheet, content: {
             // 2. 폴더/앨범 재정렬 시트(풀커버)
