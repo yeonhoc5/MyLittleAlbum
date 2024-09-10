@@ -575,18 +575,15 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
         let album = self.parent.album
+        let array = parent.hiddenAssets ? album.hiddenAssetsArray : album.photosArray
         var count: Int
         switch album.filteringType {
         case .all:
-            count = parent.hiddenAssets 
-                    ? album.hiddenAssetsArray.count
-                    : album.count
+            count = array.count
         case .image:
-            count = (parent.hiddenAssets ? album.hiddenAssetsArray : album.photosArray)
-                    .filter{ $0.mediaType == .image }.count
+            count = array.filter{ $0.mediaType == .image }.count
         case .video:
-            count = (parent.hiddenAssets ? album.hiddenAssetsArray : album.photosArray)
-                    .filter{ $0.mediaType == .video }.count
+            count = array.filter{ $0.mediaType == .video }.count
         }
         
         // step 1. cell별 identifier 구분

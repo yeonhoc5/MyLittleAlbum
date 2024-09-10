@@ -193,6 +193,14 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		1A0129022C8E7990002EEBAA /* ImageDetailView */ = {
+			isa = PBXGroup;
+			children = (
+				1A2A304229D669A5002EFFFD /* ImageDetailView.swift */,
+			);
+			path = ImageDetailView;
+			sourceTree = "<group>";
+		};
 		1A18072D29820613005117D2 /* Model */ = {
 			isa = PBXGroup;
 			children = (
@@ -219,7 +227,7 @@
 			isa = PBXGroup;
 			children = (
 				1A29B8AA29A5CFEA00C03E4F /* PhotosDetailView.swift */,
-				1A2A304229D669A5002EFFFD /* ImageDetailView.swift */,
+				1A0129022C8E7990002EEBAA /* ImageDetailView */,
 				1A848D2A29ED06AC005EEB2A /* VideoDetailScenes */,
 				1A848D2829ED0249005EEB2A /* RepeatedPageView.swift */,
 			);
@@ -319,7 +327,6 @@
 		1A422F3629CC2D23001411E5 /* HelperScenes */ = {
 			isa = PBXGroup;
 			children = (
-				1A848D2B29ED06D6005EEB2A /* AVPlayerController.swift */,
 				1A8DEA7829E62EF300EEA9B7 /* BlurView.swift */,
 				1A422F3329CC0FF2001411E5 /* NonAuthorizedView.swift */,
 				1ACE735C29C2C6B9007ABDFF /* RefreshPhotoView.swift */,
@@ -414,6 +421,7 @@
 			children = (
 				1A2A304429D669B3002EFFFD /* VideoDetailView.swift */,
 				1A848D2D29ED07B5005EEB2A /* CustomSeekBar.swift */,
+				1A848D2B29ED06D6005EEB2A /* AVPlayerController.swift */,
 			);
 			path = VideoDetailScenes;
 			sourceTree = "<group>";

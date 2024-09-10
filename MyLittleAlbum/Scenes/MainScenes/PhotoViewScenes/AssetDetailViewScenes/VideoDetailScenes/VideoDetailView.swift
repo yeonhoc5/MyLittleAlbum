@@ -11,7 +11,6 @@ import AVKit
 
 struct VideoDetailView: View {
     @Environment(\.scenePhase) var scenePhase
-    @Binding var isExpanded: Bool
     var offsetIndex: Int
     var asset: PHAsset
     
@@ -20,11 +19,13 @@ struct VideoDetailView: View {
     @State var play: Bool = false
     @State var mute: Bool = false
     @Binding var hidden: Bool
-    @Binding var isSeeking: Bool
-    @State var value: Float = 0
     @State var timeObserver: Any!
+    @Binding var isSeeking: Bool
     @State var slider: UISlider = UISlider()
+    // uislider의 vlaue가 float임
+    @State var sliderValue: Float = 0
     @State var currentTime: Double = 0
+    @State var tempSliderPosition: Float = 0
     
     let imageManager = PHCachingImageManager()
     // offset proverties
@@ -33,97 +34,86 @@ struct VideoDetailView: View {
     
     var body: some View {
         if avPlayer == nil {
-            ProgressView()
-                .tint(.color1)
-                .progressViewStyle(.circular)
-                .scaleEffect(1.5)
-                .onAppear {
-                    DispatchQueue.main.async {
-                        fetchingVideo(asset: asset)
-                    }
-                }
+            loadingView
         } else {
             if let avPlayer = self.avPlayer {
-                AVPlayerController(player: avPlayer)
-                    .simultaneousGesture(hideGesture)
-                    .overlay(alignment: .bottom) {
-                        GeometryReader { geoproxy in
+                GeometryReader { geoproxy in
+                    AVPlayerController(player: avPlayer)
+                        .simultaneousGesture(hideGesture)
+                        .overlay(alignment: .bottom) {
                             customPlayBack(geo: geoproxy)
-                                .simultaneousGesture(seekGesture(current: currentTime))
+                                .simultaneousGesture(
+                                    seekGesture(current: $currentTime,
+                                                geoProxy: geoproxy)
+                                )
+                                .opacity(self.hidden ? 0 : 1)
+                                .padding(.bottom, 50)
                         }
-                        .frame(width: device == .phone 
-                               ? screenWidth - 50 : screenWidth * 0.5,
-                               height: 130)
-                        .opacity(self.hidden ? 0 : 1)
-                        .padding(.bottom, 50)
-                    }
-                    .onChange(of: play, perform: { bool in
-                        if bool {
-                            if self.timeObserver == nil {
-                                addObserverToPlayer()
-                            }
-                            // play & pasue by button
-                            if avPlayer.status == .readyToPlay {
-                                avPlayer.play()
-                            }
-                        } else {
-                            avPlayer.pause()
-                        }
-                    })
-                    .onChange(of: offsetIndex) { newValue in
-                        if newValue != 0 {
-                            removeObserver()
-                            resetVideo()
-                        }
-                    }
-                    .onDisappear {
-                        if offsetIndex == 0 {
-                            removeObserver()
-                            resetVideo()
-                            DispatchQueue.main.async {
-                                self.avPlayer = nil
-                            }
-                        }
-                    }
-                    .onChange(of: value) { newValue in
-                        if newValue == 1.0 {
-                            DispatchQueue.main.async {
+                        .onChange(of: offsetIndex) { newValue in
+                            if newValue != 0 {
                                 removeObserver()
                                 resetVideo()
                             }
                         }
-                    }
-                    .onChange(of: scenePhase) { newValue in
-                        if offsetIndex == 0 && newValue == .background {
-                            withAnimation { offsetY = 0 }
-                            DispatchQueue.main.async {
-                                avPlayer.pause()
+                        .onDisappear {
+                            if offsetIndex == 0 {
+                                removeObserver()
+                                resetVideo()
+                                if self.avPlayer != nil {
+                                    print("video scene out")
+                                    DispatchQueue.main.async {
+                                        self.avPlayer = nil
+                                    }
+                                }
                             }
                         }
-                    }
-                    .onChange(of: mute, perform: { newValue in
-                        avPlayer.isMuted = newValue
-                    })
-//                    .onChange(of: getSeconds()) { newValue in
-//                        if !isSeeking {
-//                            DispatchQueue.main.async {
-//                                self.currentTime = newValue
-//                            }
-//                        }
-//                    }
+                        .onChange(of: sliderValue) { newValue in
+                            if newValue == 1.0 && !isSeeking {
+                                DispatchQueue.main.async {
+                                    removeObserver()
+                                    resetVideo()
+                                }
+                            }
+                            if play {
+                                self.currentTime = getSeconds()
+                            }
+                        }
+                        .onChange(of: scenePhase) { newValue in
+                            if offsetIndex == 0 && newValue == .background {
+                                withAnimation { offsetY = 0 }
+                                DispatchQueue.main.async {
+                                    avPlayer.pause()
+                                }
+                            }
+                        }
+                        .onChange(of: mute, perform: { newValue in
+                            avPlayer.isMuted = newValue
+                        })
+                }
             }
         }
     }
 }
 // MARK: - 2. subViews
 extension VideoDetailView {
+    var loadingView: some View {
+        ProgressView()
+            .tint(.color1)
+            .progressViewStyle(.circular)
+            .scaleEffect(1.5)
+            .onAppear {
+                DispatchQueue.main.async {
+                    fetchingVideo(asset: asset)
+                }
+            }
+    }
     // 커스텀 비디오 컨트롤러
     func customPlayBack(geo: GeometryProxy) -> some View {
         let iconSize: CGFloat = 30
-        let innerPadding = 25.0
+        let innerPadding = 10.0
         return ZStack {
-            BlurView(style: .prominent)
-                .cornerRadius(20)
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
             VStack(spacing: 25) {
                 VStack(spacing: 5) {
                     HStack {
@@ -135,98 +125,123 @@ extension VideoDetailView {
                     }
                     .font(.subheadline)
                     .foregroundColor(.gray)
-                    CustomSeekBar(value: self.$value, 
-                                  avPlayer: $avPlayer, 
-                                  play: $play,
-                                  isSeeking: $isSeeking,
-                                  slider: $slider,
-                                  currentTime: $currentTime)
+                    CustomSeekBar(value: sliderValue, slider: slider)
                 }
-                HStack {
-                    if play {
-                        btnStopPlay(iconSize: iconSize)
-                            .animation(.interactiveSpring(), value: play)
-                    } else {
-                        Rectangle()
-                            .foregroundStyle(.clear)
-                            .frame(width: iconSize, height: iconSize)
-                    }
-                    Spacer()
-                    btnBackward(iconSize: iconSize)
-                    Spacer()
-                    btnPlayToggle(play: play, iconSize: iconSize)
-                    Spacer()
-                    btnForward(iconSize: iconSize)
-                    Spacer()
-                    btnMuteToggle(mute: mute, iconSize: iconSize)
+                HStack(spacing: 0) {
+                    btnStopPlay(iconSize: iconSize, 
+                                padding: innerPadding)
+                        .opacity(play ? 1 : 0.2)
+                        .disabled(!play)
+                    Spacer(minLength: 1.0)
+                    btnBackward(iconSize: iconSize, 
+                                padding: innerPadding)
+                    Spacer(minLength: 1.0)
+                    btnPlayToggle(play: $play,
+                                  iconSize: iconSize,
+                                  padding: innerPadding)
+                    Spacer(minLength: 1.0)
+                    btnForward(iconSize: iconSize, 
+                               padding: innerPadding)
+                    Spacer(minLength: 1.0)
+                    btnMuteToggle(mute: mute, 
+                                  iconSize: iconSize,
+                                  padding: innerPadding)
                 }
-                .scaleEffect(0.8)
             }
-            .padding(innerPadding)
+            .padding(25)
         }
         .foregroundColor(.white)
-        
+        .frame(width: device == .phone ? geo.size.width * 0.9
+                                    : min(geo.size.width, geo.size.height) * 0.7,
+               height: 150)
     }
     // 버튼 1/4. 재생 토글
-    func btnPlayToggle(play: Bool, iconSize: CGFloat) -> some View {
-        let playIcon = play ? "pause.fill" : "play.fill"
+    func btnPlayToggle(play: Binding<Bool>, iconSize: CGFloat, padding: CGFloat) -> some View {
+        let playIcon = play.wrappedValue ? "pause.fill" : "play.fill"
         return Button {
-            withAnimation(.interactiveSpring()) {
-                self.play.toggle()
+            if !isSeeking {
+                if !play.wrappedValue {
+                    withAnimation(.interactiveSpring()) {
+                        self.play = true
+                    }
+                    if self.timeObserver == nil {
+                        addObserverToPlayer()
+                    }
+                    // play & pasue by button
+                    if avPlayer.status == .readyToPlay {
+                        avPlayer.play()
+                    }
+                } else {
+                    withAnimation(.interactiveSpring()) {
+                        self.play = false
+                    }
+                    avPlayer.pause()
+                }
             }
         } label: {
             imageScaledFit(systemName: playIcon, width: iconSize, height: iconSize)
+                .padding(padding)
         }
     }
     // 버튼 2/4. 뒤로 5초
-    func btnBackward(iconSize: CGFloat) -> some View {
+    func btnBackward(iconSize: CGFloat, padding: CGFloat) -> some View {
         Button {
-            if currentTime - 5 <= 0 {
-                avPlayer.seek(to: CMTime(seconds: 0, preferredTimescale: 1))
-                currentTime = 0
-            } else {
-                avPlayer.seek(to: CMTime(seconds: currentTime - 5, preferredTimescale: 1))
-                currentTime = currentTime - 5
-            }
-            DispatchQueue.main.async {
-                getValue(runningTime: asset.duration, current: currentTime)
-            }
-        } label: {
-            imageScaledFit(systemName: "gobackward.5", width: iconSize, height: iconSize)
-        }
-    }
-    // 버튼 3/4. 앞으로 5초
-    func btnForward(iconSize: CGFloat) -> some View {
-        Button {
-            if let total = avPlayer.currentItem?.duration.seconds.rounded(.toNearestOrAwayFromZero) {
-                if total - currentTime <= 5 {
-                    avPlayer.seek(to: CMTime(seconds: total, preferredTimescale: 10))
-                    currentTime = total
+            if !isSeeking {
+                if let bool = avPlayer.currentItem?.canStepBackward,
+                    bool == true {
+                    avPlayer.seek(to: CMTime(seconds: currentTime - 5, preferredTimescale: 1))
+                    currentTime = currentTime - 5
                 } else {
-                    avPlayer.seek(to: CMTime(seconds: currentTime + 5, preferredTimescale: 10))
-                    currentTime = currentTime + 5
+                    avPlayer.seek(to: CMTime(seconds: 0, preferredTimescale: 1))
+                    currentTime = 0
                 }
                 DispatchQueue.main.async {
                     getValue(runningTime: asset.duration, current: currentTime)
                 }
             }
         } label: {
+            imageScaledFit(systemName: "gobackward.5", width: iconSize, height: iconSize)
+                .padding(padding)
+        }
+    }
+    // 버튼 3/4. 앞으로 5초
+    func btnForward(iconSize: CGFloat, padding: CGFloat) -> some View {
+        Button {
+            if !isSeeking {
+                if let total = avPlayer.currentItem?.duration.seconds.rounded(.toNearestOrAwayFromZero) {
+                    if total - currentTime <= 5 {
+                        avPlayer.seek(to: CMTime(seconds: total, preferredTimescale: 10))
+                        currentTime = total
+                    } else {
+                        avPlayer.seek(to: CMTime(seconds: currentTime + 5, preferredTimescale: 10))
+                        currentTime = currentTime + 5
+                    }
+                    DispatchQueue.main.async {
+                        getValue(runningTime: asset.duration, current: currentTime)
+                    }
+                }
+            }
+        } label: {
             imageScaledFit(systemName: "goforward.5", width: iconSize, height: iconSize)
+                .padding(padding)
         }
     }
     // 버튼 4/4. 뮤트 토글
-    func btnMuteToggle(mute: Bool, iconSize: CGFloat) -> some View {
+    func btnMuteToggle(mute: Bool, iconSize: CGFloat, padding: CGFloat) -> some View {
         let muteIcon = mute ? "speaker.slash.fill" : "speaker.wave.2.fill"
         return Button {
-            withAnimation(.interactiveSpring()) {
-                self.mute.toggle()
+            if !isSeeking {
+                withAnimation(.interactiveSpring()) {
+                    self.mute.toggle()
+                }
             }
         } label: {
             imageScaledFit(systemName: muteIcon, width: iconSize, height: iconSize)
+                .padding(padding)
         }
     }
     
-    func btnStopPlay(iconSize: CGFloat) -> some View {
+    func btnStopPlay(iconSize: CGFloat, padding: CGFloat) -> some View {
         Button {
             DispatchQueue.main.async {
                 resetVideo()
@@ -234,6 +249,7 @@ extension VideoDetailView {
             }
         } label: {
             imageScaledFit(systemName: "stop.fill", width: iconSize, height: iconSize)
+                .padding(padding)
         }
     }
     
@@ -273,12 +289,14 @@ extension VideoDetailView {
     // get 슬라이더 위치
     func getValue(runningTime: TimeInterval, current: TimeInterval) {
         DispatchQueue.main.async {
-            value = Float(current / runningTime)
+            sliderValue = Float(current / runningTime)
         }
     }
     // get 현재 비디오 타임
     func getSeconds() -> Double {
-        return Double(Double(value) * (asset.duration)).rounded(.toNearestOrAwayFromZero)
+        let time = Double(sliderValue) * (asset.duration)
+        return Double(time < 0 ? 0 : time)
+            .rounded(.toNearestOrAwayFromZero)
     }
     
     // Reset 비디오 재생
@@ -287,7 +305,7 @@ extension VideoDetailView {
         DispatchQueue.main.async {
             avPlayer?.pause()
             avPlayer?.seek(to: .zero)
-            value = 0
+            sliderValue = 0
         }
     }
 
@@ -336,9 +354,23 @@ extension VideoDetailView {
         print("옵저버 ADDed")
         guard let _ = self.avPlayer.currentItem else { return }
         self.timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: time, queue: .main) { time in
-            DispatchQueue.main.async {
-                self.value = Float(time.seconds / runningTime)
+            let remain = runningTime - time.seconds
+            print(remain)
+            if remain > 0.05 {
+                currentTime = time.seconds
+                DispatchQueue.main.async {
+                    withAnimation {
+                        self.sliderValue = Float(time.seconds / runningTime)
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    withAnimation {
+                        self.sliderValue = 1.0
+                    }
+                }
             }
+//            print(time.seconds, runningTime)
         }
     }
     
@@ -366,43 +398,50 @@ extension VideoDetailView {
     }
     
     // video seek Gestrue
-    func seekGesture(current: Double) -> some Gesture {
-        var playPosition: Double = 0
+    func seekGesture(current: Binding<Double>, geoProxy: GeometryProxy) -> some Gesture {
+        var movedWidth: CGFloat = 0
+        
         return DragGesture(minimumDistance: 1)
             .onChanged { newValue in
-                isSeeking = true
+                if !isSeeking {
+                    isSeeking = true
+                    tempSliderPosition = sliderValue
+                    avPlayer?.pause()
+                    print("on changed", "isSeeking \(isSeeking)")
+                }
                 self.offsetX = 0
                 self.offsetY = 0
-                avPlayer?.pause()
                 if let item = avPlayer.currentItem {
-                    guard !(item.duration.seconds.isNaN || item.duration.seconds.isInfinite) else { return }
-                    let sec = Int((newValue.translation.width / 180) * item.duration.seconds)
-                    avPlayer?.seek(to: CMTime(seconds: Double(Int(current) + sec), preferredTimescale: 1))
-                    playPosition = Double(Int(current) + sec)
-                    if (0...asset.duration).contains(playPosition) {
-                        DispatchQueue.main.async {
-                            getValue(runningTime: asset.duration, current: playPosition)
-                        }
+                    guard !(item.duration.seconds.isNaN || item.duration.seconds.isInfinite) 
+                    else {
+                        return
                     }
+                    movedWidth = CGFloat(newValue.translation.width / (geoProxy.size.width * 0.7))
+                    let movePercent = tempSliderPosition + Float(movedWidth)
+                    sliderValue = movePercent < 0 ? 0 : (movePercent > 1 ? 1 : movePercent)
+                    currentTime = item.duration.seconds * Double(sliderValue)
+                    avPlayer?
+                        .seek(to: CMTime(seconds: currentTime,
+                                         preferredTimescale: 1))
                 }
             }
             .onEnded { newValue in
-                isSeeking = false
-                avPlayer?.seek(to: CMTime(seconds: playPosition, preferredTimescale: 1))
+                print(currentTime)
+                tempSliderPosition = 0
                 DispatchQueue.main.async {
-                    self.currentTime = playPosition
+                    if play {
+                        avPlayer?.play()
+                    }
                 }
-                if play {
-                    avPlayer?.play()
-                }
+                isSeeking = false
+                print("on Ended", "isSeeking \(isSeeking)")
             }
     }
 }
 
 struct VideoDetailView_Previews: PreviewProvider {
     static var previews: some View {
-        VideoDetailView(isExpanded: .constant(true),
-                        offsetIndex: 0,
+        VideoDetailView(offsetIndex: 0,
                         asset: PHAsset(),
 //                        navigationTitle: "sample",
                         hidden: .constant(false),

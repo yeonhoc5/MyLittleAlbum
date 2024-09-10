@@ -8,7 +8,6 @@
 import SwiftUI
 
 struct RepeatedPageView<Content: View>: View {
-    let screenSize = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.screen.bounds.size
     let content: (_ offsetIndex: Int, _ pageIndex: Int) -> Content
     let count: Int
     var indexToView: Int
@@ -44,36 +43,11 @@ struct RepeatedPageView<Content: View>: View {
             Color.black
                 .ignoresSafeArea()
                 .zIndex(0.49)
-            if (0..<count).contains(calcPageIndex(offsetIndex - 1, indexToView)) {
-                contentFrame(offsetIndex: calcOffsetIndex(offsetIndex - 1),
-                             pageIndex: calcPageIndex(offsetIndex - 1, indexToView),
-                             color: .red)
-                .zIndex(calczIndex(calcOffsetIndex(offsetIndex - 1)))
-            }
-            if (0..<count).contains(calcPageIndex(offsetIndex - 2, indexToView)) {
-                contentFrame(offsetIndex: calcOffsetIndex(offsetIndex - 2),
-                             pageIndex: calcPageIndex(offsetIndex - 2, indexToView),
-                             color: .green)
-                .zIndex(calczIndex(calcOffsetIndex(offsetIndex - 2)))
-            }
-            if (0..<count).contains(calcPageIndex(offsetIndex + 1, indexToView)) {
-                contentFrame(offsetIndex: calcOffsetIndex(offsetIndex + 1),
-                             pageIndex: calcPageIndex(offsetIndex + 1, indexToView),
-                             color: .blue)
-                .zIndex(calczIndex(calcOffsetIndex(offsetIndex + 1)))
-            }
-            if (0..<count).contains(calcPageIndex(offsetIndex + 2, indexToView)) {
-                contentFrame(offsetIndex: calcOffsetIndex(offsetIndex + 2),
-                             pageIndex: calcPageIndex(offsetIndex + 2, indexToView),
-                             color: .yellow)
-                .zIndex(calczIndex(calcOffsetIndex(offsetIndex + 2)))
-            }
-            if (0..<count).contains(calcPageIndex(offsetIndex, indexToView)) {
-                contentFrame(offsetIndex: calcOffsetIndex(offsetIndex),
-                             pageIndex: calcPageIndex(offsetIndex, indexToView),
-                             color: .white)
-                .zIndex(calczIndex(calcOffsetIndex(offsetIndex)))
-
+            ForEach(-2..<3) { int in
+                contentFrame(offsetIndex: calcOffsetIndex(offsetIndex - int),
+                             pageIndex: calcPageIndex(offsetIndex - int, indexToView),
+                             color: colorSet[int + 2])
+                .zIndex(calczIndex(calcOffsetIndex(offsetIndex - int)))
             }
         }
     }
@@ -209,7 +183,6 @@ extension RepeatedPageView {
                 }
             }
     }
-    
 }
 
 struct RepeatedPageView_Previews: PreviewProvider {
