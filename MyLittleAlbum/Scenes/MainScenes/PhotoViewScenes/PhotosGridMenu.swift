@@ -15,6 +15,10 @@ enum LabelType {
 
 enum FilteringType {
     case video, image, all
+    
+    static func trueType(type: Self) -> PHAssetMediaType {
+        return type == .video ? .video : .image
+    }
 }
 enum BelongingType {
     case nonAlbum, album, all

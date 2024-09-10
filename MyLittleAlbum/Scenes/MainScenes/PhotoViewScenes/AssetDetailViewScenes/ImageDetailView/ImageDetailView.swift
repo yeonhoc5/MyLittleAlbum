@@ -11,7 +11,6 @@ import Photos
 struct ImageDetailView: View {
     @Environment(\.scenePhase) var scenePhase
     
-    @Binding var isExpanded: Bool
     let asset: PHAsset
     let imageManager = PHCachingImageManager()
     @Binding var variableScale: CGFloat

@@ -16,9 +16,9 @@ struct AllPhotosView: View {
     @Environment(\.presentationMode) var isPresented: Binding<PresentationMode>
     @Environment(\.scenePhase) var scenePhase
     
-    // 앨범 타입이 album일 경우에만 "피커버튼" 노출 결정
+    // 앨범 타입이 album일 경우에만 "피커 버튼" 노출 결정
     var albumType: AlbumType = .album
-    // 보여줄 사진 - 앨범 프라퍼티 : [나의 앨범]탭에서는 상위에서 부여 / [나의 사진], [사진 관리]탭에서는 본 페이지 진입하여 로딩
+    // 보여줄 사진-앨범 프라퍼티 : [나의 앨범]탭에서는 상위에서 부여 / [나의 사진], [사진 관리]탭에서는 본 페이지 진입하여 로딩
     @State var album: Album!
     // [나의 사진]탭용 album 세팅용 프라퍼티
     @State var settingDone: Bool! = true
@@ -260,23 +260,18 @@ struct AllPhotosView: View {
                 }
             }))
         .fullScreenCover(isPresented: $isExpanded, content: {
-            if !isHiddenAssets {
-                let assetArray = self.filteringType == .all ?
-                album.photosArray : (self.filteringType == .image ?
-                                     album.photosArray.filter({$0.mediaType == .image}) : album.photosArray.filter({$0.mediaType == .video}))
-                    PhotosDetailView(assetArray: assetArray, 
-                                     indexToView: $indexToView,
-                                     isExpanded: $isExpanded, 
-                                     navigationTitle: "")
-            } else {
-                let assetArray = self.filteringType == .all ?
-                album.hiddenAssetsArray : (self.filteringType == .image ?
-                                     album.hiddenAssetsArray.filter({$0.mediaType == .image}) : album.hiddenAssetsArray.filter({$0.mediaType == .video}))
-                    PhotosDetailView(assetArray: assetArray, 
-                                     indexToView: $indexToView,
-                                     isExpanded: $isExpanded,
-                                     navigationTitle: "")
+            let assetArray = (!isExpanded ? [] 
+                              : (!isHiddenAssets ? album.photosArray : album.hiddenAssetsArray)
+            )
+                .filter {
+                self.filteringType == .all ? true : (
+                    $0.mediaType == FilteringType.trueType(type: self.filteringType)
+                )
             }
+            PhotosDetailView(assetArray: assetArray,
+                             indexToView: $indexToView,
+                             isExpanded: $isExpanded,
+                             navigationTitle: "")
         })
         .sheet(isPresented: $isShowingSheet) {
             if albumType == .home || albumType == .album {

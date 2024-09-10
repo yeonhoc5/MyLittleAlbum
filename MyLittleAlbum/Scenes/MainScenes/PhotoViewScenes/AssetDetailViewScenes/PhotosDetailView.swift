@@ -14,109 +14,23 @@ struct PhotosDetailView: View {
     var assetArray = [PHAsset]()
     @Binding var indexToView: Int
     @Binding var isExpanded: Bool
-    
     @State var navigationTitle: String
     @Namespace var animationID
-
-    @State var hidden: Bool = false
     
-    @State var isSeeking: Bool = false
+    // 페이지
+    @State var hideToolbar: Bool = false
     @State var isUserSwiping: Bool = false
     @State var pagingGesture: Bool = false
     @State var toDismiss: Bool = false
-    
+    // 이미지/비디오 공통
     @State var offsetY: CGFloat = 0
     @State var offsetX: CGFloat = .zero
-    
+    // 이미지
     @State var variableScale: CGFloat = 1
     @State var currentScale: CGFloat = 1
-    @State var currentTime: Double = 0
+    // 비디오
+    @State var isSeeking: Bool = false
     
-    
-//    var body: some View {
-//        detailPageView(indexToView: $indexToView, countSum: assetArray.count, isExpanded: $isExpanded) { pageIndex in
-//            if (indexToView-1...indexToView+1).contains(pageIndex) {
-//                ImageDetailView(isExpanded: $isExpanded, asset: assetArray[pageIndex], navigationTitle: navigationTitle, variableScale: $variableScale, currentScale: $currentScale, offsetY: $offsetX)
-//            }
-//            
-//            detailView(currentAsset: assetArray[pageIndex], offsetIndex: 1, animationID: animationID)
-//                .onChange(of: indexToView) { newValue in
-//                    let options = PHImageRequestOptions()
-//                    options.deliveryMode = .opportunistic
-//                    options.isSynchronous = true
-//                    options.isNetworkAccessAllowed = true
-//                    let width = screenSize.width * scale
-//                    let size = CGSize(width: width, height: .infinity)
-//                    let imageManager = PHCachingImageManager()
-//                    let firstCheckNum = min(max(newValue-3, 0), max(newValue-2, 0))
-//                    let lastCheckNum = max(min(newValue+2, assetArray.count-1), min(newValue+3, assetArray.count-1))
-//                    if (0..<assetArray.count).contains(firstCheckNum) {
-//                        imageManager.startCachingImages(for: Array(assetArray[firstCheckNum...newValue-2]),
-//                                                        targetSize: size, contentMode: .aspectFit, options: options)
-//                    }
-//                    if (0..<assetArray.count).contains(lastCheckNum) {
-//                        imageManager.startCachingImages(for: Array(assetArray[newValue+2...lastCheckNum]),
-//                                                        targetSize: size, contentMode: .aspectFit, options: options)
-//                    }
-//                }
-//                .onDisappear {
-//                    let options = PHImageRequestOptions()
-//                    options.deliveryMode = .opportunistic
-//                    options.isSynchronous = true
-//                    options.isNetworkAccessAllowed = true
-//                    let width = screenSize.width * scale
-//                    let size = CGSize(width: width, height: .infinity)
-//                    let imageManager = PHCachingImageManager()
-//                    imageManager.stopCachingImages(for: assetArray,
-//                                                    targetSize: size, contentMode: .aspectFit, options: options)
-//
-//                }
-//
-//        }
-//    }
-//        
-//        TabView(selection: $indexToView) {
-//            ForEach(0..<assetArray.count, id: \.self) { index in
-//                switch index {
-//                case indexToView-3...indexToView+3:
-//                    ZStack {
-//                        Color.black
-//                        ImageDetailView(isExpanded: $isExpanded,
-//                                        asset: assetArray[index],
-//                                        navigationTitle: navigationTitle,
-//                                        variableScale: $variableScale,
-//                                        currentScale: $currentScale,
-//                                        offsetY: $offsetY)
-//                            .tag(index)
-////                            .matchedGeometryEffect(id: assetArray[index], in: animationID)
-//                            .id(assetArray[index].localIdentifier)
-//                            .scaleEffect(variableScale)
-////                            .simultaneousGesture(hideGesture)
-////                            .simultaneousGesture(zoomGestureByPinch)
-//                            .onTapGesture {
-//                                isExpanded = false
-//                            }
-//                    }
-//                default:
-//                    Color.clear
-//                        .tag(index)
-//                        .onTapGesture {
-//                            isExpanded = false
-//                        }
-//                }
-////                if (indexToView-1...indexToView+1).contains(assetArray.firstIndex(of: asset as! PHAsset)!) {
-////                    Color.yellow
-////                        .onTapGesture {
-////                            isExpanded = false
-////                        }
-////                } else {
-//
-////                }
-//            }
-//        }
-//        .tabViewStyle(.page(indexDisplayMode: .always))
-//    }
-//    
     var body: some View {
         let count = assetArray.count
         NavigationStack {
@@ -129,7 +43,7 @@ struct PhotosDetailView: View {
                              scale: variableScale,
                              isSeeking: isSeeking,
                              offsetX: $offsetX) { offsetIndex, pageIndex in
-                if (indexToView-1...indexToView+1).contains(pageIndex) {
+                if (0..<count).contains(pageIndex) {
                     let asset = assetArray[pageIndex]
                     detailView(currentAsset: asset, offsetIndex: offsetIndex, animationID: animationID)
                         .id(asset.localIdentifier)
@@ -161,7 +75,7 @@ struct PhotosDetailView: View {
             .ignoresSafeArea()
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(hidden ? .hidden : .visible, for: .navigationBar)
+            .toolbar(hideToolbar ? .hidden : .visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) { closeButton }
                 ToolbarItem(placement: .navigationBarTrailing) { assetCountLabel }
@@ -252,8 +166,7 @@ extension PhotosDetailView {
     @ViewBuilder
     func detailView(currentAsset: PHAsset, offsetIndex: Int, animationID: Namespace.ID) -> some View {
         if currentAsset.mediaType == .image {
-            ImageDetailView(isExpanded: $isExpanded,
-                            asset: currentAsset,
+            ImageDetailView(asset: currentAsset,
                             variableScale: $variableScale,
                             currentScale: $currentScale,
                             offsetY: $offsetY)
@@ -263,10 +176,9 @@ extension PhotosDetailView {
             .simultaneousGesture(zoomGestureByPinch)
             
         } else if currentAsset.mediaType == .video {
-            VideoDetailView(isExpanded: $isExpanded,
-                            offsetIndex: offsetIndex,
+            VideoDetailView(offsetIndex: offsetIndex,
                             asset: currentAsset,
-                            hidden: $hidden,
+                            hidden: $hideToolbar,
                             isSeeking: $isSeeking,
                             offsetY: $offsetY,
                             offsetX: $offsetX)
@@ -314,7 +226,7 @@ extension PhotosDetailView {
         TapGesture(count: 1)
             .onEnded { _ in
                 withAnimation(.easeOut(duration: 0.1)) {
-                    self.hidden.toggle()
+                    self.hideToolbar.toggle()
                 }
             }
     }
