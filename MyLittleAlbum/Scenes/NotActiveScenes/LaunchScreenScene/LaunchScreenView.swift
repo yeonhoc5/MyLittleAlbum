@@ -98,7 +98,7 @@ extension LaunchScreenView {
                 withAnimation(.interactiveSpring(response: 0.4, 
                                                  dampingFraction: 0.8,
                                                  blendDuration: 0.25)) {
-                    maskingScale = 0.8
+                    maskingScale = device == .phone ? 0.8 : 0.6
                 }
                 
                 videoPlayer.play()
