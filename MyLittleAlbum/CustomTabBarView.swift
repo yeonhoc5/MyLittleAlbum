@@ -126,7 +126,7 @@ extension CustomTabBarView {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             withAnimation(.easeIn(duration: 0.2)) {
-                maskingScale = 0.8
+                maskingScale = device == .phone ? 0.8 : 0.6
             }
         }
     }
