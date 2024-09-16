@@ -10,27 +10,16 @@ import AVKit
 
 struct CustomSeekBar: UIViewRepresentable {
     let value: Float
-//    @Binding var avPlayer: AVPlayer!
-//    @Binding var play: Bool
-//    @Binding var isSeeking: Bool
     let slider: UISlider
-//    @Binding var currentTime: Double
     
     func makeUIView(context: UIViewRepresentableContext<CustomSeekBar>) -> UISlider {
-    
         slider.minimumTrackTintColor = .white
         slider.maximumTrackTintColor = .gray
         slider.setThumbImage(UIImage(), for: .normal)
         slider.value = value
-//        slider.addTarget(context.coordinator,
-//                         action: #selector(context.coordinator.changed(slider:)),
-//                         for: .valueChanged)
-        slider.layer.cornerRadius = 1
+        slider.layer.cornerRadius = 5
         slider.clipsToBounds = true
         slider.isContinuous = true
-//        DispatchQueue.main.async {
-//            self.slider = slider
-//        }
         return slider
     }
     
@@ -53,21 +42,6 @@ struct CustomSeekBar: UIViewRepresentable {
             self.parent = parent
         }
         
-//        @objc func changed(slider: UISlider) {
-//            guard let item = parent.avPlayer.currentItem else { return }
-//            let sec = Int(slider.value * Float((item.duration.seconds)))
-//            if slider.isTracking {
-//                parent.avPlayer.pause()
-//                parent.avPlayer.seek(to: CMTime(seconds: Double(sec), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
-//            } else {
-//                parent.currentTime = Double(sec)
-//                parent.avPlayer?.seek(to: CMTime(seconds: Double(sec), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
-//                if parent.play {
-//                    parent.avPlayer.play()
-//                }
-//                parent.isSeeking = false
-//            }
-//        }
     }
 
 }
