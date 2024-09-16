@@ -130,8 +130,8 @@ extension VideoDetailView {
                 HStack(spacing: 0) {
                     btnStopPlay(iconSize: iconSize, 
                                 padding: innerPadding)
-                        .opacity(play ? 1 : 0.2)
-                        .disabled(!play)
+                    .opacity(sliderValue != 0 ? 1 : 0.2)
+                        .disabled(sliderValue == 0)
                     Spacer(minLength: 1.0)
                     btnBackward(iconSize: iconSize, 
                                 padding: innerPadding)
@@ -147,6 +147,7 @@ extension VideoDetailView {
                                   iconSize: iconSize,
                                   padding: innerPadding)
                 }
+                .disabled(isSeeking)
             }
             .padding(25)
         }
@@ -189,8 +190,8 @@ extension VideoDetailView {
             if !isSeeking {
                 if let bool = avPlayer.currentItem?.canStepBackward,
                     bool == true {
-                    avPlayer.seek(to: CMTime(seconds: currentTime - 5, preferredTimescale: 1))
                     currentTime = currentTime - 5
+                    avPlayer.seek(to: CMTime(seconds: currentTime, preferredTimescale: 1))
                 } else {
                     avPlayer.seek(to: CMTime(seconds: 0, preferredTimescale: 1))
                     currentTime = 0
@@ -208,17 +209,15 @@ extension VideoDetailView {
     func btnForward(iconSize: CGFloat, padding: CGFloat) -> some View {
         Button {
             if !isSeeking {
-                if let total = avPlayer.currentItem?.duration.seconds.rounded(.toNearestOrAwayFromZero) {
-                    if total - currentTime <= 5 {
-                        avPlayer.seek(to: CMTime(seconds: total, preferredTimescale: 10))
-                        currentTime = total
-                    } else {
-                        avPlayer.seek(to: CMTime(seconds: currentTime + 5, preferredTimescale: 10))
-                        currentTime = currentTime + 5
-                    }
-                    DispatchQueue.main.async {
-                        getValue(runningTime: asset.duration, current: currentTime)
-                    }
+                if let bool = avPlayer.currentItem?.canStepForward,
+                    bool == true {
+                    currentTime += 5
+                    avPlayer.seek(to: CMTime(seconds: currentTime, preferredTimescale: 1))
+                } else {
+                    currentTime = avPlayer.currentItem?.preferredForwardBufferDuration.magnitude ?? 0
+                    avPlayer.seek(to: CMTime(seconds: currentTime,
+                                             preferredTimescale: 1))
+                    
                 }
             }
         } label: {
@@ -355,7 +354,6 @@ extension VideoDetailView {
         guard let _ = self.avPlayer.currentItem else { return }
         self.timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: time, queue: .main) { time in
             let remain = runningTime - time.seconds
-            print(remain)
             if remain > 0.05 {
                 currentTime = time.seconds
                 DispatchQueue.main.async {
@@ -370,7 +368,6 @@ extension VideoDetailView {
                     }
                 }
             }
-//            print(time.seconds, runningTime)
         }
     }
     
@@ -426,7 +423,6 @@ extension VideoDetailView {
                 }
             }
             .onEnded { newValue in
-                print(currentTime)
                 tempSliderPosition = 0
                 DispatchQueue.main.async {
                     if play {
@@ -434,7 +430,6 @@ extension VideoDetailView {
                     }
                 }
                 isSeeking = false
-                print("on Ended", "isSeeking \(isSeeking)")
             }
     }
 }
