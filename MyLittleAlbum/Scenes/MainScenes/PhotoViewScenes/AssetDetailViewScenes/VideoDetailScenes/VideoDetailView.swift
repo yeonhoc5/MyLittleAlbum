@@ -11,6 +11,7 @@ import AVKit
 import CoreHaptics
 import MediaPlayer
 import LottieUI
+import Zoomable
 
 enum VideoState {
     case play, pause, stop
@@ -59,7 +60,13 @@ struct VideoDetailView: View {
                     })
                     .padding(.bottom,
                              accordingToVideoHeight(height: size.height))
-                    .simultaneousGesture(hideGesture)
+                    .zoomable(minZoomScale: 1.0,
+                              doubleTapZoomScale: 3.0,
+                              outOfBoundsColor: .clear)
+                    .gesture(
+                        TapGesture(count: 2)
+                            .exclusively(before: hideGesture)
+                    )
                     .overlay(alignment: .topTrailing, content: {
                         if userGesture == .soundAdjusting {
                             soundSlider
@@ -86,8 +93,7 @@ struct VideoDetailView: View {
                                     .padding(.horizontal, vcHorisontalPadding)
                                     .frame(width: width)
                                     .offset(y: yOffset)
-                                    .opacity(needOpacity
-                                             ? (hideTools ? 0 : 1) : 1)
+                                    .opacity(needOpacity ? (hideTools ? 0 : 1) : 1)
                             }
                         }
                     }
@@ -726,11 +732,11 @@ extension VideoDetailView {
     }
 
     func assetHeight(asset: PHAsset) -> CGFloat {
-        return screenWidth * CGFloat(asset.pixelHeight) / CGFloat(asset.pixelWidth)
+        return size.width * CGFloat(asset.pixelHeight) / CGFloat(asset.pixelWidth)
     }
     
     func needOpacity(asset: PHAsset) -> Bool {
-        return screenSize.height
+        return size.height
         - assetHeight(asset: asset)
         - statusBarHeight
         > tabbarHeight + 50
@@ -750,7 +756,7 @@ extension VideoDetailView {
 struct VideoDetailView_Previews: PreviewProvider {
     static var previews: some View {
         VideoDetailView(offsetIndex: 0,
-                        asset: MLAsset(phAsset: PHAsset(), isAlbum: true),
+                        asset: MLAsset(phAsset: PHAsset()),
                         imageManager: PHCachingImageManager(),
                         size: .zero,
                         play: .constant(.play),

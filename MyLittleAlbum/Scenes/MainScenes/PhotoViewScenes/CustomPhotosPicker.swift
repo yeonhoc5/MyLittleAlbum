@@ -12,7 +12,7 @@ struct CustomPhotosPicker: View {
     @Binding var isShowingPhotosPicker: Bool
     @EnvironmentObject var photoData: MLPhotoData
     @State var mlAlbum: MLAlbum?
-    let albumToEdit: MLAlbum
+    let albumToEdit: String
     let imageCachingManager: PHCachingImageManager
 
     @State var belongingType: BelongingType = .nonAlbum
@@ -26,46 +26,70 @@ struct CustomPhotosPicker: View {
         let assetArray = assetArray(mlAlbum: mlAlbum,
                                     albumType: .picker,
                                     belongingType: belongingType)
-        NavigationView {
-            GeometryReader(content: { geoProxy in
-                let columnCount = columnCount(geoProxy: geoProxy)
-                let cellWidth = (geoProxy.size.width - CGFloat(columnCount - 1))
-                                / CGFloat(columnCount)
-                VStack {
-                    VStack(spacing: 15) {
-                        titleView(belongingType: belongingType)
-                        subTitleView(assetArray: assetArray, size: geoProxy.size)
-                    }
-                    ZStack(alignment: .bottom) {
-                        if let allPhotos = mlAlbum {
-                            photosView(mlAlbum: allPhotos,
-                                       assetArray: assetArray,
-                                       geoProxy: geoProxy,
-                                       cellWidth: cellWidth)
-                            gridMenuView(mlAlbum: allPhotos,
-                                         assetArray: assetArray,
-                                         width: geoProxy.size.width)
-                        } else {
-                            lottieLoadingView(lottie: "photoLoading",
-                                        size: CGSize(width: 100,
-                                                     height: geoProxy.size.height / 2),
-                                        leadingPadding: 0)
-                            .onAppear {
-                                if self.mlAlbum == nil {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                        withAnimation {
-                                            self.mlAlbum = photoData.homeAlbum
-                                        }
+        GeometryReader(content: { geoProxy in
+            let columnCount = columnCount(geoProxy: geoProxy)
+            let cellWidth = (geoProxy.size.width - CGFloat(columnCount - 1))
+                            / CGFloat(columnCount)
+            VStack {
+                HStack(spacing: 15) {
+                    let width = geoProxy.size.width - 40 - 15
+                    titleView(belongingType: belongingType, width: width)
+                    subTitleView(assetArray: assetArray, width: width)
+                        .frame(width: abs(width * 0.4))
+                }
+                .frame(height: 90)
+                .clipped()
+                .padding(.horizontal, 20)
+                .padding(.vertical, 15)
+                ZStack(alignment: .bottom) {
+                    if let allPhotos = mlAlbum {
+                        photosView(mlAlbum: allPhotos,
+                                   assetArray: assetArray,
+                                   geoProxy: geoProxy,
+                                   cellWidth: cellWidth)
+                        gridMenuView(mlAlbum: allPhotos,
+                                     assetArray: assetArray,
+                                     width: geoProxy.size.width)
+                    } else {
+                        lottieLoadingView(lottie: "photoLoading",
+                                          size: CGSize(width: 100,
+                                                       height: geoProxy.size.height / 2),
+                                          leadingPadding: 0)
+                        .onAppear {
+                            if photoData.homeAlbum != nil {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    withAnimation {
+                                        self.mlAlbum = photoData.homeAlbum
+                                    }
+                                }
+                            } else {
+                                let homeAlbum = MLAlbum(isHome: true)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    withAnimation {
+                                        photoData.homeAlbum = homeAlbum
+                                        self.mlAlbum = homeAlbum
                                     }
                                 }
                             }
                         }
                     }
                 }
-            })
-            .background { FancyBackground() }
-        }
-    }           
+                .onReceive(NotificationCenter.default
+                    .publisher(for: .outsideFetchChange), perform: { object in
+                        if reLoadingType != .reFetchOutside {
+                            if object.object as? String == "picker" {
+                                print("Picker View outter fetch Recieved")
+                                DispatchQueue.main.async {
+                                    reLoadingType = .reFetchOutside
+                                }
+                            }
+                        }
+                    })
+            }
+            .padding(.top, 10)
+        })
+        .background { FancyBackground() }
+    }
 }
 
 extension CustomPhotosPicker {
@@ -73,9 +97,9 @@ extension CustomPhotosPicker {
         NewPhotosCollectionView(
             albumType: .picker,
             mlAlbum: mlAlbum,
-            smartAlbumType: .none,
-            assetArray: assetArray,
+            assetArray: .constant(assetArray),
             filteringType: $filteringType,
+            belongingType: belongingType,
             geoProxy: geoProxy,
             cellWidth: cellWidth,
             imageCachingManager: imageCachingManager,
@@ -127,63 +151,85 @@ extension CustomPhotosPicker {
             .shadow(color: Color.fancyBackground.opacity(0.5),
                     radius: 2, x: 0, y: 0)
         }    }
-    func titleView(belongingType: BelongingType) -> some View {
-        Group {
-            switch belongingType {
-            case .nonAlbum:
-                Text("앨범에 없는 항목 모음")
-                    .animation(.easeInOut)
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
-            case .all:
-                Text("모든 항목")
-                    .animation(.easeInOut)
-                    .transition(
-                        .move(edge: belongingType == .all ? .leading : .trailing)
-                        .combined(with: .opacity))
-            case .album:
-                Text("앨범 항목 모음")
-                    .animation(.easeInOut)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-            }
+    func titleView(belongingType: BelongingType, width: CGFloat) -> some View {
+        return ZStack {
+            Picker("미디어", selection: .constant(self.belongingType), content: {
+                Group {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 5)
+                            .foregroundColor(belongingType == .album ? .white : .clear)
+                        Text("앨범 항목 모음")
+                            .foregroundColor(belongingType == .album ? .fancyBackground : .white)
+                    }
+                    .tag(BelongingType.album)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 5)
+                            .foregroundColor(belongingType == .all ? .white : .clear)
+                        Text("모든 항목")
+                            .foregroundColor(belongingType == .all ? .fancyBackground : .white)
+                    }
+                    .tag(BelongingType.all)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 5)
+                            .foregroundColor(belongingType == .nonAlbum ? .white : .clear)
+                        Text("앨범에 없는 항목 모음")
+                            .foregroundColor(belongingType == .nonAlbum ? .fancyBackground : .white)
+                    }
+                    .tag(BelongingType.nonAlbum)
+                }
+                .font(Font.system(size: 20, weight: .semibold, design: .rounded))
+            })
+            .pickerStyle(.wheel)
+            .disabled(true)
+            .frame(width: abs(width * 0.6))
+            .clipShape(
+                RoundedRectangle(cornerRadius: 5)
+            )
         }
-        .font(Font.system(size: 20, weight: .semibold, design: .rounded))
-        .foregroundColor(.white)
-        .padding(.top, 40)
+        .frame(alignment: .center)
     }
     
-    func subTitleView(assetArray: [MLAsset], size: CGSize) -> some View {
+    func subTitleView(assetArray: [MLAsset], width: CGFloat) -> some View {
         let imageCount = assetArray.filter { $0.mediaType == .image }.count
         let videoCount = assetArray.filter { $0.mediaType == .video }.count
         return HStack {
-            Text("사진: \(mlAlbum != nil ? String(imageCount) : "--")")
-                .foregroundColor(filteringType == .image ? .blue : .gray)
-                .contentTransition(.numericText())
-            Text(" / ")
-            Text("비디오: \(mlAlbum != nil ? String(videoCount) : "--")")
-                .foregroundColor(filteringType == .video ? .blue : .gray)
-                .contentTransition(.numericText())
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 13) {
+                    Text("사")
+                    Text("진 :")
+                }
+                    .foregroundColor(filteringType == .image ? .blue : .gray)
+                Text("비디오 :")
+                    .foregroundColor(filteringType == .video ? .blue : .gray)
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                Text(mlAlbum != nil ? "\(imageCount)" : "--")
+                    .foregroundColor(filteringType == .image ? .blue : .gray)
+                Text(mlAlbum != nil ? "\(videoCount)" : "--")
+                    .foregroundColor(filteringType == .video ? .blue : .gray)
+            }
         }
         .font(.body)
+        .frame(alignment: .leading)
         .contentTransition(.numericText())
         .foregroundColor(.gray)
-        .frame(width: size.width)
-        .padding(.bottom, 20)
     }
                 
     func assetArray(mlAlbum: MLAlbum?, albumType: AlbumType, belongingType: BelongingType) -> [MLAsset] {
         guard let allPhotos = switch belongingType {
         case .all: mlAlbum?.photosArray
-        case .nonAlbum: mlAlbum?.subtractingArray(
-                        isHiddenAsset: false,
-                        subtracting: Array(photoData.albumsPhotosSet())
-                        )
-                        .sorted(by: { $0.creationDate < $1.creationDate })
-        case .album:
-            Array(photoData.albumsPhotosSet())
-                .sorted(by: { $0.creationDate < $1.creationDate })
+        case .nonAlbum: mlAlbum?
+                .operatedArray(isHiddenAsset: false,
+                               setOperation: .subtraction,
+                               assets: Array(photoData.albumsPhotosSet()))
+        case .album: mlAlbum?
+                .operatedArray(isHiddenAsset: false,
+                               setOperation: .intersection,
+                               assets: Array(photoData.albumsPhotosSet()))
         }
         else { return [] }
         return allPhotos
+            .sorted(by: { $0.creationDate < $1.creationDate })
     }
     
     func columnCount(geoProxy: GeometryProxy) -> Int {

@@ -88,7 +88,7 @@ struct FolderCategoryView: View {
     
     func folderLineView(folder: MLFolder, disable: Bool) -> some View {
         let sideImage = folder.phCollectionList == currentFolder
-        ? "chevron.up.circle.fill"
+        ? "chevron.left.circle.fill"
         : folder.phCollectionList == toMoveCollection
                 ? "circle.circle.fill"
                 : (inheritedDisable ? "chevron.down.circle.fill" : "" )

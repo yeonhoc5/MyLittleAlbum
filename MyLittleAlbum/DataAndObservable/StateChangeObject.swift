@@ -16,8 +16,7 @@ class StateChangeObject: ObservableObject {
     
     // 폴더/앨범 지우기 모드
     @Published var isEditingMode: Bool = false
-    // 폴더/앨범 추가/이름변경 알럿
-    @Published var isShowingAlert: Bool = false
+    
     // 폴더/앨범 다른 폴더로 이동 시트
     @Published var isShowingSheet: Bool = false
     // 폴더 / 앨범 순서 조정 시트
@@ -48,7 +47,6 @@ class StateChangeObject: ObservableObject {
     @Published var isTabbarHidden: Bool = false
     @Published var isSlideShowEnded: Bool = false
     
-//    @Published var typeFilterChanged: Bool = false
     @Published var photosEdited: Bool = false
     
     @Published var selectToggleAllPhotos: Bool = false

@@ -22,6 +22,7 @@ struct SettingView: View {
     @State var isShowingSettingGuide: Bool = false
     
     var body: some View {
+//        Rectangle()
         VStack(spacing: 0, content: {
             if device == .pad {
                 titleViewForPAD
@@ -55,20 +56,15 @@ struct SettingView: View {
             btnDone
                 .opacity(isShowingSettingGuide ? 0 : 1)
         })
-        .background {
-            switch device {
-            case .phone: Color.fancyBackground
-                    .ignoresSafeArea()
-            default:
-                ZStack(content: {
-                    Color.fancyBackground
-                    Color.white.opacity(0.7)
-                })
-                .cornerRadius(20)
-            }
-        }
         .onAppear {
             loadPreviousSetting()
+        }
+        .background {
+            if device == .pad {
+                RoundedRectangle(cornerRadius: 20)
+                    .foregroundStyle(.white)
+                    
+            }
         }
     }
 }
@@ -96,13 +92,12 @@ extension SettingView {
     }
     
     var btnDone: some View {
-        let state = changeChecker(
-            self.starView,
-            self.uiMode,
-            self.useOpeningAni,
-            self.useKnock,
-            self.isRandomPlay,
-            self.transitionIndex)
+        let state = changeChecker(self.starView,
+                                  self.uiMode,
+                                  self.useOpeningAni,
+                                  self.useKnock,
+                                  self.isRandomPlay,
+                                  self.transitionIndex)
         return ZStack(alignment: .trailing) {
             // 저장 버튼
             Button {
@@ -125,8 +120,7 @@ extension SettingView {
                             } else {
                                 EmptyView()
                             }
-                        }
-                        .animation(.interpolatingSpring, value: state)
+                        } 
                     }
                     .disabled(!state)
             }
@@ -137,7 +131,7 @@ extension SettingView {
                 }
                 loadPreviousSetting()
             } label: {
-                Capsule()
+                Circle()
                     .foregroundStyle(.white)
                     .frame(width: 50, height: 50)
                     .shadow(color: state ? .gray : .clear ,radius: state ? 3 : -1)
@@ -150,11 +144,11 @@ extension SettingView {
                                 .degrees(state ? 270 : 0)
                             )
                     }
-                    .animation(.easeInOut, value: state)
             }
             .offset(x: -4)
             .buttonStyle(ClickScaleEffect())
         }
+        .animation(.interpolatingSpring, value: state)
     }
 }
 

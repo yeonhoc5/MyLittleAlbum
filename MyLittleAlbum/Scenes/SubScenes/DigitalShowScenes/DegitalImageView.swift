@@ -24,7 +24,6 @@ struct DigitalImageView: View {
                         ImageDetailView(asset: asset,
                                         imageManager: cachingManager,
                                         size: size,
-                                        enableZoom: false,
                                         variableScale: .constant(1),
                                         currentScale: .constant(1),
                                         offsetY: .constant(0))

@@ -16,10 +16,8 @@ struct RprstImage {
 }
 
 class MLAlbum: NSObject, Identifiable, ObservableObject, Observable {
-//    let isTop: Bool
     // 1. 로딩
-    var isSample: Bool = false
-    var sampleCase: SampleCase = .none
+    let sampleCase: SampleCase
     let id: String
     @Published var phAssetCollection: PHAssetCollection!
     var smartType: PHAssetCollectionSubtype!
@@ -27,46 +25,55 @@ class MLAlbum: NSObject, Identifiable, ObservableObject, Observable {
     @Published var title: String
     // 2. 미디어
     @Published var fetchResult: PHFetchResult<PHAsset>
-    @Published var hiddenFetchResult: PHFetchResult<PHAsset>!
     @Published var photosArray: [MLAsset] = []
+    @Published var hiddenFetchResult = PHFetchResult<PHAsset>()
     @Published var hiddenArray: [MLAsset] = []
+    @Published var innerProcessing: Bool = false
     
     // 유저 앨범용 init
     init(assetCollection: PHAssetCollection) {
+        self.sampleCase = .none
         self.id = assetCollection.localIdentifier
         self.phAssetCollection = assetCollection
         self.title = assetCollection.localizedTitle ?? ""
+        let option = PHFetchOptions()
+        option.wantsIncrementalChangeDetails = true
         self.fetchResult = PHAsset
-            .fetchAssets(in: assetCollection, options: nil)
+            .fetchAssets(in: assetCollection, options: option)
         super.init()
         PHPhotoLibrary.shared().register(self)
     }
     // smart 앨범용 init
     init(assetCollection: PHAssetCollection, title: String, isPrivacy: Bool = false) {
+        self.sampleCase = .none
         self.id = assetCollection.localIdentifier
         self.phAssetCollection = assetCollection
         self.title = title
         self.isPrivacy = isPrivacy
+        let option = PHFetchOptions()
+        option.wantsIncrementalChangeDetails = true
         if !isPrivacy {
-            fetchResult = PHAsset.fetchAssets(in: assetCollection, options: nil)
+            fetchResult = PHAsset.fetchAssets(in: assetCollection, options: option)
         } else {
             fetchResult = PHFetchResult()
-            hiddenFetchResult = PHAsset.fetchAssets(in: assetCollection, options: nil)
+            hiddenFetchResult = PHAsset.fetchAssets(in: assetCollection, options: option)
         }
         super.init()
         PHPhotoLibrary.shared().register(self)
     }
     // Photos용 init
     init(isHome: Bool) {
+        self.sampleCase = .none
         self.id = "myPhotos"
         self.title = "나의 사진"
-        self.fetchResult = PHAsset.fetchAssets(with: nil)
+        let option = PHFetchOptions()
+        option.wantsIncrementalChangeDetails = true
+        self.fetchResult = PHAsset.fetchAssets(with: option)
         super.init()
         PHPhotoLibrary.shared().register(self)
     }
     // sample용
     init(sampleID: Int, sampleCase: SampleCase) {
-        self.isSample = true
         self.sampleCase = sampleCase
         self.id = "album\(sampleID)"
         self.title = "앨범\(sampleID)"
@@ -74,7 +81,7 @@ class MLAlbum: NSObject, Identifiable, ObservableObject, Observable {
         super.init()
     }
     deinit {
-        if !isSample {
+        if sampleCase != .none {
             print("deinited Album : \(self.title)")
         }
         PHPhotoLibrary.shared().unregisterChangeObserver(self)
@@ -86,9 +93,8 @@ class MLAlbum: NSObject, Identifiable, ObservableObject, Observable {
                 withAnimation {
                     self.photosArray = self.fetchResult
                         .objects(at: IndexSet(integersIn: 0..<self.fetchResult.count))
-                        .sorted(by: { $0.creationDate ?? Date() < $1.creationDate ?? Date() })
-                        .map { MLAsset(phAsset: $0, isAlbum: self.phAssetCollection != nil) }
-                    print("photos generated")
+                        .map { MLAsset(phAsset: $0) }
+                    print("[\(title)] photos generated")
                     completion()
                 }
             }
@@ -98,9 +104,8 @@ class MLAlbum: NSObject, Identifiable, ObservableObject, Observable {
                     self.hiddenArray = self.hiddenFetchResult
                         .objects(at: IndexSet(integersIn: 0..<self.hiddenFetchResult.count))
                         .filter { $0.isHidden }
-                        .sorted(by: { $0.creationDate ?? Date() < $1.creationDate ?? Date() })
-                        .map { MLAsset(phAsset: $0, isAlbum: self.phAssetCollection != nil) }
-                    print("hidden photos generated")
+                        .map { MLAsset(phAsset: $0) }
+                    print("[\(title)] hidden photos generated")
                     completion()
                 }
             }
@@ -109,7 +114,14 @@ class MLAlbum: NSObject, Identifiable, ObservableObject, Observable {
     func mlAsset() -> [MLAsset] {
         return self.fetchResult
             .objects(at: IndexSet(integersIn: 0..<self.fetchResult.count))
-            .map { MLAsset(phAsset: $0, isAlbum: self.phAssetCollection != nil) }
+            .map { MLAsset(phAsset: $0) }
+    }
+    func processingChange(bool: Bool) {
+        DispatchQueue.main.async {
+            withAnimation {
+                self.innerProcessing = bool
+            }
+        }
     }
 }
 // MARK: - 1. setting Album
@@ -130,8 +142,7 @@ extension MLAlbum {
     }
     func unSetHiddenAssets(result: @escaping () -> Void) {
         DispatchQueue.main.async { [unowned self] in
-//            self.hiddenArray = []
-            self.hiddenFetchResult = nil
+            self.hiddenArray = []
             result()
         }
     }
@@ -160,30 +171,44 @@ extension MLAlbum {
     func addAsset(assets: [MLAsset],
                   completion: (@escaping (Bool) -> Void)) {
         guard let assetCollection = self.phAssetCollection else { return }
+        // 선작업
+        DispatchQueue.main.async {
+            withAnimation {
+                self.photosArray = self.operatedArray(
+                                    isHiddenAsset: false,
+                                    setOperation: .union,
+                                    assets: assets
+                                )
+            }
+        }
+        // 후 처리
         PHPhotoLibrary.shared()
             .performChanges {
-                PHAssetCollectionChangeRequest(
-                    for: assetCollection,
-                    assets: self.fetchResult)?
+                PHAssetCollectionChangeRequest(for: assetCollection,
+                                                             assets: self.fetchResult)?
                     .addAssets(assets.compactMap { $0.phAsset } as NSFastEnumeration)
             } completionHandler: { [unowned self] bool, _ in
                 if bool {
+                    let option = PHFetchOptions()
+                    option.wantsIncrementalChangeDetails = true
                     DispatchQueue.main.async {
-                        self.fetchResult = PHAsset
-                            .fetchAssets(in: self.phAssetCollection, options: nil)
-                        self.photosArray = Array(
-                            Set(self.photosArray).union(Set(assets))
-                        )
-                        .sorted(by: { $0.creationDate < $1.creationDate })
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            NotificationCenter.default
-                                .post(name: .innerFetchChange, object: self.id)
-                            NotificationCenter.default
-                                .post(name: .changeRprstPhotos, object: self.id)
+                        withAnimation {
+                            self.fetchResult = PHAsset
+                                .fetchAssets(in: self.phAssetCollection, options: option)
                         }
+                        completion(bool)
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        withAnimation {
+                            self.photosArray = self.operatedArray(
+                                                isHiddenAsset: false,
+                                                setOperation: .subtraction,
+                                                assets: assets)
+                        }
+                        completion(bool)
                     }
                 }
-                completion(bool)
             }
     }
     // user 앨범에서만 사용
@@ -191,40 +216,54 @@ extension MLAlbum {
                               isHidden: Bool = false,
                               filteringType: FilteringType = .all,
                               completion: @escaping (Bool) -> Void) {
-        let options = PHFetchOptions()
-        options.includeHiddenAssets = isHidden
-        let checkFetchResult = !isHidden ? self.fetchResult : PHAsset
-            .fetchAssets(in: self.phAssetCollection,
-                         options: options)
+        // 선 작업
+        DispatchQueue.main.async {
+            if !isHidden {
+                self.photosArray = self.operatedArray(
+                                    isHiddenAsset: false,
+                                    setOperation: .subtraction,
+                                    assets: assets)
+            } else {
+                self.hiddenArray = self.operatedArray(
+                                    isHiddenAsset: true,
+                                    setOperation: .subtraction,
+                                    assets: assets)
+            }
+        }
+        // 후 처리
+        let checkFetchResult = !isHidden ? self.fetchResult : hiddenFetchResult
         PHPhotoLibrary.shared().performChanges {
             PHAssetCollectionChangeRequest(for: self.phAssetCollection,
                                            assets: checkFetchResult)?
                 .removeAssets(assets.compactMap { $0.phAsset } as NSFastEnumeration)
         } completionHandler: { [unowned self] bool, _ in
             if bool {
+                let option = PHFetchOptions()
+                option.wantsIncrementalChangeDetails = true
+                option.includeHiddenAssets = isHidden
                 DispatchQueue.main.async {
                     if !isHidden {
                         self.fetchResult = PHAsset
-                            .fetchAssets(in: self.phAssetCollection, options: nil)
-                        self.photosArray = Array(
-                            Set(self.photosArray).subtracting(Set(assets))
-                        )
-                        .sorted(by: { $0.creationDate < $1.creationDate })
-                        NotificationCenter.default
-                            .post(name: .changeRprstPhotos, object: self.id)
+                            .fetchAssets(in: self.phAssetCollection, options: option)
                     } else {
                         self.hiddenFetchResult = PHAsset
-                            .fetchAssets(in: self.phAssetCollection, options: options)
-                        self.hiddenArray = Array(
-                            Set(self.hiddenArray).subtracting(Set(assets))
-                        )
-                        .sorted(by: { $0.creationDate < $1.creationDate })
+                            .fetchAssets(in: self.phAssetCollection, options: option)
                     }
                 }
-                completion(bool)
             } else {
-                completion(bool)
+                if !isHidden {
+                    self.photosArray = self.operatedArray(
+                                        isHiddenAsset: false,
+                                        setOperation: .union,
+                                        assets: assets)
+                } else {
+                    self.hiddenArray = self.operatedArray(
+                                        isHiddenAsset: true,
+                                        setOperation: .union,
+                                        assets: assets)
+                }
             }
+            completion(bool)
         }
     }
     // 기기에서 삭제하기
@@ -233,37 +272,59 @@ extension MLAlbum {
                                isHiddenAsset: Bool = false,
                                isDetailView: Bool = false,
                                completion: @escaping (Bool) -> Void) {
+        // 선 작업
+        DispatchQueue.main.async {
+            if !isHiddenAsset {
+                self.photosArray = self.operatedArray(
+                                    isHiddenAsset: false,
+                                    setOperation: .subtraction,
+                                    assets: assets)
+            } else {
+                self.hiddenArray = self.operatedArray(
+                                    isHiddenAsset: true,
+                                    setOperation: .subtraction,
+                                    assets: assets)
+            }
+        }
+        // 후 처리
         PHPhotoLibrary.shared().performChanges {
             PHAssetChangeRequest
                 .deleteAssets(assets.compactMap { $0.phAsset } as NSFastEnumeration)
         } completionHandler: { [unowned self] bool, _ in
             if bool {
+                let option = PHFetchOptions()
+                option.wantsIncrementalChangeDetails = true
+                option.includeHiddenAssets = isHiddenAsset
                 DispatchQueue.main.async {
                     if !isHiddenAsset {
                         if let assetCollection = self.phAssetCollection {
                             self.fetchResult = PHAsset
-                                .fetchAssets(in: assetCollection, options: nil)
+                                .fetchAssets(in: assetCollection, options: option)
                         } else {
-                            self.fetchResult = PHAsset.fetchAssets(with: nil)
+                            self.fetchResult = PHAsset.fetchAssets(with: option)
                         }
-                        self.photosArray = Array(
-                            Set(self.photosArray).subtracting(Set(assets))
-                        )
-                        .sorted(by: { $0.creationDate < $1.creationDate })
                         NotificationCenter.default
                             .post(name: .changeRprstPhotos, object: self.id)
                     } else {
-                        let options = PHFetchOptions()
-                        options.includeHiddenAssets = true
                         self.hiddenFetchResult = PHAsset
-                            .fetchAssets(in: self.phAssetCollection, options: options)
-                        self.hiddenArray = Array(Set(self.hiddenArray)
-                            .subtracting(Set(assets)))
-                        .sorted(by: { $0.creationDate < $1.creationDate })
+                            .fetchAssets(in: self.phAssetCollection, options: option)
                     }
                     completion(bool)
                 }
             } else {
+                DispatchQueue.main.async {
+                    if !isHiddenAsset {
+                        self.photosArray = self.operatedArray(
+                                            isHiddenAsset: false,
+                                            setOperation: .union,
+                                            assets: assets)
+                    } else {
+                        self.hiddenArray = self.operatedArray(
+                                            isHiddenAsset: true,
+                                            setOperation: .union,
+                                            assets: assets)
+                    }
+                }
                 completion(bool)
             }
         }
@@ -273,6 +334,21 @@ extension MLAlbum {
                            toHide: Bool,
                            isDetailView: Bool = false,
                            completion: @escaping (Bool) -> Void) {
+        // 선 작업
+        DispatchQueue.main.async {
+            if toHide {
+                self.photosArray = self.operatedArray(
+                    isHiddenAsset: false,
+                    setOperation: .subtraction,
+                    assets: assets)
+            } else {
+                self.hiddenArray = self.operatedArray(
+                    isHiddenAsset: true,
+                    setOperation: .subtraction,
+                    assets: assets)
+            }
+        }
+        // 후 처리
         PHPhotoLibrary.shared().performChanges {
             assets.forEach { asset in
                 let request = PHAssetChangeRequest(for: asset.phAsset)
@@ -280,30 +356,37 @@ extension MLAlbum {
             }
         } completionHandler: { [unowned self] bool, _ in
             if bool {
+                let option = PHFetchOptions()
+                option.wantsIncrementalChangeDetails = true
                 DispatchQueue.main.async {
+                    option.includeHiddenAssets = false
                     if let assetCollection = self.phAssetCollection {
                         self.fetchResult = PHAsset
-                            .fetchAssets(in: assetCollection, options: nil)
+                            .fetchAssets(in: assetCollection, options: option)
                     } else {
-                        self.fetchResult = PHAsset.fetchAssets(with: nil)
-                    }
-                    self.generateArray(isHiddenAsset: false) {
-                        NotificationCenter.default
-                            .post(name: .changeRprstPhotos, object: self.id)
+                        self.fetchResult = PHAsset.fetchAssets(with: option)
                     }
                     if !toHide {
-                        let options = PHFetchOptions()
-                        options.includeHiddenAssets = true
+                        option.includeHiddenAssets = true
                         self.hiddenFetchResult = PHAsset
-                            .fetchAssets(in: self.phAssetCollection, options: options)
-                        self.hiddenArray = Array(
-                            Set(self.hiddenArray).subtracting(Set(assets))
-                        )
-                        .sorted(by: { $0.creationDate < $1.creationDate })
+                            .fetchAssets(in: self.phAssetCollection, options: option)
                     }
+                    completion(bool)
                 }
+            } else {
+                if toHide {
+                    self.photosArray = self.operatedArray(
+                        isHiddenAsset: false,
+                        setOperation: .union,
+                        assets: assets)
+                } else {
+                    self.hiddenArray = self.operatedArray(
+                        isHiddenAsset: true,
+                        setOperation: .union,
+                        assets: assets)
+                }
+                completion(bool)
             }
-            completion(bool)
         }
     }
     
@@ -313,7 +396,7 @@ extension MLAlbum {
                        completion: @escaping (Bool) -> Void) {
         var count = 0
         assets.forEach { asset in
-            asset.favoriteAsset { bool in
+            asset.favoriteAsset(bool: toFavorite) { bool in
                 count += 1
                 if count == assets.count {
                     completion(true)
@@ -324,16 +407,14 @@ extension MLAlbum {
 }
 
 extension MLAlbum {
-    
     func frObject(isHiddenAsset: Bool) -> [MLAsset] {
         let object = !isHiddenAsset ? self.fetchResult : self.hiddenFetchResult
-        let result = (object ?? PHFetchResult<PHAsset>())
-            .objects(at: IndexSet(integersIn: 0..<(object ?? self.fetchResult).count))
-            .map({ MLAsset(phAsset: $0, isAlbum: self.phAssetCollection != nil)})
+        let result = object
+            .objects(at: IndexSet(integersIn: 0..<object.count))
+            .map({ MLAsset(phAsset: $0)})
             .filter {
                 isHiddenAsset ? $0.isHidden : true
             }
-            .sorted(by: { $0.creationDate < $1.creationDate })
         return result
     }
     func frCount(fr1: PHFetchResult<PHAsset>, fr2: PHFetchResult<PHAsset>! = nil) -> Int {
@@ -345,16 +426,19 @@ extension MLAlbum {
                 .count
         }
     }
-    func subtractingArray(isHiddenAsset: Bool,
-                          subtracting: [MLAsset]) -> [MLAsset] {
-        let assets = frObject(isHiddenAsset: isHiddenAsset)
-        let set = Set(assets).subtracting(Set(subtracting))
-        return Array(set)
-    }
-    func intersectingArray(isHiddenAsset: Bool,
-                           intersecting: [MLAsset]) -> [MLAsset] {
-        let assets = frObject(isHiddenAsset: isHiddenAsset)
-        let set = Set(assets).intersection(Set(intersecting))
+    
+    func operatedArray(isHiddenAsset: Bool,
+                       setOperation: SetOpertation,
+                       assets: [MLAsset]) -> [MLAsset] {
+        var set = Set(isHiddenAsset ? self.hiddenArray : self.photosArray)
+        switch setOperation {
+        case .union:
+            set = set.union(Set(assets))
+        case .intersection:
+            set = set.intersection(Set(assets))
+        case .subtraction:
+            set = set.subtracting(Set(assets))
+        }
         return Array(set)
     }
 }
@@ -375,60 +459,104 @@ extension MLAlbum: PHPhotoLibraryChangeObserver {
         }
         if let newFetch = changeInstance.changeDetails(for: self.fetchResult) {
             if self.fetchResult != newFetch.fetchResultAfterChanges {
-                print("fetch changed [\(title)]")
-                DispatchQueue.main.async {
-                    self.fetchResult = newFetch.fetchResultAfterChanges
+                print("album Observer [\(title)] : fetch changed")
+                if !innerProcessing {
+                    DispatchQueue.main.async {
+                        self.fetchResult = newFetch.fetchResultAfterChanges
+                    }
+                    if newFetch.hasIncrementalChanges {
+                        if newFetch.fetchResultAfterChanges.count != self.photosArray.count {
+                            self.generateArray(isHiddenAsset: false) {
+                                NotificationCenter.default
+                                    .post(name: .outsideFetchChange, object: self.id)
+                                NotificationCenter.default
+                                    .post(name: .changeRprstPhotos, object: self.id)
+                                if self.phAssetCollection == nil {
+                                    NotificationCenter.default
+                                        .post(name: .outsideFetchChange, object: "picker")
+                                }
+                            }
+                        }
+//                        } else {
+//                            if newFetch.changedObjects.count > 0 {
+//                                let items = newFetch.changedObjects.map({ MLAsset(phAsset: $0) })
+//                                let object = ChangedItem(assets: items,
+//                                                         albumType: self.phAssetCollection == nil ? .home : (self.smartType == nil ? .album : .smartAlbum))
+//                                DispatchQueue.main.async {
+//                                    NotificationCenter.default
+//                                        .post(name: .assetChanged, object: object)
+//                                }
+//                            }
+//                        }
+                    }
+                    
+                    
+//                        print("album Observer [\(title)]: has inscrementalChanges")
+//                        if !newFetch.insertedObjects.isEmpty {
+//                            print("album Observer [\(title)]: [inserted] \(newFetch.insertedObjects.count)")
+//                            let array = self.photosArray.compactMap({ $0.phAsset })
+//                            for asset in newFetch.insertedObjects {
+//                                if !array.contains(asset) {
+//                                    let newAsset = MLAsset(phAsset: asset)
+//                                    DispatchQueue.main.async {
+//                                        withAnimation {
+//                                            self.photosArray.append(newAsset)
+//                                        }
+//                                    }
+//                                }
+//                            }
+//                        }
+//                        if !newFetch.removedObjects.isEmpty {
+//                            print("album Observer [\(title)]: [removed] \(newFetch.removedObjects.count)")
+//                            let array = self.photosArray.compactMap({ $0.phAsset })
+//                            var indexs: [Int] = []
+//                            for asset in newFetch.removedObjects {
+//                                if let index = array.firstIndex(of: asset) {
+//                                    indexs.append(index)
+//                                }
+//                            }
+//                            indexs = indexs.sorted(by: { $0 > $1 })
+//                            for index in indexs {
+//                                DispatchQueue.main.async {
+//                                    withAnimation {
+//                                        let _ = self.photosArray.remove(at: index)
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
                 }
-                if self.photosArray.count != newFetch.fetchResultAfterChanges.count {
-                    print("outside fetch \(self.title)")
-                    DispatchQueue.main.async { [unowned self] in
-                        self.generateArray(isHiddenAsset: false,
-                                           completion: {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [unowned self] in
+            }
+            
+        }
+        if let newFetch = changeInstance.changeDetails(for: hiddenFetchResult) {
+            if self.hiddenFetchResult != newFetch.fetchResultAfterChanges {
+                if newFetch.hasIncrementalChanges {
+                    if !innerProcessing {
+                        DispatchQueue.main.async { [unowned self] in
+                            self.hiddenFetchResult = newFetch.fetchResultAfterChanges
+                            self.generateArray(isHiddenAsset: true) {
                                 NotificationCenter.default
                                     .post(name: .outsideFetchChange, object: self.id)
                                 NotificationCenter.default
                                     .post(name: .changeRprstPhotos, object: self.id)
                             }
-                        })
+                        }
                     }
-                } else {
-                    for asset in newFetch.changedObjects {
-//                        if let index = self.photosArray
-//                            .compactMap ({ $0.phAsset })
-//                            .firstIndex(of: asset) {
-//                            DispatchQueue.main.async { [unowned self] in
-//                                withAnimation {
-//                                    self.photosArray
-//                                        .replace([self.photosArray[index]],
-//                                                 with: [MLAsset(phAsset: asset, isAlbum: self.phAssetCollection != nil )])
-//                                    self.photosArray.remove(at: index)
-//                                    self.photosArray.insert(MLAsset(phAsset: asset, isAlbum: self.phAssetCollection != nil),
-//                                                            at: index)
-//                                }
-//                            }
-//                        }
-                    }
-
                 }
             }
         }
-        
-        if let hiddenFetch = self.hiddenFetchResult,
-           let newFetch = changeInstance.changeDetails(for: hiddenFetch) {
-            if hiddenFetch != newFetch.fetchResultAfterChanges {
-                if hiddenFetch.count != newFetch.fetchResultAfterChanges.count {
-                    DispatchQueue.main.async { [unowned self] in
-                        self.hiddenFetchResult = newFetch.fetchResultAfterChanges
-                        self.generateArray(isHiddenAsset: true, completion: {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                NotificationCenter.default
-                                    .post(name: .outsideFetchChange, object: self.id)
-                            }
-                        })
-                    }
-                }
-            }
+    }
+}
+
+// homeAlbum 작업
+extension MLAlbum {
+    // 1. 앨범에 넣음
+    func subtractingAssets(assets: [MLAsset]) {
+        DispatchQueue.main.async {
+            self.photosArray = Array(
+                Set(self.photosArray).subtracting(Set(assets))
+            )
         }
     }
 }
@@ -437,4 +565,8 @@ struct NewFetchObject {
     let identifier: String
     let inserted: [PHAsset]
     let removed: [PHAsset]
+}
+
+enum SetOpertation {
+    case union, intersection, subtraction
 }

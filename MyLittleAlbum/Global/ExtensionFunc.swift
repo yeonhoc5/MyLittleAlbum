@@ -18,17 +18,13 @@ extension View {
             let reason = "We need to unlock your data."
             context
                 .evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-                                localizedReason: reason) { success, authenticationError in
+                                localizedReason: reason) { success, _ in
                     resultHandler(success)
-                    //                    returnHiddenAssets(albumType: albumType)
-                    //                    DispatchQueue.main.async {
-                    //                        album.isHidden = true
-                    //                    }
                 }
         } else {
             let reason = "We need to unlock your data."
             context.evaluatePolicy(.deviceOwnerAuthentication,
-                                   localizedReason: reason) { success, authenticationError in
+                                   localizedReason: reason) { success, _ in
                 resultHandler(success)
             }
         }

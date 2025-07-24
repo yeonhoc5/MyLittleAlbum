@@ -15,7 +15,6 @@ struct ImageDetailView: View {
     let asset: MLAsset
     let imageManager: PHCachingImageManager
     let size: CGSize
-    let enableZoom: Bool
     
     @Binding var variableScale: CGFloat
     @Binding var currentScale: CGFloat
@@ -35,16 +34,6 @@ struct ImageDetailView: View {
                         Image(uiImage: (fetchedImage))
                             .resizable()
                             .scaledToFit()
-                            .modify({ view in
-                                if enableZoom {
-                                    view
-                                        .zoomable(minZoomScale: 1.0,
-                                                  doubleTapZoomScale: 3.0,
-                                                  outOfBoundsColor: .clear)
-                                } else {
-                                    view
-                                }
-                            })
 //                        Spacer(minLength: 0)
 //                    }
 //                    Spacer(minLength: 0)
@@ -89,7 +78,7 @@ extension ImageDetailView {
 extension ImageDetailView {
     func fetchingImage(asset: PHAsset) -> UIImage {
         let assetRatio = CGFloat(asset.pixelHeight) / CGFloat(asset.pixelWidth)
-        let screenRatio = screenSize.height / screenSize.width
+        let screenRatio = size.height / size.width
         widthIsCreteria = assetRatio <= screenRatio
         var returnImage: UIImage!
         let options = PHImageRequestOptions()
@@ -98,8 +87,8 @@ extension ImageDetailView {
         options.isNetworkAccessAllowed = true
         options.resizeMode = .exact
         let creteriaSize = (widthIsCreteria
-                     ? screenSize.width
-                     : screenSize.height) * scale
+                     ? size.width
+                     : size.height) * scale
         let size = CGSize(width: widthIsCreteria ? creteriaSize : .infinity,
                           height: widthIsCreteria ? .infinity : creteriaSize)
         

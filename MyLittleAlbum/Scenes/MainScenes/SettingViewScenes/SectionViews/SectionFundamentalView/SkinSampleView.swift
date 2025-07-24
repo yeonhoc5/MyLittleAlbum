@@ -20,16 +20,15 @@ struct SkinSampleView: View {
                     CellView(uiMode: uiMode,
                              cellType: .album,
                              index: 0,
-                             width: firstWidth, tapAction: {
-                        
-                    }) { size, namespace in
+                             width: firstWidth) { size, namespace in
                         AlbumCoverView(
-                            sampleMLAlbum: MLAlbum(sampleID: 1,
-                                                   sampleCase: .overTwo),
+                            album: MLAlbum(sampleID: 1, sampleCase: .overTwo),
                             uiMode: uiMode,
                             cellType: .album,
                             size: size,
+                            colorIndex: 0,
                             albumCell: namespace,
+                            isEditingMode: false,
                             rprstImage1: UIImage(named: "sampleImage01"),
                             rprstImage2: UIImage(named: "sampleImage03")
                         )
@@ -38,42 +37,39 @@ struct SkinSampleView: View {
                 CellView(uiMode: uiMode,
                          cellType: .album,
                          index: 1,
-                         width: firstWidth, tapAction: {
-                    
-                }) { size, namespace in
+                         width: firstWidth) { size, namespace in
                     AlbumCoverView(
-                        sampleMLAlbum: MLAlbum(sampleID: 2,
-                                        sampleCase: .one),
+                        album: MLAlbum(sampleID: 2, sampleCase: .one),
                         uiMode: uiMode,
                         cellType: .album,
                         size: size,
+                        colorIndex: 0,
                         albumCell: namespace,
+                        isEditingMode: false,
                         rprstImage1: UIImage(named: "sampleImage02")
                     )
                 }
                 CellView(uiMode: uiMode,
                          cellType: .album,
                          index: 2,
-                         width: firstWidth, tapAction: {
-                    
-                }) { size, namespace in
+                         width: firstWidth) { size, namespace in
                     AlbumCoverView(
-                        sampleMLAlbum: MLAlbum(sampleID: 3,
-                                         sampleCase: .none),
+                        album: MLAlbum(sampleID: 3, sampleCase: .zero),
                                    uiMode: uiMode,
                                    cellType: .album,
                                    size: size,
-                                   albumCell: namespace)
+                                colorIndex: 0,
+                                   albumCell: namespace,
+                        isEditingMode: false)
                 }
             }
             HStack(alignment: .top, content: {
                 CellView(uiMode: uiMode,
                          cellType: .folder,
                          index: 0,
-                         width: secondWidth, tapAction: {
-                    
-                }) { size, namespace in
+                         width: secondWidth) { size, namespace in
                     FolderCoverView(folder: MLFolder(sampleID: 1),
+                                    phCollectionList: nil,
                                     uiMode: uiMode,
                                     size: size,
                                     cellNameSpace: namespace)
@@ -81,31 +77,32 @@ struct SkinSampleView: View {
                 CellView(uiMode: uiMode,
                          cellType: .miniAlbum,
                          index: 3,
-                         width: secondWidth, tapAction: {
-                    
-                }) { size, namespace in
+                         width: secondWidth) { size, namespace in
                     AlbumCoverView(
-                        sampleMLAlbum: MLAlbum(sampleID: 4,
+                        album: MLAlbum(sampleID: 4,
                                         sampleCase: .one),
                         uiMode: uiMode,
                         cellType: .miniAlbum,
                         size: size,
+                        colorIndex: 0,
                         albumCell: namespace,
+                        isEditingMode: false,
                         rprstImage1: UIImage(named: "sampleImage04")
                     )
                 }
                 CellView(uiMode: uiMode,
                          cellType: .miniAlbum,
                          index: 4,
-                         width: secondWidth, tapAction: {
-                }) { size, namespace in
+                         width: secondWidth) { size, namespace in
                     AlbumCoverView(
-                        sampleMLAlbum: MLAlbum(sampleID: 5,
-                                        sampleCase: .none),
+                        album: MLAlbum(sampleID: 5,
+                                        sampleCase: .zero),
                         uiMode: uiMode,
                         cellType: .miniAlbum,
                         size: size,
-                        albumCell: namespace)
+                        colorIndex: 0,
+                        albumCell: namespace,
+                        isEditingMode: false)
                 }
 //
             })

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import LottieUI
 
 extension View {
     func modify<T: View>(@ViewBuilder _ modifier: (Self) -> T) -> some View {
@@ -16,6 +17,15 @@ extension View {
         Rectangle()
             .fill(color)
             .frame(height: height)
+    }
+    func lottieLoadingView(lottie: String, size: CGSize, leadingPadding: CGFloat) -> some View {
+        LottieView(lottie)
+            .renderingEngine(.automatic)
+            .play(true)
+            .loopMode(.loop)
+            .padding(.leading, leadingPadding)
+            .frame(width: size.width, height: size.height)
+            .foregroundColor(.clear)
     }
 }
 // text
@@ -82,9 +92,9 @@ extension View {
                     bottomLeadingRadius: cornerBottomL ? radius : 0,
                     bottomTrailingRadius: cornerBottomT ? radius : 0,
                     topTrailingRadius: cornerTopT ? radius : 0,
-                    style: .continuous))
-//            .clipped()
-//            .cornerRadius(radius)
+                    style: .continuous)
+            )
+            .allowsHitTesting(false)
     }
     
     func imageScaledFit(_ name: String, width: CGFloat, height: CGFloat) -> some View {
@@ -106,10 +116,19 @@ extension View {
             .resizable()
             .foregroundColor(color)
             .frame(width: width, height: height)
+            .offset(y: 1)
     }
     
     func imageWithScale(systemName: String, scale: Image.Scale = .medium) -> some View {
         Image(systemName: systemName)
             .imageScale(scale)
+    }
+    
+    func dispatchAnimation(_ action: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            withAnimation {
+                action()
+            }
+        }
     }
 }

@@ -128,14 +128,12 @@ extension MoveCollectionCategoryView {
             CellView(uiMode: photoData.uiMode,
                      cellType: cellType,
                      index: moveObject?.objectColorIndex ?? 0,
-                     width: width,
-                     tapAction: {
-                
-            }) { size, namespace in
+                     width: width) { size, namespace in
                 Group {
                     if cellType == .folder {
                         if let folder = photoData.folders[objectFolder.localIdentifier] {
                             FolderCoverView(folder: folder,
+                                            phCollectionList: objectFolder,
                                             uiMode: photoData.uiMode,
                                             size: size,
                                             cellNameSpace: namespace)
@@ -143,11 +141,18 @@ extension MoveCollectionCategoryView {
                             EmptyView()
                         }
                     } else {
-                        AlbumCoverView(assetCollection: objectAlbum,
-                                       cellType: cellType,
-                                       size: size,
-                                       padding: 5,
-                                       albumCell: namespace)
+                        if let album = photoData.albums[objectAlbum.localIdentifier] {
+                            AlbumCoverView(album: album,
+                                           assetCollection: objectAlbum,
+                                           uiMode: photoData.uiMode,
+                                           cellType: cellType,
+                                           size: size,
+                                           colorIndex: 0,
+                                           albumCell: namespace,
+                                           isEditingMode: false)
+                        } else {
+                            EmptyView()
+                        }
                     }
                 }
             }
@@ -171,7 +176,7 @@ extension MoveCollectionCategoryView {
         let disable = currentParent.phCollectionList == nil
         return FolderLineView(isCollectionMoveView: true,
                               title: "최상위 폴더",
-                              subImage: disable ? "chevron.up.circle.fill" : "",
+                              subImage: disable ? "chevron.left.circle.fill" : "",
                               isSelected: isTopFolderSelected,
                               albumEmpty: true)
         .foregroundColor(disable ? .disabledColor
@@ -213,7 +218,7 @@ extension MoveCollectionCategoryView {
     }
     func chevronDirection(direction: DepthType) -> some View {
         let image = switch direction {
-        case .current: "chevron.up.circle.fill" // 현재위치
+        case .current: "chevron.left.circle.fill" // 현재위치
         case .none: "circle.circle.fill" // 오브젝트 대상
         case .secondary: "chevron.down.circle.fill" // 하위
         }
@@ -261,6 +266,9 @@ extension MoveCollectionCategoryView {
         let disable = !isTopFolderSelected && folderToAddCollection == nil
         var tempIndex: Int?
         return Button {
+            dispatchAnimation {
+                self.moveObject = nil
+            }
             phDataQueue.async {
                 if let destinationFolder = photoData.folders[isTopFolderSelected ? "topFolder" : folderToAddCollection.localIdentifier] {
                     destinationFolder
@@ -285,7 +293,7 @@ extension MoveCollectionCategoryView {
                                     }
                                 }
                                 dispatchAnimation {
-                                    currentParent.fetchCollection(needSetting: false)
+                                    currentParent.fetchCollection()
                                 }
                             } else {
                                 if let tempIndex = tempIndex {
@@ -302,7 +310,6 @@ extension MoveCollectionCategoryView {
                                     }
                                 }
                             }
-                            self.moveObject = nil
                     }
                     // 최근 작업 폴더 저장
                     DispatchQueue.global(qos: .utility).async {

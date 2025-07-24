@@ -112,6 +112,7 @@ extension RecyclePageView {
                     Color.black
                         .opacity(Double(100.0 - Double(offsetY)) / 100.0)
                         .ignoresSafeArea()
+                        .gesture(hideGesture)
                 })
                 .offset(x: self.userGesture == .paging ?
                         CGFloat(offsetIndex) * (geometry.size.width + 20) + self.offsetX
@@ -125,12 +126,10 @@ extension RecyclePageView {
                         }
                     }
                 })
-//                .gesture(hideGesture)
                 .simultaneousGesture(
                     pagingGesture(geometry: geometry, pageIndex: pageIndex)
-                        .exclusively(before: hideGesture)
+                        .exclusively(before: TapGesture(count: 1))
                 )
-            
         }
     }
     
@@ -174,7 +173,7 @@ extension RecyclePageView {
                     if (1..<count).contains(pageIndex)
                         && max(value.predictedEndTranslation.width,
                                value.translation.width)
-                        > 150 {
+                        > (geometry.size.width / 4) {
                         withAnimation(.easeOut(duration: 0.25)) {
                             self.offsetIndex += 1
                             userGesture = .none
@@ -182,7 +181,7 @@ extension RecyclePageView {
                     } else if (0..<count - 1).contains(pageIndex)
                                 && min(value.predictedEndTranslation.width,
                                        value.translation.width)
-                                < -150 {
+                                < -(geometry.size.width / 4) {
                         withAnimation(.easeOut(duration: 0.25)) {
                             self.offsetIndex -= 1
                             userGesture = .none

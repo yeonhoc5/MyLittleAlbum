@@ -10,13 +10,13 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject var photoData: MLPhotoData
     @State var selection: Tabs = .album
-    @Binding var isPhotosView: Int
+    @State var isPhotosView: Int = 0
+    @State var isShowingSettingView: Bool = false
+    @Namespace var nameSpace
     
     let launchScreenManger: LaunchScreenManager
     @Binding var isOpen: Bool
     @Binding var maskingScale: CGFloat
-    @Binding var isShowingSettingView: Bool
-    let nameSpace: Namespace.ID
     
     var body: some View {
         // 메인 뷰 - 각 탭뷰 별도의 네비게이션 스타일(extension) 적용
@@ -34,11 +34,11 @@ struct MainTabView: View {
                 })
                 .tag(Tabs.photo)
                 NavigationStack(root: {
-                    AlbumView(phCollectionList: nil,
+                    AlbumView(pageFolder: photoData.folders["topFolder"] ?? MLFolder(collectionList: nil),
+                              phCollectionList: nil,
                               isPhotosView: $isPhotosView,
                               nameSpace: nameSpace,
-                              isShowingSettingView: $isShowingSettingView,
-                              isHome: true)
+                              isShowingSettingView: $isShowingSettingView)
                 })
                 .tag(Tabs.album)
 //                NavigationStack(root: {
@@ -93,10 +93,7 @@ struct MainTabView: View {
 }
 
 #Preview {
-    MainTabView(isPhotosView: .constant(0),
-                launchScreenManger: LaunchScreenManager(),
+    MainTabView(launchScreenManger: LaunchScreenManager(),
                 isOpen: .constant(true),
-                maskingScale: .constant(0),
-                isShowingSettingView: .constant(false),
-                nameSpace: Namespace().wrappedValue)
+                maskingScale: .constant(0))
 }

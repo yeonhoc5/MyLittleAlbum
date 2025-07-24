@@ -14,12 +14,11 @@ struct InAppInfoView: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                ZStack {
-                    Rectangle()
-                        .foregroundStyle(.thinMaterial)
-                        .ignoresSafeArea()
-                        .opacity(infoState == .none ? 0 : 1)
-                    if infoState != .none {
+                if infoState == .hiddenAssets {
+                    ZStack {
+                        Rectangle()
+                            .foregroundStyle(.thinMaterial)
+                            .ignoresSafeArea()
                         infoView(infoState: infoState)
                             .animation(.easeInOut, value: infoState != .none)
                             .transition(.flip.combined(with: .scale))
@@ -31,7 +30,6 @@ struct InAppInfoView: ViewModifier {
                     DispatchQueue.main.async {
                         self.infoState = object
                     }
-                    self.infoState = object
                 }
             }
     }
@@ -54,75 +52,80 @@ enum Info {
 
 extension InAppInfoView {
     func infoView(infoState: Info) -> some View {
-        let info = getInfo(case: .hiddenAssets)
-        return VStack {
-            VStack {
-                Text(info.title)
-                    .font(.title)
-                    .bold()
-                    .padding(.bottom, 3)
-                    .foregroundStyle(Color.fancyBackground)
-                Text(info.semiTitle)
-                    .font(.callout)
-                    .font(Font.system(size: 10, design: .rounded))
-                    .foregroundStyle(Color.color17)
-                    .padding(.bottom, 25)
-                VStack(alignment: .leading, spacing: 10) {
-                    Group {
-                        Text(info.priorText)
-                        VStack(alignment: .trailing) {
-                            Image(info.middelPhoto)
-                                .resizable()
-                                .scaledToFit()
-                                .cornerRadius(radius / 2)
-                            Text(info.photoCaption)
-                                .foregroundStyle(Color.color17)
-                                .font(.caption)
+        return Group {
+            if let info = getInfo(cases: .hiddenAssets) {
+                VStack {
+                    VStack {
+                        Text(info.title)
+                            .font(.title)
+                            .bold()
+                            .padding(.bottom, 3)
+                            .foregroundStyle(Color.fancyBackground)
+                        Text(info.semiTitle)
+                            .font(.callout)
+                            .font(Font.system(size: 10, design: .rounded))
+                            .foregroundStyle(Color.color17)
+                            .padding(.bottom, 25)
+                        VStack(alignment: .leading, spacing: 10) {
+                            Group {
+                                Text(info.priorText)
+                                VStack(alignment: .trailing) {
+                                    Image(info.middelPhoto)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .cornerRadius(radius / 2)
+                                    Text(info.photoCaption)
+                                        .foregroundStyle(Color.color17)
+                                        .font(.caption)
+                                }
+                                .padding(10)
+                                Text(info.latterText)
+                            }
                         }
-                        .padding(10)
-                        Text(info.latterText)
+                        .font(.body)
+                        .lineSpacing(10)
+                    }
+                    .padding(.horizontal, 25)
+                    .padding(.top, 40)
+                    .padding(.bottom, 20)
+                    ZStack {
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 0,
+                            bottomLeadingRadius: radius,
+                            bottomTrailingRadius: radius,
+                            topTrailingRadius: 0,
+                            style: .continuous)
+                            .foregroundStyle(
+                                .white.opacity(0.7)
+                            )
+                            
+                        Text("확 인")
+                    }
+                    .frame(height: 60)
+                    .onTapGesture {
+                        DispatchQueue.main.async {
+                            withAnimation {
+                                self.infoState = .none
+                            }
+                        }
                     }
                 }
-                .font(.body)
-                .lineSpacing(10)
-            }
-            .padding(.horizontal, 25)
-            .padding(.top, 40)
-            .padding(.bottom, 20)
-            ZStack {
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 0,
-                    bottomLeadingRadius: radius,
-                    bottomTrailingRadius: radius,
-                    topTrailingRadius: 0,
-                    style: .continuous)
-                    .foregroundStyle(
-                        .white.opacity(0.7)
-                    )
-                    
-                Text("확 인")
-            }
-            .frame(height: 60)
-            .onTapGesture {
-                DispatchQueue.main.async {
-                    withAnimation {
-                        self.infoState = .none
+                .foregroundStyle(.black)
+                .background {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: radius)
+                            .foregroundStyle(.gray.opacity(0.7))
                     }
                 }
+                .padding(40)
+                .frame(maxWidth: widthLimit)
+            } else {
+                EmptyView()
             }
         }
-        .foregroundStyle(.black)
-        .background {
-            ZStack {
-                RoundedRectangle(cornerRadius: radius)
-                    .foregroundStyle(.gray.opacity(0.7))
-            }
-        }
-        .padding(40)
-        .frame(maxWidth: widthLimit)
     }
     
-    func getInfo(case : Info) -> InfoObject {
+    func getInfo(cases : Info) -> InfoObject! {
         return InfoObject(
             title: "가려진 사진 안내",
             semiTitle: "가려진 사진이 있음에도 없다고 나오나요?",

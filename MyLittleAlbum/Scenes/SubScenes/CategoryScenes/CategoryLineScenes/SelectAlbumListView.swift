@@ -15,7 +15,7 @@ struct SelectableCollectionView: View {
     
     // move asset
     let currentAlbum: PHAssetCollection!
-    let albumArray: [String]
+    let albumArray: [String] // recent + category albumList View
     @Binding var albumToAddPhotos: PHAssetCollection!
     let depthCount: Int
     
@@ -27,10 +27,10 @@ struct SelectableCollectionView: View {
     let lowers: [String]
     
     var body: some View {
-        GeometryReader { geoProxy in
-            let array = collectionType == .folder
-                                    ? photoData.recentWorkFolder
-                                    : albumArray
+        let array = collectionType == .folder
+                                ? photoData.recentWorkFolder
+                                : albumArray
+        return GeometryReader { geoProxy in
             let size = geoProxy.size
             collectionLayout(count: array.count, emptyText: emptytext) {
                 collectionList(isFolder: collectionType == .folder,
@@ -182,7 +182,7 @@ struct SelectableCollectionView: View {
 
     func chevronDirection(direction: DepthType) -> some View {
         let image = switch direction {
-        case .current: "chevron.up.circle.fill" // 현재위치
+        case .current: "chevron.left.circle.fill" // 현재위치
         case .none: "circle.circle.fill" // 오브젝트 대상
         case .secondary: "chevron.down.circle.fill" // 하위 
         }

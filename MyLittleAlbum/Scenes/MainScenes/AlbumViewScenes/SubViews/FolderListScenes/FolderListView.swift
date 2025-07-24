@@ -11,7 +11,8 @@ import LottieUI
 
 struct FolderListView: View {
     @EnvironmentObject var photoData: MLPhotoData
-    let phCollectionList: PHCollectionList!
+    @ObservedObject var pageFolder: MLFolder
+    let isHome: Bool
     // ui 프라퍼티
     let pageIndex: Int
     let screenWidth: CGFloat
@@ -19,22 +20,19 @@ struct FolderListView: View {
     var isEditingMode: Bool
     var nameSpace: Namespace.ID
     var albumViewNameSpace: Namespace.ID
+    let scrollProxy: ScrollViewProxy
     @Binding var isPhotosView: Int
     @State var foldedFolder: [String] = []
     @State var processingCollection: PHCollection!
     
     var body: some View {
         VStack(spacing: 5) {
-            let pageFolder = photoData.folders[phCollectionList?.localIdentifier ?? "topFolder"]
             SectionView(sectionType: .folder,
                         uiMode: photoData.uiMode,
-                        collectionCount: pageFolder?.foldersArray.count ?? 0,
+                        collectionCount: pageFolder.foldersArray.count,
                         isUnfolded: .constant(false))
-            if pageFolder != nil {
-                folderListView(pageFolder: pageFolder,
-                               idEditingMode: isEditingMode)
-                .animation(.easeInOut, value: pageFolder != nil)
-            }
+            folderListView(pageFolder: pageFolder,
+                           idEditingMode: isEditingMode)
         }
     }
 }
@@ -46,7 +44,7 @@ extension FolderListView {
                                     uiMode: photoData.uiMode,
                                     cellType: .folder)
         return VStack(spacing: 0) {
-            ForEach(pageFolder?.foldersArray ?? [], id: \.self) { phCollectionList in
+            ForEach(pageFolder?.foldersArray ?? [], id: \.localIdentifier) { phCollectionList in
                 let isFolded = !self.foldedFolder
                     .contains(phCollectionList.localIdentifier)
                 let index = (pageFolder?.foldersArray ?? []).firstIndex(of: phCollectionList) ?? 0
@@ -56,17 +54,35 @@ extension FolderListView {
                                height: lineHeight,
                                isFolded: isFolded,
                                lineView: { folderIndex in
-                        SecondaryLineView(
-                            phCollectionList: phCollectionList,
-                            index: folderIndex,
-                            secondaryWidth: secondaryWidth,
-                            lineHeight: lineHeight,
-                            isFolded: isFolded,
-                            isPhotosView: $isPhotosView,
-                            nameSpace: nameSpace,
-                            albumViewNameSpace: albumViewNameSpace,
-                            isEditingMode: isEditingMode
-                        )
+                    Group {
+                        if let secondaryFolder = photoData.folders[phCollectionList.localIdentifier] {
+                            SecondaryLineView(
+                                pageFolder: secondaryFolder,
+                                phCollectionList: phCollectionList,
+                                isHome: isHome,
+                                index: folderIndex,
+                                screenWidth: screenWidth,
+                                secondaryWidth: secondaryWidth,
+                                lineHeight: lineHeight,
+                                isFolded: isFolded,
+                                isPhotosView: $isPhotosView,
+                                nameSpace: nameSpace,
+                                albumViewNameSpace: albumViewNameSpace,
+                                isEditingMode: isEditingMode
+                            )
+                            .onChange(of: secondaryFolder.fetchResult.count,
+                                      perform: { [oldValue = secondaryFolder.fetchResult.count] newValue in
+                                if newValue > oldValue {
+                                    withAnimation {
+                                        scrollProxy
+                                            .scrollTo(secondaryFolder.id, anchor: .center)
+                                    }
+                                }
+                            })
+                        } else {
+                            FancyBackground()
+                        }
+                    }
                 })
                 .transition(.move(edge: .leading))
             }
@@ -117,13 +133,12 @@ extension FolderListView {
                 .padding(.leading, 10)
                 .zIndex(1)
                     lineView(folderIndex)
-//                    .padding(.leading, secondaryWidth * 0.3)
             }
         }
     }
     
     func classicFolderLineView(pageFolder: MLFolder!, view: some View, mode: Bool, width: CGFloat) -> some View {
-        let spacing = (screenWidth - (CGFloat(listCount+1) * width)) / CGFloat(listCount+1)
+        let spacing = (self.screenWidth - (CGFloat(listCount+1) * width)) / CGFloat(listCount+1)
         let albumCount = pageFolder?.albumsArray.count ?? 0
         let folderCount = pageFolder?.foldersArray.count ?? 0
         
@@ -207,31 +222,46 @@ extension FolderListView {
     
     func fancyModernNextFolderview(folder: PHCollectionList, index: Int, height: CGFloat) -> some View {
         return NavigationLink {
-            AlbumView(phCollectionList: folder,
-                      pageIndex: index,
-                      isPhotosView: $isPhotosView,
-                      nameSpace: nameSpace,
-                      isShowingSettingView: .constant(false))
+            if let pageFolder = photoData.folders[folder.localIdentifier] {
+                AlbumView(pageFolder: pageFolder,
+                          phCollectionList: folder,
+                          pageIndex: index,
+                          isPhotosView: $isPhotosView,
+                          nameSpace: nameSpace,
+                          isShowingSettingView: .constant(false))
+
+            }
         } label: {
             ZStack(alignment: .center) {
                 RoundedRectangle(cornerRadius: 10)
                     .foregroundColor(.folder)
-                Text(photoData.folders[folder.localIdentifier]?.title ?? folder.localizedTitle ?? "")
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.white)
-                    .contentTransition(.numericText())
-                    .padding(.all, 5)
+                if let folder = photoData.folders[folder.localIdentifier] {
+                    FolderTitleView(folder: folder)
+                } else {
+                    Text(folder.localizedTitle ?? "")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.white)
+                        .contentTransition(.numericText())
+                        .padding(.all, 5)
+                }
             }
             .shadow(radius: 2)
         }
         .buttonStyle(ClickScaleEffect())
-//        .contextMenu{
-//            editFolderMenu(folder: photoData
-//                .folders[collectionList.localIdentifier] ?? MLFolder(collectionList: collectionList))
-//        }
         .frame(width: abs(secondaryWidth * 0.6),
                height: abs(height))
         .transition(.scale)
+    }
+}
+
+struct FolderTitleView: View {
+    @ObservedObject var folder: MLFolder
+    var body: some View {
+        Text(folder.title)
+            .multilineTextAlignment(.center)
+            .foregroundColor(.white)
+            .contentTransition(.numericText())
+            .padding(.all, 5)
     }
 }
 
@@ -287,7 +317,6 @@ extension FolderListView {
             }
             Divider()
             Button {
-                guard let pageFolder = photoData.folders[phCollectionList?.localIdentifier ?? "topFolder"] else { return }
                 let moveObject = MoveCollectionObject(
                     currentParent: pageFolder,
                     objectCellType: .folder,
@@ -304,18 +333,7 @@ extension FolderListView {
             }
             Divider()
             Button(role: .destructive) {
-                guard let pageFolder = photoData.folders[phCollectionList?.localIdentifier ?? "topFolder"] else { return }
-                pageFolder.deleteFolder(folder: folder) { _ in
-                    dispatchAnimation {
-                        photoData.folders.removeValue(forKey: folder.localIdentifier)
-                    }
-                    DispatchQueue.global().async {
-                        if let _ = photoData.recentWorkFolder.firstIndex(of: folder.localIdentifier) {
-                            photoData
-                                .removeRecentWork(isFolder: true, id: folder.localIdentifier)
-                        }
-                    }
-                }
+                deleteFolderInDepth(folder: folder)
             } label: {
                 ContextMenuItem(title: "이 폴더 삭제하기", image: "trash")
             }
@@ -323,50 +341,27 @@ extension FolderListView {
     }
     
     func btnDelete(folder: PHCollectionList) -> some View {
-        Group {
-            if processingCollection == folder as PHCollection {
-                ProgressView()
-                    .tint(.red)
-                    .progressViewStyle(.circular)
-            } else {
-                Button {
-                    processingCollection = folder as PHCollection
-                    deleteFolderInDepth(folder: folder)
-                } label: {
-                    RemoveButtonLabel(shapeType: .rectangle)
-                }
-                .opacity(isEditingMode ? 1:0)
-                .scaleEffect(isEditingMode ? 1:0.1, anchor: .center)
-                .buttonStyle(ClickScaleEffect())
-            }
+        Button {
+            processingCollection = folder as PHCollection
+            deleteFolderInDepth(folder: folder)
+        } label: {
+            RemoveButtonLabel(shapeType: .rectangle,
+                              isProcessing: processingCollection == folder)
         }
+        .opacity(isEditingMode ? 1:0)
+        .scaleEffect(isEditingMode ? 1:0.1, anchor: .center)
+        .buttonStyle(ClickScaleEffect())
     }
         
     func deleteFolderInDepth(folder: PHCollectionList)  {
-        guard let pageFolder = photoData.folders[phCollectionList?.localIdentifier ?? "topFolder"] else { return }
         pageFolder.deleteFolder(folder: folder) { bool in
-            print("asdfasdfa \(bool)")
-            if bool {
-                if let folder = photoData.folders[folder.localIdentifier] {
-                    for seconAlbum in folder.albumsArray {
-                        dispatchAnimation {
-                            photoData.albums
-                                .removeValue(forKey: seconAlbum.localIdentifier)
-                        }
-                    }
-                    for seconFolder in folder.foldersArray {
-                        dispatchAnimation {
-                            photoData.folders
-                                .removeValue(forKey: seconFolder.localIdentifier)
-                        }
-                    }
-                }
-                DispatchQueue.main.async {
-                    photoData.folders
-                        .removeValue(forKey: folder.localIdentifier)
-                }
-            }
             dispatchAnimation {
+                if bool {
+                    photoData.removeFolderValue(folder: folder) { 
+                        NotificationCenter.default
+                            .post(name: .outsideFetchChange, object: "myPhotos")
+                    }
+                }
                 self.processingCollection = nil
             }
         }
@@ -390,7 +385,8 @@ enum SheetType {
 
 struct CollectionLineView_Previews: PreviewProvider {
     static var previews: some View {
-        AlbumView(phCollectionList: nil,
+        AlbumView(pageFolder: MLFolder(collectionList: nil),
+                  phCollectionList: nil,
                   pageIndex: 0,
                   isPhotosView: .constant(0),
                   nameSpace: Namespace().wrappedValue,

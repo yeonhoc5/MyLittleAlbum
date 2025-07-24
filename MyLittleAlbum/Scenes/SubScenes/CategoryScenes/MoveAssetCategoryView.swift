@@ -39,7 +39,9 @@ struct MoveAssetCategoryView: View {
                 moveAssetTitleView
             }
             VStack(spacing: 10) {
-                legendView
+                if albumType != .home {
+                    legendView
+                }
                 folderCategoryView
                 recentWorkAlbumList
             }
@@ -114,7 +116,7 @@ extension MoveAssetCategoryView {
 //                }
         SelectableCollectionView(
             collectionType: .album,
-            emptytext: "이 폴더엔 앨범이 없습니다.",
+            emptytext: "이 폴더에는 앨범이 없습니다.",
             currentAlbum: currentAlbum,
             albumArray: folder.albumsArray.map({ $0.localIdentifier }),
             albumToAddPhotos: $albumToAddPhotos,
@@ -234,11 +236,12 @@ extension MoveAssetCategoryView {
     // (왼쪽) 취소 버튼
     var btnCancelAndClose: some View {
         Button {
-            dispatchAnimation {
-                self.object = nil
+            DispatchQueue.main.async {
                 NotificationCenter.default
-                    .post(name: .endProgress, object: nil)
+                    .post(name: .assetWorkDone,
+                          object: currentAlbum?.localIdentifier ?? "myPhotos")
             }
+            self.object = nil
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
@@ -293,9 +296,9 @@ extension MoveAssetCategoryView {
                             Text("\(albumToAddPhotos.localizedTitle ?? "앨범")")
                                 .truncationMode(.middle)
                                 .contentTransition(.numericText())
-                            Text("(으)로")
+                            Text(albumType == .home ? "에" : "(으)로")
                         }
-                        Text("옮기기")
+                        Text(albumType == .home ? "넣기" : "옮기기")
                     }
                 } flipReverseView: {
                     Text("앨범을 선택해 주세요.")
@@ -434,15 +437,22 @@ extension MoveAssetCategoryView {
                 if isDetailView {
                     DispatchQueue.main.async {
                         NotificationCenter.default
-                            .post(name: .detailViewRemoveAsset,
-                                  object: assets.first!)
+                            .post(name: .detailViewRemoveAsset, object: assets.first!)
                     }
                 }
-                if albumType == .album {
+                switch albumType {
+                case .home:
+                    DispatchQueue.main.async {
+                        NotificationCenter.default
+                            .post(name: .innerFetchChange, object: "myPhotos")
+                        NotificationCenter.default
+                            .post(name: .outsideFetchChange, object: toAlbum.id)
+                    }
+                case .album:
+                    // 다른 앨범으로 이동한 asset 제거
                     if let current = photoData.albums[currentAlbum?.localIdentifier ?? ""] {
-                        current.removeAssetFromAlbum(
-                            assets: assets,
-                            isHidden: isHiddenAssets) { bool in
+                        current
+                            .removeAssetFromAlbum(assets: assets, isHidden: isHiddenAssets) { bool in
                                 DispatchQueue.main.async {
                                     withAnimation(.easeInOut(duration: 0.5)) {
                                         NotificationCenter.default
@@ -451,12 +461,8 @@ extension MoveAssetCategoryView {
                                 }
                         }
                     }
+                default: break
                 }
-                DispatchQueue.main.async {
-                    NotificationCenter.default
-                        .post(name: .innerFetchChange, object: "myPhotos")
-                }
-                
             }
             // 최근 작업 앨범 저장
             DispatchQueue.global(qos: .utility).async {

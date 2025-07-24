@@ -14,17 +14,23 @@ enum ShapeTypes {
 struct RemoveButtonLabel: View {
     var width: Double = 20
     var shapeType: ShapeTypes = .rectangle
+    var isProcessing: Bool = false
     
     var body: some View {
-        let frontImage = shapeType == .rectangle ? "minus.rectangle.fill":"minus.circle.fill"
-        let backImage = shapeType == .rectangle ? "rectangle.fill":"circle.fill"
+        let backImage = shapeType == .rectangle ? "square.fill":"circle.fill"
         ZStack {
             Image(systemName: backImage)
                 .resizable()
-                .foregroundColor(.white)
-            Image(systemName: frontImage)
-                .resizable()
                 .foregroundColor(.red)
+            if isProcessing {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .controlSize(.mini)
+                    .foregroundColor(.white)
+            } else {
+                Image(systemName: "minus")
+                    .foregroundColor(.white)
+            }
         }
         .frame(width: width, height: width)
         .clipped()

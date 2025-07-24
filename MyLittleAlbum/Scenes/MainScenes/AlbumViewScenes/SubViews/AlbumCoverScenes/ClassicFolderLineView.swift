@@ -14,6 +14,7 @@ struct ClassicFolderLineView: View {
     @ObservedObject var stateChangeObject: StateChangeObject
     @StateObject var pageFolder: MLFolder
     
+    let screenWidth: CGFloat
     var width: CGFloat
     @Binding var isPhotosView: Int
 
@@ -116,11 +117,14 @@ extension ClassicFolderLineView {
     }
     func viewForEachfolder(folder: PHCollectionList, width: CGFloat) -> some View {
         NavigationLink {
-            AlbumView(phCollectionList: folder,
-                      pageIndex: 0,
-                      isPhotosView: $isPhotosView,
-                      nameSpace: nameSpace,
-                      isShowingSettingView: .constant(false))
+            if let pageFolder = photoData.folders[folder.localIdentifier] {
+                AlbumView(pageFolder: pageFolder,
+                          phCollectionList: folder,
+                          pageIndex: 0,
+                          isPhotosView: $isPhotosView,
+                          nameSpace: nameSpace,
+                          isShowingSettingView: .constant(false))
+            }
         } label: {
 //            CellView(uiMode: .classic,
 //                     cellType: .folder,

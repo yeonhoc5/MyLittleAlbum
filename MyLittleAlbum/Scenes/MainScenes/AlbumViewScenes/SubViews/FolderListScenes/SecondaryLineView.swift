@@ -11,8 +11,11 @@ import LottieUI
 
 struct SecondaryLineView: View {
     @EnvironmentObject var photoData: MLPhotoData
+    @ObservedObject var pageFolder: MLFolder
     let phCollectionList: PHCollectionList
+    let isHome: Bool
     let index: Int
+    let screenWidth: CGFloat
     let secondaryWidth: CGFloat
     let lineHeight: CGFloat
     let isFolded: Bool
@@ -23,173 +26,151 @@ struct SecondaryLineView: View {
 
     let isEditingMode: Bool
     @State var processingCollection: PHCollection!
-    
-    @Namespace private var albumEdge
-    @Namespace private var secondaryEdge
 
     @Environment(\.scenePhase) var scenePhase
     @State var isSetted: Bool = false
     
     var body: some View {
-        HStack(spacing: 0) {
+        let spacing = (screenWidth - 20 - secondaryWidth * ( CGFloat(listCount + 1))) / CGFloat(listCount)
+        return HStack(spacing: 0) {
             if photoData.uiMode != .classic {
                 Color.fancyBackground
                     .frame(width: 10 + secondaryWidth * 0.3)
                     .zIndex(1)
             }
-            if isSetted {
-                ScrollViewReader { scrollProxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        let spacing = (screenWidth - 20 - secondaryWidth * ( CGFloat(listCount + 1))) / CGFloat(listCount)
-                        if isSetted {
-                            if let pageFolder = photoData.folders[phCollectionList.localIdentifier] {
-                                let column = Array(
-                                    repeating: GridItem(.fixed(secondaryWidth),
-                                                        spacing: isFolded ? 7 : spacing),
-                                    count: isFolded ? pageFolder.fetchResult.count + 1 : listCount + 1)
-                                LazyVGrid(columns: column)  {
-                                    secondaryDepthView(folder: pageFolder,
-                                                       proxy: scrollProxy)
+            ScrollViewReader { scrollProxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    if isSetted {
+                        let column = Array(
+                            repeating: GridItem(.fixed(secondaryWidth), spacing: isFolded ? 7 : spacing),
+                            count: isFolded
+                                    ? (pageFolder.fetchResult.count) + 1
+                                    : listCount + 1
+                        )
+                        LazyVGrid(columns: column)  {
+                            fetchSecondaryDepth(width: secondaryWidth,
+                                                proxy: scrollProxy)
+                        }
+                        .padding(.leading,
+                                 10 + (photoData.uiMode == .classic
+                                       ? 0 : secondaryWidth * 0.3)
+                        )
+                        .transition(.slide)
+                        .onAppear {
+                            if isHome && photoData.loadingState == .doneSecondaryLines {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    photoData.loadingState = .loadAllAlbums
                                 }
-                                .matchedGeometryEffect(id: "contatiner", in: secondaryEdge)
-                                .padding(.leading,
-                                          10 + (photoData.uiMode == .classic
-                                                ? 0 : secondaryWidth * 0.3)
-                                )
+                            }
+                        }
+                    } else {
+                        let padding: CGFloat = (secondaryWidth * 0.6) - 10
+                        lottieLoadingView(lottie: "secondaryLoadingJson",
+                                          size: CGSize(width: screenWidth - padding,
+                                                       height: lineHeight),
+                                          leadingPadding:padding)
+                        .onAppear {
+                            if photoData.folders[phCollectionList.localIdentifier] != nil {
+                                dispatchAnimation {
+                                    isSetted = true
+                                }
                             }
                         }
                     }
-                    .scrollDisabled(!isFolded)
                 }
-                .transition(.slide)
-            } else {
-                GeometryReader { geometry in
-                    lottieLoadingView(lottie: "secondaryLoadingJson",
-                                      size: geometry.size,
-                                      leadingPadding: (secondaryWidth * 0.6) - 10)
-                }
-                .frame(height: abs(lineHeight))
-                .task {
-                    dispatchAnimation {
-                        isSetted = true
+                .scrollDisabled(!isFolded)
+                .onChange(of: photoData.loadingState) { newValue in
+                    if isHome && (newValue == .doneSecondaryLines
+                                  || newValue == .loadingComplete) {
+                        DispatchQueue.main.async {
+                            withAnimation {
+                                isSetted = true
+                            }
+                        }
                     }
                 }
+                .onChange(of: pageFolder.albumsArray.count,
+                          perform: { [oldValue = pageFolder.albumsArray.count] newValue in
+                    if newValue > oldValue {
+                        withAnimation {
+                            scrollProxy
+                                .scrollTo(pageFolder.albumsArray.last?.localIdentifier,
+                                          anchor: .trailing)
+                        }
+                    }
+                })
+                .onChange(of: pageFolder.foldersArray.count,
+                          perform: { [oldValue = pageFolder.foldersArray.count] newValue in
+                    if newValue > oldValue {
+                        withAnimation {
+                            scrollProxy
+                                .scrollTo(pageFolder.foldersArray.last?.localIdentifier)
+                        }
+                    }
+                })
             }
         }
-//        .onChange(of: scenePhase) { [oldValue = scenePhase] newValue in
-//            if oldValue != newValue {
-//                if newValue == .background {
-//                    print("background View")
-//                    DispatchQueue.global().async {
-//                        self.isSetted = false
-//                    }
-//                } else if newValue == .active {
-//                    print("active View")
-//                    DispatchQueue.main.async {
-//                        withAnimation {
-//                            self.isSetted = true
-//                        }
-//                    }
-//                }
-//            }
-//        }
     }
 }
 
 // load photodata
 extension SecondaryLineView {
-    func secondaryDepthView(folder: MLFolder, proxy: ScrollViewProxy) -> some View {
-        fetchSecondaryDepth(pageFolder: folder, width: secondaryWidth, proxy: proxy)
-            .id("secondaryEdge")
-            .onChange(of: folder.fetchResult, perform: { [oldValue = folder.fetchResult] newValue in
-                if newValue.count > oldValue.count {
-                    if let id = (newValue.lastObject as? PHAssetCollection)?.localIdentifier {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            withAnimation(.interactiveSpring()) {
-                                proxy.scrollTo(id, anchor: .bottomTrailing)
-                            }
-                        }
-                    } else {
-                        if let id = (newValue.lastObject as? PHCollectionList)?.localIdentifier {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                withAnimation(.interactiveSpring()) {
-                                    proxy.scrollTo(id, anchor: .bottomTrailing)
-                                }
-                            }
-                        }
-                    }
-                }
-            })
-            .onReceive(NotificationCenter.default
-                .publisher(for: .scrollToItem)) { output in
-                    if let scrollObject = output.object as? ScrollItem {
-                        if folder.albumsArray
-                            .compactMap({ $0.localIdentifier })
-                            .contains(scrollObject.identifier) {
-                            withAnimation {
-                                proxy
-                                    .scrollTo(scrollObject.identifier, anchor: .trailing)
-                            }
-                        }
-                    }
-                }
-    }
-    
-    func fetchSecondaryDepth(pageFolder: MLFolder, width: CGFloat, proxy: ScrollViewProxy) -> some View {
+    func fetchSecondaryDepth(width: CGFloat, proxy: ScrollViewProxy) -> some View {
         Group {
-            ForEach(pageFolder.foldersArray, id: \.localIdentifier) { folder in
+            ForEach(pageFolder.foldersArray, id: \.self) { folder in
                 let secondaryIndex = pageFolder.foldersArray.firstIndex(of: folder) ?? 0
                 folderListView(collectionList: folder,
                                index: index + ((secondaryIndex + 1) * 4),
                                width: width)
-                    .id(folder.localIdentifier)
                     .matchedGeometryEffect(id: folder.localIdentifier,
                                            in: albumViewNameSpace)
                     .buttonStyle(ClickScaleEffect())
                     .transition(.scale)
+                    .id(folder.localIdentifier)
             }
-            ForEach(pageFolder.albumsArray, id: \.localIdentifier) { album in
+            ForEach(pageFolder.albumsArray, id: \.self) { album in
                 let secondaryIndex = pageFolder.albumsArray.firstIndex(of: album) ?? 0
                 albumListView(assetCollection: album,
                               index: index + secondaryIndex,
                               width: width)
-                    .id(album.localIdentifier)
                     .matchedGeometryEffect(id: album.localIdentifier,
                                            in: albumViewNameSpace)
                     .buttonStyle(ClickScaleEffect())
                     .transition(.scale)
+                    .id(album.localIdentifier)
             }
         }
         .padding(.vertical, 6)
-//        .id(albumEdge)
     }
 
     func folderListView(collectionList: PHCollectionList,
                         index: Int, width: CGFloat!) -> some View {
         NavigationLink {
-            AlbumView(phCollectionList: collectionList,
-                      pageIndex: index,
-                      isPhotosView: $isPhotosView,
-                      nameSpace: nameSpace,
-                      isShowingSettingView: .constant(false))
+            if let nextFolder = photoData.folders[collectionList.localIdentifier] {
+                AlbumView(pageFolder: nextFolder,
+                          phCollectionList: collectionList,
+                          pageIndex: index,
+                          isPhotosView: $isPhotosView,
+                          nameSpace: nameSpace,
+                          isShowingSettingView: .constant(false))
+            }
         } label: {
             CellView(uiMode: photoData.uiMode,
                      cellType: .folder,
                      index: 0,
-                     width: width, tapAction: {
-            }) { size, cellNameSpace in
+                     width: width) { size, cellNameSpace in
                 Group {
                     if let nextFolder = photoData.folders[collectionList.localIdentifier] {
                         FolderCoverView(folder: nextFolder,
+                                        phCollectionList: collectionList,
                                         uiMode: photoData.uiMode,
                                         size: size,
                                         cellNameSpace: cellNameSpace)
                     } else {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .frame(width: size.width,
-                                   height: size.height * 0.6)
-                            .offset(y: size.height * 0.4)
+                        TempCoverView(title: collectionList.localizedTitle ?? "Loading...",
+                                      nameSpace: cellNameSpace,
+                                      size: size,
+                                      cellType: .folder)
                     }
                 }
                 .matchedGeometryEffect(id: collectionList.localIdentifier,
@@ -219,23 +200,25 @@ extension SecondaryLineView {
                 CellView(uiMode: photoData.uiMode,
                          cellType: .miniAlbum,
                          index: index,
-                         width: width,
-                         tapAction: {
-                    guard let album = photoData.albums[assetCollection.localIdentifier]
-                    else { return }
-                    if album.frObject(isHiddenAsset: false) != album.photosArray.map({ $0.phAsset }) {
-                        album.generateArray(isHiddenAsset: false) { }
-                    }
-                }) { size, cellNameSpace in
+                         width: width) { size, cellNameSpace in
                     Group {
-                    AlbumCoverView(assetCollection: assetCollection,
-                                   cellType: .miniAlbum,
-                                   size: size,
-                                   colorIndex: index,
-                                   padding: 5,
-                                   albumCell: cellNameSpace)
-                    .matchedGeometryEffect(id: assetCollection.localIdentifier,
-                                           in: cellNameSpace)
+                        if let album = photoData.albums[assetCollection.localIdentifier] {
+                            AlbumCoverView(album: album,
+                                           assetCollection: assetCollection,
+                                           uiMode: photoData.uiMode,
+                                           cellType: .miniAlbum,
+                                           size: size,
+                                           colorIndex: index,
+                                           albumCell: cellNameSpace,
+                                           isEditingMode: isEditingMode)
+                            .matchedGeometryEffect(id: assetCollection.localIdentifier,
+                                                   in: cellNameSpace)
+                        } else {
+                            TempCoverView(title: assetCollection.localizedTitle ?? "Loading...",
+                                          nameSpace: cellNameSpace,
+                                          size: size,
+                                          cellType: .miniAlbum)
+                        }
                     }
                 }
                  .contextMenu{
@@ -301,8 +284,6 @@ extension SecondaryLineView {
                 ContextMenuItem(title: "폴더 이름 변경하기", image: "pencil")
             }
             Button {
-                guard let pageFolder = photoData.folders[phCollectionList.localIdentifier]
-                else { return }
                 let moveObject = MoveCollectionObject(
                     currentParent: pageFolder,
                     objectCellType: .folder,
@@ -326,29 +307,22 @@ extension SecondaryLineView {
         }
     }
     func btnDelete(collection: PHCollection) -> some View {
-        Group {
-            if processingCollection == collection {
-                ProgressView()
-                    .tint(.red)
-                    .progressViewStyle(.circular)
+        Button {
+            processingCollection = collection
+            if let folder = collection as? PHCollectionList {
+                deleteFolderInSecDepth(folder: folder)
             } else {
-                Button {
-                    processingCollection = collection
-                    if let folder = collection as? PHCollectionList {
-                        deleteFolderInSecDepth(folder: folder)
-                    } else {
-                        if let album = collection as? PHAssetCollection {
-                            deleteAlbumInSecDepth(album: album)
-                        }
-                    }
-                } label: {
-                    RemoveButtonLabel(shapeType: .circle)
+                if let album = collection as? PHAssetCollection {
+                    deleteAlbumInSecDepth(album: album)
                 }
-                .opacity(isEditingMode ? 1:0)
-                .scaleEffect(isEditingMode ? 1:0.1, anchor: .center)
-                .buttonStyle(ClickScaleEffect())
             }
+        } label: {
+            RemoveButtonLabel(shapeType: .circle,
+                              isProcessing: processingCollection == collection)
         }
+        .opacity(isEditingMode ? 1:0)
+        .scaleEffect(isEditingMode ? 1:0.1, anchor: .center)
+        .buttonStyle(ClickScaleEffect())
     }
 }
 // edit funcs (2/2) 앨범
@@ -360,7 +334,7 @@ extension SecondaryLineView {
             // 앨범에 미디어 추가
             Button {
                 guard let album = photoData.albums[assetCollection.localIdentifier] else { return }
-                let object = PickerObject(editToAlbum: album,
+                let object = PickerObject(editToAlbum: album.id,
                                           imageManager: PHCachingImageManager())
                 DispatchQueue.main.async {
                     NotificationCenter.default
@@ -386,8 +360,6 @@ extension SecondaryLineView {
             }
             // 다른 폴더로 이동
             Button {
-                guard let pageFolder = photoData.folders[phCollectionList.localIdentifier]
-                else { return }
                 let moveObject = MoveCollectionObject(
                     currentParent: pageFolder,
                     objectCellType: .miniAlbum,
@@ -413,20 +385,12 @@ extension SecondaryLineView {
     }
     // 앨범 삭제
     func deleteFolderInSecDepth(folder: PHCollectionList) {
-        guard let pageFolder = photoData.folders[phCollectionList.localIdentifier]
-        else { return }
         pageFolder.deleteFolder(folder: folder) { bool in
             if bool {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation {
-                        let _ = photoData.folders
-                            .removeValue(forKey: folder.localIdentifier)
-                    }
-                }
-                DispatchQueue.global().async {
-                    if let _ = photoData.recentWorkFolder.firstIndex(of: folder.localIdentifier) {
-                        photoData
-                            .removeRecentWork(isFolder: true, id: folder.localIdentifier)
+                dispatchAnimation {
+                    photoData.removeFolderValue(folder: folder) {
+                        NotificationCenter.default
+                            .post(name: .outsideFetchChange, object: "myPhotos")
                     }
                 }
             }
@@ -436,16 +400,15 @@ extension SecondaryLineView {
         }
     }
     func deleteAlbumInSecDepth(album: PHAssetCollection)  {
-        guard let pageFolder = photoData.folders[phCollectionList.localIdentifier]
-        else { return }
-        pageFolder.deleteAlbum(album: album) { _ in
-//            if bool {
-//                DispatchQueue.global().async {
-//                    if let index = photoData.recentWorkAlbum.firstIndex(of: album.localIdentifier) {
-//                        photoData.removeRecentWork(isFolder: false, index: index)
-//                    }
-//                }
-//            }
+        pageFolder.deleteAlbum(album: album) { bool in
+            if bool {
+                dispatchAnimation {
+                    photoData.removeAlbumValue(album: album) {
+                        NotificationCenter.default
+                            .post(name: .outsideFetchChange, object: "myPhotos")
+                    }
+                }
+            }
             dispatchAnimation {
                 processingCollection = nil
             }

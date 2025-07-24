@@ -16,7 +16,7 @@ struct SmartAlbumView: View {
                                      SmartAlbum(smatType: .hiddenAsset)]
     var nameSpace: Namespace.ID
     @State var isShowingSmartAlbum: Bool = false
-    @State var smartAlbum: SmartAlbum!
+    @State var smartAlbumToSee: SmartAlbum! = nil
     
     var body: some View {
         List {
@@ -27,13 +27,13 @@ struct SmartAlbumView: View {
                             authenticate(albumType: .smartAlbum) { bool in
                                 if bool {
                                     dispatchAnimation {
-                                        self.smartAlbum = smart
-                                    } 
+                                        smartAlbumToSee = smart
+                                    }
                                 }
                             }
                         } else {
                             dispatchAnimation {
-                                self.smartAlbum = smart
+                                smartAlbumToSee = smart
                                 isShowingSmartAlbum = true
                             }
                         }
@@ -42,6 +42,37 @@ struct SmartAlbumView: View {
                     .foregroundColor(.fancyBackground)
                 }
             }
+            .navigationDestination(isPresented: $isShowingSmartAlbum,
+                                   destination: {
+    //            if let smart = smartAlbum {
+    //                if let mlAlbum = photoData.smartAlbums[smart.id] {
+                        AllPhotosView(
+                            albumType: .smartAlbum,
+                            assetCollection: smartAlbumToSee?.phAssetCollection,
+                            isHiddenAsset: smartAlbumToSee?.isPrivacy ?? false,
+                            smartAlbum: smartAlbumToSee,
+                            isPhotosView: $isPhotosView,
+                            nameSpace: nameSpace)
+    //                } else {
+    //                    RefreshPhotoView(task: {
+    //                        phDataQueue.async {
+    //                            let album = MLAlbum(
+    //                                assetCollection: smart.phAssetCollection,
+    //                                title: smart.title,
+    //                                isPrivacy: smart.isPrivacy)
+    //                            album.generateArray(isHiddenAsset: smart.isPrivacy) {
+    //                                DispatchQueue.main.async {
+    //                                    withAnimation {
+    //                                        let _ = photoData.smartAlbums
+    //                                            .updateValue(album, forKey: album.id)
+    //                                    }
+    //                                }
+    //                            }
+    //                        }
+    //                    })
+    //                }
+    //            }
+            })
 //            footer: {
 //                Text("애플(APPLE)의 정책에 의해,\n[설정>앱>사진]에서 \"암호사용\" 또는 \"FaceID사용\"을 활성화 한 경우,\n아이폰 [사진] 앱을 제외한 앱에서는 \"가린 항목\"을 볼 수 없습니다.")
 //                    .foregroundColor(.gray)
@@ -68,42 +99,11 @@ struct SmartAlbumView: View {
         .scrollDisabled(true)
         .navigationBarTitleDisplayMode(.inline)
         .navigationTitle("사진 관리")
-        .onAppear(perform: {
-            smartAlbum = nil
-        })
-        .navigationDestination(isPresented: $isShowingSmartAlbum,
-                               destination: {
-            if let smart = smartAlbum {
-                if let mlAlbum = photoData.smartAlbums[smart.id] {
-                    AllPhotosView(
-                        albumType: .smartAlbum,
-                        assetCollection: nil,
-                        mlAlbum: mlAlbum,
-                        smartAlbumType: smart.smartAlbumType,
-                        isHiddenAsset: smart.isPrivacy,
-                        settingDone: false,
-                        isPhotosView: $isPhotosView,
-                        nameSpace: nameSpace)
-                } else {
-                    RefreshPhotoView(task: {
-                        phDataQueue.async {
-                            let album = MLAlbum(
-                                assetCollection: smart.phAssetCollection,
-                                title: smart.title,
-                                isPrivacy: smart.isPrivacy)
-                            album.generateArray(isHiddenAsset: smart.isPrivacy) {
-                                DispatchQueue.main.async {
-                                    withAnimation {
-                                        let _ = photoData.smartAlbums
-                                            .updateValue(album, forKey: album.id)
-                                    }
-                                }
-                            }
-                        }
-                    })
-                }
+        .onAppear {
+            DispatchQueue.global(qos: .default).async {
+                smartAlbumToSee = nil
             }
-        })
+        }
     }
 }
 
@@ -123,7 +123,7 @@ extension SmartAlbumView {
                     Spacer()
                     LottieView("unlock")
                         .renderingEngine(.automatic)
-                        .play(self.smartAlbum?.id == smart.id)
+                        .play(smartAlbumToSee?.id ?? "" == smart.id)
                         .loopMode(.playOnce)
                         .backgroundBehavior(.pauseAndRestore)
                         .onFrame({ frame in
@@ -157,7 +157,7 @@ extension SmartAlbumView {
     
 struct SmarAlbumView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView(selection: .other, isOpen: true)
+        ContentView(isOpen: true)
             .environmentObject(PhotoData())
     }
 }

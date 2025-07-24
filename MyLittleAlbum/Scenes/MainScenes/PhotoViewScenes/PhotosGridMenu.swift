@@ -46,7 +46,6 @@ enum BelongingType {
 
 struct PhotosGridMenu: View {
     @EnvironmentObject var photoData: MLPhotoData
-//    @Binding var pickerObject: PickerObject!
     var albumType: AlbumType = .album
     let smartAlbumType: SmartType
     @ObservedObject var mlAlbum: MLAlbum
@@ -67,7 +66,7 @@ struct PhotosGridMenu: View {
     @Binding var isShowingShareSheet: Bool
     @Binding var isShowingPhotosPicker: Bool
     
-    var albumToEdit: MLAlbum!
+    var albumToEdit: String!
     var nameSpace: Namespace.ID
     
     let width: CGFloat
@@ -76,7 +75,6 @@ struct PhotosGridMenu: View {
     let opacity: CGFloat = 0.8
     
     @Binding var reloadingType: ReLoadingType
-    @State var isProcessing: Bool = false
     let isReadyHiddenAsset: Bool
     
     var body: some View {
@@ -118,18 +116,19 @@ struct PhotosGridMenu: View {
                 }
         }
         .onReceive(NotificationCenter.default
-            .publisher(for: .endProgress), perform: { _ in
-                dispatchAnimation {
-                    isProcessing = false
+            .publisher(for: .assetWorkStart), perform: { output in
+                if let mlID = output.object as? String {
+                    if mlID == self.mlAlbum.id {
+                        mlAlbum.processingChange(bool: true)
+                    }
                 }
             })
         .onReceive(NotificationCenter.default
-            .publisher(for: .showPhotosProgress), perform: { output in
-                if let object = output.object as? String {
-                    if object == self.mlAlbum.id {
-                        withAnimation {
-                            self.isProcessing = true
-                        }
+            .publisher(for: .assetWorkDone), perform: { output in
+                if let mlID = output.object as? String {
+                    print("[\(mlID == mlAlbum.id)] \(mlID), \(mlAlbum.id)")
+                    if mlID == self.mlAlbum.id {
+                        mlAlbum.processingChange(bool: false)
                     }
                 }
             })
@@ -268,22 +267,9 @@ extension PhotosGridMenu {
 
 // MARK: - 포토 그리드 공통 버튼
 extension PhotosGridMenu {
-    var btnClose: some View {
-        return menuButton(type: .text, text: "close") {
-            DispatchQueue.main.async {
-                isShowingPhotosPicker = false
-//                self.selectedItems.removeAll()
-//                self.pickerObject = nil
-            }
-        }
-    }
-    
-    // 가운데 라벨바
+    // 0. 가운데 라벨바
     func centerMenuBar(assetArray: [MLAsset], isSelectMode: Bool) -> some View {
         return ZStack(alignment: .center) {
-            if isReadyHiddenAsset {
-                
-            }
             Capsule()
                 .modify({ view in
                     if isReadyHiddenAsset {
@@ -298,11 +284,10 @@ extension PhotosGridMenu {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .tint(.white)
-                    Text("Generating")
+                    Text("Generating...")
                         .foregroundStyle(.white)
                 }
                 .transition(.opacity)
-                
             } else {
                 FlipViewTransitor(isModeChange: isSelectMode) {
                     HStack {
@@ -314,7 +299,7 @@ extension PhotosGridMenu {
                         Text("사진: \(imageCount)")
                             .foregroundColor(filteringType == .image ? .blue : .white)
                             .contentTransition(.numericText())
-                        if isProcessing {
+                        if mlAlbum.innerProcessing {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .tint(.blue)
@@ -339,7 +324,7 @@ extension PhotosGridMenu {
                             .contentTransition(.numericText())
                             .animation(.linear, value: selectedCount)
                         Text("개의 항목 ")
-                        if isProcessing {
+                        if mlAlbum.innerProcessing {
                             ProgressView()
                                 .progressViewStyle(.circular)
                                 .tint(.blue)
@@ -350,16 +335,16 @@ extension PhotosGridMenu {
                     }
                 }
                 .font(.system(.subheadline, design: .rounded, weight: .medium))
+                .foregroundColor(.white)
             }
         }
     }
-    // 사진 추가 버튼
+    // 1. show PhotoPickerView : album
     var btnPlus: some View {
         return menuButton(type: .image, image: "plus",
-                          scale: .large,
-                          color: .white, bgColor: .blue,
+                          scale: .large, color: .white, bgColor: .blue,
                           disabled: isSelectMode) {
-            let object = PickerObject(editToAlbum: self.mlAlbum,
+            let object = PickerObject(editToAlbum: self.mlAlbum.id,
                                       imageManager: cachingimageManager)
             dispatchAnimation {
                 NotificationCenter.default
@@ -441,8 +426,14 @@ extension PhotosGridMenu {
             }
         let disable = assetArray.isEmpty
         let color: Color = disable ? .gray.opacity(0.5) : .black
+        var symbol: String = ""
+        if #available(iOS 17, *) {
+            symbol = "play.square.stack"
+        } else {
+            symbol = "play.square"
+        }
         return menuButton(type: .image,
-                          image: "play.square.stack",
+                          image: symbol,
                           scale: .small,
                           color: color,
                           bgColor: isShowingDigitalShow ? .clear : .white,
@@ -482,13 +473,10 @@ extension PhotosGridMenu {
         return Menu {
             photoMenu
         } label: {
-            menuButton(type: .text,
-                       text: text,
-                       color: textColor,
-                       disabled: disable) {
-            }
+            menuButton(type: .text, text: text, color: textColor, disabled: disable) { }
             .fontWeight(.bold)
         }
+        .disabled(disable)
     }
     
     // 필터링
@@ -528,7 +516,7 @@ extension PhotosGridMenu {
         VStack {
             ForEach(FilteringType
                 .allCases
-                .filter({ smartAlbumType == .favorite ? $0 != .favorite : true })) { type in
+                .filter({ smartAlbumType == .favorite ? $0 != .favorite : true }), id: \.self) { type in
                 if type != .all {
                     Button {
                         if filteringType != type {
@@ -591,15 +579,32 @@ extension PhotosGridMenu {
         let icon = toFavorite ? iconFavorite : iconUnfavorite
         let assets = selectedItems.filter { $0.isFavorite != toFavorite }
         return menuButton(type: .image, image: icon, disabled: disable) {
+            mlAlbum.processingChange(bool: true)
             mlAlbum.favoriteAsset(toFavorite: toFavorite,
                                   assets: assets,
                                   isHiddenAsset: self.isHiddenAssets) { bool in
                 if bool {
                     dispatchAnimation {
-                        let object = ItemChangedView(id: self.mlAlbum.id,
-                                                    items: assets.compactMap({ $0.id }))
-                        NotificationCenter.default
-                            .post(name: .itemChanged, object: object)
+                        isSelectMode = false
+                        reloadingType = .itemChangedInside
+//                        switch albumType {
+//                        case .home:
+//                            let object = ChangedItem(assets: selectedItems, albumType: .album)
+//                            NotificationCenter.default
+//                                .post(name: .assetChanged, object: object)
+//                        case .album:
+//                            let object = ChangedItem(assets: selectedItems, albumType: .home)
+//                            NotificationCenter.default
+//                                .post(name: .assetChanged, object: object)
+//                        case .smartAlbum:
+//                            let object1 = ChangedItem(assets: selectedItems, albumType: .album)
+//                            let object2 = ChangedItem(assets: selectedItems, albumType: .home)
+//                            NotificationCenter.default
+//                                .post(name: .assetChanged, object: object1)
+//                            NotificationCenter.default
+//                                .post(name: .assetChanged, object: object2)
+//                        default: break
+//                        }
                     }
                 }
             }
@@ -613,7 +618,8 @@ extension PhotosGridMenu {
                 case .all:
                     dispatchAnimation {
                         belongingType = .nonAlbum
-                        reloadingType = .belongingChange                    }
+                        reloadingType = .belongingChange
+                    }
                 case .album:
                     dispatchAnimation {
                         belongingType = .all
@@ -630,6 +636,20 @@ extension PhotosGridMenu {
             } label: {
                 ContextMenuItem(title: "앨범에 없는 항목만 보기",
                                 image: belongingType == .nonAlbum ? "checkmark" : "",
+                                color: belongingType == .nonAlbum ? .blue : .black)
+            }
+            Button {
+                if belongingType != .all {
+                    DispatchQueue.main.async {
+                        withAnimation(.interactiveSpring()) {
+                            belongingType = .all
+                        }
+                        reloadingType = .belongingChange
+                    }
+                }
+            } label: {
+                ContextMenuItem(title: "모든 항목 보기",
+                                image: belongingType == .all ? "checkmark" : "",
                                 color: belongingType == .nonAlbum ? .blue : .black)
             }
             Button {
@@ -666,20 +686,6 @@ extension PhotosGridMenu {
                                 image: belongingType == .album ? "checkmark" : "",
                                 color: belongingType == .nonAlbum ? .blue : .black)
             }
-            Button {
-                if belongingType != .all {
-                    DispatchQueue.main.async {
-                        withAnimation(.interactiveSpring()) {
-                            belongingType = .all
-                        }
-                        reloadingType = .belongingChange
-                    }
-                }
-            } label: {
-                ContextMenuItem(title: "모두 보기",
-                                image: belongingType == .all ? "checkmark" : "",
-                                color: belongingType == .nonAlbum ? .blue : .primary)
-            }
         }
     }
     
@@ -704,17 +710,13 @@ extension PhotosGridMenu {
     // 앨범에서 빼기
     func btnTakeFrom() -> some View {
         let disable = selectedItems.isEmpty
-        return menuButton(type: .text,
-                          text: "앨범에서 빼기",
-                          disabled: disable) {
-            dispatchAnimation { isProcessing = true }
+        return menuButton(type: .text, text: "앨범에서 빼기", disabled: disable) {
             let alertObject = AlertObject(alertCase: .mediaTakeFromAlbum,
                                           album: mlAlbum.phAssetCollection,
                                           folder: nil,
                                           selectedItems: selectedItems,
                                           isHiddenAsset: isHiddenAssets
             )
-            
             DispatchQueue.main.async {
                 NotificationCenter.default
                     .post(name: .showAlert, object: alertObject)
@@ -773,21 +775,20 @@ extension PhotosGridMenu {
         return assetsToShare
     }
     
-    
-    // 앨범에 넣기 / 다른 앨범으로 이동 (둘 모두 시트에서 처리)
+    // 1-1. album: 어셋 이동 시트 열기
+    // 1-2. home: 어셋 이동 시트 열기
+    // 2. picker: 현재 앨범에 넣기
     func btnMove(albumType: AlbumType) -> some View {
         let disable = selectedItems.isEmpty
-        let text: String
         let textColor: Color
         let bgColor: Color
-        switch albumType {
-        case .home: text = "앨범에 넣기"
-        case .album: text = "다른 앨범으로 이동하기"
-        default: text = selectedItems.isEmpty
-            ? "선택한 항목 없음"
-            : "\(selectedItems.count)개의 항목 이 앨범에 넣기"
+        let text = switch albumType {
+        case .home: "앨범에 넣기"
+        case .album: "다른 앨범으로 이동하기"
+        default: selectedItems.isEmpty 
+                        ? "선택한 항목 없음"
+                        : "\(selectedItems.count)개의 항목 이 앨범에 넣기"
         }
-        
         switch albumType {
         case .home, .album:
             textColor = disable ? .gray.opacity(0.5) : .black
@@ -799,37 +800,54 @@ extension PhotosGridMenu {
         return menuButton(type: .text, text: text,
                           color: textColor, bgColor: bgColor,
                           disabled: disable) {
-            dispatchAnimation {
-                NotificationCenter.default
-                    .post(name: .showPhotosProgress, object: albumToEdit?.id)
-            }
-            if albumType == .picker {
+            switch albumType {
+            case .home, .album:
+                mlAlbum.processingChange(bool: true)
+                let moveAssetObject = MoveAssetObject(
+                    albumType: albumType,
+                    currentAlbum: mlAlbum.phAssetCollection,
+                    selectedItems: self.selectedItems,
+                    isHidden: isHiddenAssets
+                )
                 dispatchAnimation {
-                    self.isShowingPhotosPicker = false
+                    NotificationCenter.default
+                        .post(name: .showMoveAssetSheet, object: moveAssetObject)
                 }
-                phDataQueue.async {
-                    addAssetIntoAlbum(assets: selectedItems) { bool in
-                        dispatchAnimation {
+            case .picker:
+                guard let albumToEdit = photoData.albums[self.albumToEdit ?? ""]
+                else { return }
+                dispatchAnimation {
+                    NotificationCenter.default
+                        .post(name: .assetWorkStart, object: albumToEdit.id)
+//                    self.isShowingPhotosPicker = false
+                }
+                albumToEdit.processingChange(bool: true)
+                albumToEdit.addAsset(assets: selectedItems) { bool in
+                    if bool {
+                        DispatchQueue.main.async {
                             selectedItems = []
+                            withAnimation {
+                                self.reloadingType = .reFetchInside
+                            }
+                            NotificationCenter.default
+                                .post(name: .outsideFetchChange, object: "myPhotos")
+                        }
+                    } else {
+                        NotificationCenter.default
+                            .post(name: .assetWorkDone, object: albumToEdit.id)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        self.isShowingPhotosPicker = false
+                        if bool {
+                            NotificationCenter.default
+                                .post(name: .innerFetchChange, object: albumToEdit.id)
                         }
                     }
                 }
-            } else {
-                phDataQueue.async {
-                    let moveAssetObject = MoveAssetObject(
-                        albumType: .album,
-                        currentAlbum: mlAlbum.phAssetCollection,
-                        selectedItems: self.selectedItems,
-                        isHidden: isHiddenAssets
-                    )
-                    dispatchAnimation {
-                        NotificationCenter.default
-                            .post(name: .showMoveAssetSheet, object: moveAssetObject)
-                    }
-                }
+            default: break
             }
         }
-          .disabled(selectedItems.isEmpty)
+        .disabled(selectedItems.isEmpty)
     }
     // 가리기 & 해제
     func btnHideUnhide(_ toHide: Bool) -> some View {
@@ -840,63 +858,50 @@ extension PhotosGridMenu {
             hideOrUnhideAsset(assets: selectedItems)
         }
     }
+    // pickerView 닫기 버튼
+    var btnClose: some View {
+        return menuButton(type: .text, text: "close") {
+            DispatchQueue.main.async {
+                isShowingPhotosPicker = false
+            }
+        }
+    }
 }
 
 //MARK: - 사진 처리 함수
 extension PhotosGridMenu {
-    // 앨범에서 빼기 - 경고창을 위해 grid 뷰에서 처리
-    // 현재 앨범에 넣기
-    func addAssetIntoAlbum(assets: [MLAsset], completion: @escaping (Bool) -> Void) {
-        albumToEdit?.addAsset(assets: assets) { bool in
-            DispatchQueue.main.async {
-                NotificationCenter.default
-                    .post(name: .innerFetchChange, object: "myPhotos")
-            }
-        }
-    }
-    
     // 기기에서 삭제
     func deleteAsset(selected: [MLAsset]) {
-        dispatchAnimation {
-            isProcessing = true
-        }
         mlAlbum.deleteAssetFromDevice(albumType: albumType,
                                        assets: selectedItems,
                                        isHiddenAsset: isHiddenAssets,
                                        isDetailView: false) { bool in
             if bool {
                 DispatchQueue.main.async {
-                    NotificationCenter.default
-                        .post(name: .innerFetchChange, object: mlAlbum.id)
-                    NotificationCenter.default
-                        .post(name: .innerFetchChange, object: "myPhotos")
+                    reloadingType = .reFetchInside
+                    if albumType == .album || albumType == .smartAlbum {
+                        NotificationCenter.default
+                            .post(name: .innerFetchChange, object: "myPhotos")
+                    }
                 }
             } else {
-                dispatchAnimation {
-                    isProcessing = false
-                }
+                mlAlbum.processingChange(bool: false)
             }
         }
     }
     
     // 사진 가리기
     func hideOrUnhideAsset(assets: [MLAsset]) {
-        dispatchAnimation {
-            isProcessing = true
-        }
+        mlAlbum.processingChange(bool: true)
         if !isHiddenAssets {
             mlAlbum.hideOrUnhideAsset(assets: selectedItems,
                                       toHide: !isHiddenAssets,
                                       isDetailView: false) { bool in
-                print(bool)
                 DispatchQueue.main.async {
                     if bool {
                         reloadingType = .reFetchInside
-                    } else {
-                        withAnimation {
-                            self.isProcessing = false
-                        }
                     }
+                    mlAlbum.processingChange(bool: false)
                 }
             }
         } else {
@@ -990,8 +995,8 @@ extension PhotosGridMenu {
                      image: String! = "",
                      rotate: Double! = 0.0,
                      font: Font! = .caption,
-                     color: Color! = .primaryColorInvert,
-                     bgColor: Color! = .primary,
+                     color: Color! = .black,
+                     bgColor: Color! = .white,
                      disabled: Bool! = false,
                      disabledColor: Color! = .gray.opacity(0.5)) -> some View {
         let unitWidth = abs(width - (2 * spacing)) / unitCount

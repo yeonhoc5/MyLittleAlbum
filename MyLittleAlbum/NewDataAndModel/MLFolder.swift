@@ -10,17 +10,22 @@ import Photos
 
 extension PHCollectionList: @retroactive Identifiable {}
 
+struct MLAssetCollection {
+    
+}
+
 class MLFolder: NSObject, ObservableObject, Observable {
-    var isSample: Bool = false
+    let isSample: Bool
     let id: String
     @Published var title: String
     @Published var phCollectionList: PHCollectionList!
     var fetchResult = PHFetchResult<PHCollection>()
     
     @Published var albumsArray: [PHAssetCollection] = []
-    @Published var foldersArray: [PHCollectionList] = []
+    @Published var foldersArray: [PHCollectionList] = [] 
     
     init(collectionList: PHCollectionList!) {
+        self.isSample = false
         self.id = collectionList?.localIdentifier ?? "topFolder"
         self.phCollectionList = collectionList
         self.title = collectionList?.localizedTitle ?? "마이 리틀 앨범"
@@ -40,7 +45,7 @@ class MLFolder: NSObject, ObservableObject, Observable {
             PHPhotoLibrary.shared().unregisterChangeObserver(self)
         }
     }
-    func fetchCollection(needSetting: Bool = true) {
+    func fetchCollection() {
         let options = PHFetchOptions()
         options.wantsIncrementalChangeDetails = true
         if let folder = self.phCollectionList {
@@ -50,23 +55,25 @@ class MLFolder: NSObject, ObservableObject, Observable {
             self.fetchResult = PHCollection
                 .fetchTopLevelUserCollections(with: options)
         }
-        if needSetting {
-            setCategory(fetchResult: self.fetchResult)
-        }
     }
 }
 // MARK: - 1. folder Set Functions
 extension MLFolder {
-    func setCategory(fetchResult: PHFetchResult<PHCollection>) {
-        fetchResult.enumerateObjects { collection, _, _ in
+    func makeArray(completion: @escaping (Bool) -> Void) {
+        var count = 0
+        self.fetchResult.enumerateObjects { collection, _, _ in
             if collection.isKind(of: PHCollectionList.self) {
-                withAnimation {
+                DispatchQueue.main.async {
                     self.foldersArray.append(collection as! PHCollectionList)
                 }
             } else {
-                withAnimation {
+                DispatchQueue.main.async {
                     self.albumsArray.append(collection as! PHAssetCollection)
                 }
+            }
+            count += 1
+            if count == self.fetchResult.count {
+                completion(true)
             }
         }
     }
@@ -125,13 +132,13 @@ extension MLFolder {
         } completionHandler: { [unowned self] (success, error) in
             print("Finished Adding the folder. \(success ? "Success" : String(describing: error))")
             if success {
-                self.fetchCollection(needSetting: false)
+                self.fetchCollection()
                 guard let placeholder = placeholder else { return }
                 let fetchResult = PHCollectionList.fetchCollectionLists(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
                 guard let folder = fetchResult.firstObject else { return }
                 DispatchQueue.main.async {
                     withAnimation {
-                        self.foldersArray.append(folder)
+                        let _ = self.foldersArray.append(folder)
                     }
                 }
                 completion(folder)
@@ -170,13 +177,13 @@ extension MLFolder {
         } completionHandler: { [unowned self] (success, error) in
             print("Finished Adding the album. \(success ? "Success" : String(describing: error))")
             if success {
-                self.fetchCollection(needSetting: false)
+                self.fetchCollection()
                 guard let placeholder = placeholder else { return }
                 let fetchResult = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
                 guard let album = fetchResult.firstObject else { return }
                 DispatchQueue.main.async {
                     withAnimation {
-                        self.albumsArray.append(album)
+                        let _ = self.albumsArray.append(album)
                     }
                 }
                 completion(album)
@@ -197,7 +204,7 @@ extension MLFolder {
         }) { [unowned self] (success, error) in
             print("Finished removing the folder [\(folder.localizedTitle ?? "")] from the [\(self.title)]folder. \(success ? "Success" : String(describing: error))")
             if success {
-                self.fetchCollection(needSetting: false)
+                self.fetchCollection()
                 if let index = self.foldersArray.firstIndex(of: folder) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         withAnimation {
@@ -218,7 +225,7 @@ extension MLFolder {
         }) { [unowned self] (success, error) in
             if success {
                 print("Finished removing the album [\(album.localizedTitle ?? "")] from the [\(self.title)]folder. \(success ? "Success" : String(describing: error))")
-                fetchCollection(needSetting: false)
+                self.fetchCollection()
                 if let index = self.albumsArray.firstIndex(of: album) {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         withAnimation {
@@ -248,7 +255,7 @@ extension MLFolder {
         }) { [unowned self] (success, error) in
             print("Finished Reordeing Collections in folder. \(success ? "Success" : String(describing: error))")
             if success {
-                self.fetchCollection(needSetting: false)
+                self.fetchCollection()
             }
             completion(success)
         }
@@ -258,19 +265,19 @@ extension MLFolder {
                              collection: PHCollection,
                              completion: @escaping (Bool) -> Void) {
         PHPhotoLibrary.shared().performChanges {
-            var addRequest = PHCollectionListChangeRequest()
+            var addRequest: PHCollectionListChangeRequest
             if self.phCollectionList == nil {
                 addRequest = PHCollectionListChangeRequest(
-                    forTopLevelCollectionListUserCollections: self.fetchResult) ?? addRequest
+                    forTopLevelCollectionListUserCollections: self.fetchResult) ?? PHCollectionListChangeRequest()
             } else {
                 addRequest = PHCollectionListChangeRequest(
                     for: self.phCollectionList,
-                    childCollections: self.fetchResult) ?? addRequest
+                    childCollections: self.fetchResult) ?? PHCollectionListChangeRequest()
             }
             addRequest.addChildCollections([collection] as NSFastEnumeration)
         } completionHandler: { [unowned self] success, _ in
             if success {
-                self.fetchCollection(needSetting: false)
+                self.fetchCollection()
                 if collectionType == .album {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         withAnimation {
@@ -334,14 +341,13 @@ extension MLFolder: PHPhotoLibraryChangeObserver {
                                 folder: folder) {
                                 DispatchQueue.main.async { [unowned self] in
                                     withAnimation {
-                                        self.foldersArray.append(folder)
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1 ) { [unowned self] in
-                                            self.foldersArray.move(fromOffsets: [self.foldersArray.count-1],
-                                                                  toOffset: index)
-                                        }
+                                        self.foldersArray.insert(folder, at: 0)
+//                                        self.foldersArray.append(folder)
+//                                        DispatchQueue.main.asyncAfter(deadline: .now() + 1 ) { [unowned self] in
+//                                            self.foldersArray.move(fromOffsets: [self.foldersArray.count-1],
+//                                                                  toOffset: index)
+//                                        }
                                     }
-                                    NotificationCenter.default
-                                        .post(name: .collectionInserted, object: folder)
                                 }
                             }
                         }
@@ -360,8 +366,6 @@ extension MLFolder: PHPhotoLibraryChangeObserver {
                                                       toOffset: index)
                                         }
                                     }
-                                    NotificationCenter.default
-                                        .post(name: .collectionInserted, object: album)
                                 }
                             }
                         }
@@ -377,8 +381,6 @@ extension MLFolder: PHPhotoLibraryChangeObserver {
                                 withAnimation {
                                     let _ = self.foldersArray.remove(at: index)
                                 }
-                                NotificationCenter.default
-                                    .post(name: .collectionRemoved, object: folder)
                             }
                         } else if let album = collection as? PHAssetCollection,
                                   let index = self.albumsArray.firstIndex(of: album) {
@@ -388,8 +390,6 @@ extension MLFolder: PHPhotoLibraryChangeObserver {
                                 }
                                 NotificationCenter.default
                                     .post(name: .outsideFetchChange, object: "myPhotos")
-                                NotificationCenter.default
-                                    .post(name: .collectionRemoved, object: album)
                             }
                         }
                     }

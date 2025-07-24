@@ -5,14 +5,21 @@
 //  Created by yeonhoc5 on 4/1/25.
 //
 
-import SwiftUI
+import MediaPlayer
 
-struct MediaPlayers: View {
-    var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+extension MPVolumeView {
+    static func catchVolume() -> CGFloat {
+        let volumeView = MPVolumeView()
+        let slider = volumeView.subviews.first(where: { $0 is UISlider }) as? UISlider
+        print(slider)
+        return CGFloat(slider?.value ?? 0)
     }
-}
+    static func setVolume(_ volume: Float) -> Void {
+       let volumeView = MPVolumeView()
+       let slider = volumeView.subviews.first(where: { $0 is UISlider }) as? UISlider
 
-#Preview {
-    MediaPlayers()
+       DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.01) {
+           slider?.value = volume
+       }
+   }
 }

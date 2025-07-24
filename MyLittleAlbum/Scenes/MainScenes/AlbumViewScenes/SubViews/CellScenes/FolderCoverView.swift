@@ -6,9 +6,11 @@
 //
 
 import SwiftUI
+import Photos
 
 struct FolderCoverView: View {
     @ObservedObject var folder: MLFolder
+    let phCollectionList: PHCollectionList!
     let uiMode: UIMode
     let size: CGSize
     let cellNameSpace: Namespace.ID
@@ -56,21 +58,21 @@ extension FolderCoverView {
                       content: {
             titleText(count, font: .caption,
                       color: .fancyBackground.opacity(0.5))
+                    .matchedGeometryEffect(id: "count", in: cellNameSpace)
                     .lineLimit(1)
                     .contentTransition(.numericText())
                     .frame(width: size.width - 10,
                            height: (size.height - spacing) * 0.33,
                            alignment: .bottomLeading)
-                    .matchedGeometryEffect(id: "count", in: cellNameSpace)
             titleText(folder.title, font: .footnote,
                       color: .fancyBackground)
+                    .matchedGeometryEffect(id: "title", in: cellNameSpace)
                     .lineLimit(.max)
                     .multilineTextAlignment(.leading)
                     .contentTransition(.numericText())
                     .frame(width: size.width - 10,
                            height: (size.height - spacing) * 0.67,
                            alignment: .topLeading)
-                    .matchedGeometryEffect(id: "title", in: cellNameSpace)
         })
         .frame(width: size.width, height: size.height)
     }

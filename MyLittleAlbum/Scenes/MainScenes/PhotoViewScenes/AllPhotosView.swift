@@ -8,30 +8,32 @@
 import SwiftUI
 import Photos
 import LocalAuthentication
+import CoreHaptics
 
 enum ReLoadingType {
-    case none, initiailFetch, reFetchInside, reFetchOutside
+    case none
+    case reFetchInside // item count + selectedItems 제거 + selectMode 체인지
+    case reFetchOutside // item count 체인지
+    case itemChangedInside // selectedItems 제거 + selectMode 체인지
+    case itemChangedOutside // selectedItems 제거
     case selectedModeChange, selectAll, deselectAll
-    case filterChange, belongingChange, itemChanged
+    case filterChange, belongingChange
 }
 
 struct AllPhotosView: View {
-    @EnvironmentObject var photoData: MLPhotoData
-    @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.isPresented) var isPresented
-    
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var photoData: MLPhotoData
     let imageCachingManger = PHCachingImageManager()
     // 앨범 타입이 album일 경우에만 "피커 버튼" 노출 결정
     var albumType: AlbumType = .album
-    // 보여줄 사진-앨범 프라퍼티 : [나의 앨범]탭에서는 상위에서 부여
-    //                      / [나의 사진], [사진 관리]탭에서는 본 페이지 진입하여 로딩
     let assetCollection: PHAssetCollection!
     @State var mlAlbum: MLAlbum!
-    var smartAlbumType: SmartType = .none
-    // [나의 사진]탭용 album 세팅용 프라퍼티
+    @State var assetArray: [MLAsset] = []
     var isHiddenAsset: Bool
-    @State var settingDone: Bool! = true
+    var smartAlbum: SmartAlbum! = nil
+    // [나의 사진]탭용 album 세팅용 프라퍼티
     // 필터링 1 : ([나의 사진]탭에서만) 전체 / In앨범 / NotIn앨범 필터링
     @State var belongingType: BelongingType = .nonAlbum
     // 필터링 2 : (전체탭) 미디어 타입 필터링
@@ -62,15 +64,15 @@ struct AllPhotosView: View {
     @State var showDetailView: Bool = false
     
     var body: some View {
-        let assetArray = assetArray(albumType: albumType,
-                                    belongingType: belongingType)
+//        let assetArray = assetArray(albumType: albumType,
+//                                    belongingType: belongingType)
         ZStack {
             FancyBackground().ignoresSafeArea()
             GeometryReader { geoProxy in
                 Group {
                     if mlAlbum == nil {
                         tempView(geoProxy: geoProxy, onAppear: {
-                            phDataQueue.asyncAfter(
+                            phPhotosQueue.asyncAfter(
                                 deadline: .now()
                                 + ((albumType == .home || albumType == .picker) ? 0.5 : 0)) {
                                 readyToShowView(albumType: albumType)
@@ -83,10 +85,10 @@ struct AllPhotosView: View {
                         NewPhotosCollectionView(
                             albumType: albumType,
                             mlAlbum: mlAlbum,
-                            smartAlbumType: smartAlbumType,
                             isHiddenAssets: isHiddenAsset,
-                            assetArray: assetArray,
+                            assetArray: $assetArray,
                             filteringType: $filteringType,
+                            belongingType: belongingType,
                             geoProxy: geoProxy,
                             cellWidth: cellWidth,
                             imageCachingManager: imageCachingManger,
@@ -128,7 +130,7 @@ struct AllPhotosView: View {
                     }
                 }
                 .overlay(alignment: .bottom, content: {
-                    photosGridMenu(assetArray: assetArray,
+                    photosGridMenu(/*assetArray: assetArray,*/
                                    filteringType: filteringType,
                                    width: geoProxy.size.width)
                 })
@@ -175,12 +177,17 @@ struct AllPhotosView: View {
                              reLoadingType: $reLoadingType,
                              selectedItems: $selectedItems)
         })
-        .onDisappear(perform: {
-            DispatchQueue.global(qos: .default).async {
-                if albumType != .smartAlbum {
-                    mlAlbum = nil
+        .onReceive(NotificationCenter.default
+            .publisher(for: .innerFetchChange), perform: { output in
+                if reLoadingType != .reFetchInside {
+                    guard let mlAlbum = mlAlbum else { return }
+                    if mlAlbum.id == output.object as? String {
+                        print("\(mlAlbum.title) innerfetch Recieved")
+                        DispatchQueue.main.async {
+                            reLoadingType = .reFetchInside
+                        }
+                    }
                 }
-            }
         })
         .onReceive(NotificationCenter.default
             .publisher(for: .outsideFetchChange), perform: { object in
@@ -195,65 +202,42 @@ struct AllPhotosView: View {
                 }
             })
         .onReceive(NotificationCenter.default
-            .publisher(for: .innerFetchChange), perform: { object in
-                if reLoadingType != .reFetchInside {
-                    guard let mlAlbum = mlAlbum else { return }
-                    if mlAlbum.id == object.object as? String {
-                        print("\(mlAlbum.title) innerfetch Recieved")
+            .publisher(for: .assetChanged), perform: { output in
+                if let object = output.object as? ChangedItem {
+                    if object.albumType == self.albumType {
                         DispatchQueue.main.async {
-                            reLoadingType = .reFetchInside
+                            refreshItmes = object.assets
+                                .filter({ assetArray.contains($0) })
+                            withAnimation {
+                                reLoadingType = .itemChangedOutside
+                            }
                         }
                     }
                 }
         })
-        .onReceive(NotificationCenter.default
-            .publisher(for: .collectionRemoved), perform: { object in
-                guard let assetCollection = object.object as? PHAssetCollection
-                else { return }
-                if assetCollection.localIdentifier == mlAlbum.id {
-                    dispatchAnimation {
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                }
-            })
-        .onReceive(NotificationCenter.default
-            .publisher(for: .itemChanged), perform: { output in
-                guard let object = output.object as? ItemChangedView else { return }
-//                if object.id != "elsewhere" {
-//                    guard object.id == self.mlAlbum?.id else { return }
+//        .onReceive(NotificationCenter.default
+//            .publisher(for: .collectionRemoved), perform: { object in
+//                guard let assetCollection = object.object as? PHAssetCollection
+//                else { return }
+//                if assetCollection.localIdentifier == mlAlbum.id {
+//                    dispatchAnimation {
+//                        dismiss()
+//                    }
 //                }
-                self.refreshItmes = assetArray.filter({ object.items.contains($0.id) })
-                if !refreshItmes.isEmpty {
-                    dispatchAnimation {
-                        reLoadingType = .itemChanged
-                    }
-                }
-        })
-        .onReceive(NotificationCenter.default
-            .publisher(for: .itemChanged), perform: { output in
-                guard let object = output.object as? ItemChangedView,
-                      object.id == self.mlAlbum?.id else { return }
-                print("Got notice at \(mlAlbum?.title ?? "home")")
-                self.refreshItmes = assetArray.filter({ object.items.contains($0.id) })
-                if !refreshItmes.isEmpty {
-                    dispatchAnimation {
-                        reLoadingType = .itemChanged
-                    }
-                }
-        })
+//            })
         .navigationDestination(isPresented: $showHiddenAssets) {
             AllPhotosView(albumType: albumType,
                           assetCollection: assetCollection,
                           mlAlbum: mlAlbum,
-                          smartAlbumType: smartAlbumType,
                           isHiddenAsset: true,
+                          smartAlbum: smartAlbum,
                           isPhotosView: $isPhotosView,
                           nameSpace: nameSpace)
-            .onDisappear {
-                mlAlbum.unSetHiddenAssets {
-                    print("hiddenAssets Removed")
-                }
-            }
+//            .onDisappear {
+//                mlAlbum.unSetHiddenAssets {
+//                    print("hiddenAssets Removed")
+//                }
+//            }
         }
         .onAppear(perform: {
             guard let mlAlbum = mlAlbum else { return }
@@ -284,11 +268,6 @@ struct AllPhotosView: View {
 //                }
 //            }
         })
-//        .onChange(of: self.belongingType, perform: { value in
-//            withAnimation {
-//                self.settingDone = false
-//            }
-//        })
         .gesture(DragGesture(minimumDistance: 10, coordinateSpace: .global)
             .onChanged({ value in
                 if isSelectMode {
@@ -297,7 +276,7 @@ struct AllPhotosView: View {
             })
             .onEnded({ value in
                 if value.translation.width > 50 && !self.isSelectMode{
-                    presentationMode.wrappedValue.dismiss()
+                    dismiss()
                 }
                 if self.isSelectingBySwipe {
                     self.isSelectingBySwipe = false
@@ -351,7 +330,7 @@ extension AllPhotosView {
         }
         .onAppear { onAppear() }
     }
-    func photosGridMenu(assetArray: [MLAsset],
+    func photosGridMenu(/*assetArray: [MLAsset],*/
                         filteringType: FilteringType,
                         width: CGFloat) -> some View {
         let spacerWidth = device == .phone
@@ -364,9 +343,8 @@ extension AllPhotosView {
             }
             if let mlAlbum = mlAlbum {
                 PhotosGridMenu(
-//                    pickerObject: .constant(nil),
                     albumType: albumType,
-                    smartAlbumType: smartAlbumType,
+                    smartAlbumType: smartAlbum?.smartAlbumType ?? .none,
                     mlAlbum: mlAlbum,
                     isHiddenAssets: isHiddenAsset,
                     cachingimageManager: imageCachingManger,
@@ -603,14 +581,12 @@ extension AllPhotosView {
                                 contentMode: .aspectFill,
                                 options: requestOptions)
                     } else {
-                        DispatchQueue.global(qos: .background).async {
-                            imageCachingManger
-                                .stopCachingImages(
-                                    for: objects,
-                                    targetSize: CGSize(width: width, height: width),
-                                    contentMode: .aspectFill,
-                                    options: requestOptions)
-                        }
+                        imageCachingManger
+                            .stopCachingImages(
+                                for: objects,
+                                targetSize: CGSize(width: width, height: width),
+                                contentMode: .aspectFill,
+                                options: requestOptions)
                     }
         }
     }
@@ -652,15 +628,14 @@ extension AllPhotosView {
     
     func emptyCapsuleView(size: CGSize, cellWidth: CGFloat) -> some View {
         ZStack {
-            Capsule()
+            RoundedRectangle(cornerRadius: 10)
                 .fill(.thinMaterial)
             HStack {
                 Text("\(albumType == .album ? "이 앨범에는 " : "")가린 항목이 없습니다.")
                 Button {
                     dispatchAnimation {
                         NotificationCenter.default
-                            .post(name: .showInfoView,
-                                  object: Info.hiddenAssets)
+                            .post(name: .showInfoView, object: Info.hiddenAssets)
                     }
                 } label: {
                     ZStack {
@@ -727,7 +702,28 @@ extension AllPhotosView {
                     self.mlAlbum = album
                 }
             }
-        default: break
+        case .smartAlbum:
+            if let album = photoData.smartAlbums[smartAlbum.id] {
+                album.generateArray(isHiddenAsset: isHiddenAsset) {
+                    dispatchAnimation {
+                        self.mlAlbum = album
+                    }
+                }
+            } else {
+                let album = MLAlbum(
+                    assetCollection: smartAlbum.phAssetCollection,
+                    title: smartAlbum.title,
+                    isPrivacy: smartAlbum.isPrivacy)
+                dispatchAnimation {
+                    let _ = photoData.smartAlbums
+                        .updateValue(album, forKey: album.id)
+                }
+                album.generateArray(isHiddenAsset: isHiddenAsset) {
+                    dispatchAnimation {
+                        self.mlAlbum = album
+                    }
+                }
+            }
         }
     }
     
@@ -740,19 +736,17 @@ extension AllPhotosView {
            switch belongingType {
            case .all:
                mlAlbum?.photosArray
-           case .nonAlbum:
-               mlAlbum?.subtractingArray(
-                        isHiddenAsset: false,
-                        subtracting: Array(photoData.albumsPhotosSet()))
-                    .sorted(by: { $0.creationDate < $1.creationDate })
-           case .album:
-               mlAlbum?.intersectingArray(
-                        isHiddenAsset: false,
-                        intersecting: Array(photoData.albumsPhotosSet()))
-                    .sorted(by: { $0.creationDate < $1.creationDate })
+           default:
+               mlAlbum?.operatedArray(
+                    isHiddenAsset: false,
+                    setOperation: belongingType == .nonAlbum ? .subtraction : .intersection,
+                    assets: Array(photoData.albumsPhotosSet())
+               )
            }
        }
-       return assetArray ?? []
+        print("[\(mlAlbum?.title ?? "")]assetArray changed to \(assetArray?.count ?? 0)")
+       return (assetArray ?? [])
+            .sorted(by: { $0.creationDate < $1.creationDate })
    }
 }
 

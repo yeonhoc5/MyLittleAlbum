@@ -658,7 +658,7 @@ class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegat
         }
         // step 3. indexpath별 셀 구성
         if indexPath.row < count {
-            var asset = array[indexPath.row]
+            let asset = array[indexPath.row]
             //            cell.cachingManger = self.parent.imageCachingManager
             cell.representedAssetIdentifier = asset.id
             cell.asset = asset

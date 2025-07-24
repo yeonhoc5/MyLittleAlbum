@@ -13,135 +13,152 @@ struct AssetHandleMenu: View {
     var albumType: AlbumType = .album
     let assetCollection: PHAssetCollection!
     let isHiddenAssets: Bool
-    @ObservedObject var asset: MLAsset
+    let asset: MLAsset
     @Binding var reLoadingType: ReLoadingType
     @Binding var selectedItems: [MLAsset]
+    @Binding var copyDone: Bool
     
     var body: some View {
-        HStack(spacing: 3) {
-            // 0. 삭제 버튼
-            assetHandleButton(imageName: iconDelete, imageColor: Color.color1) {
-                guard let album = albumType == .home
-                                ? photoData.homeAlbum
-                                : photoData.homeAlbum
-                else { return }
-                
-                album.deleteAssetFromDevice(albumType: albumType,
-                                            assets: [asset],
-                                            isHiddenAsset: isHiddenAssets,
-                                            isDetailView: true) { bool in
-                    if bool {
-                        DispatchQueue.main.async {
-                            NotificationCenter.default
-                                .post(name: .innerFetchChange, object: album.id)
-                            NotificationCenter.default
-                                .post(name: .innerFetchChange, object: "myPhotos")
+        Group {
+            if let album = albumType == .album
+                ? photoData.albums[assetCollection.localIdentifier]
+                : (albumType == .smartAlbum
+                   ? photoData.smartAlbums[assetCollection.localIdentifier]
+                   : photoData.homeAlbum) {
+                HStack(spacing: 3) {
+                    // 0. 삭제 버튼
+                    assetHandleButton(imageName: iconDelete, imageColor: Color.color1) {
+                        album.deleteAssetFromDevice(albumType: albumType,
+                                                    assets: [asset],
+                                                    isHiddenAsset: isHiddenAssets,
+                                                    isDetailView: true) { bool in
+                            if bool {
+                                DispatchQueue.main.async {
+                                    NotificationCenter.default
+                                        .post(name: .innerFetchChange, object: album.id)
+                                    NotificationCenter.default
+                                        .post(name: .innerFetchChange, object: "myPhotos")
+                                }
+                            }
                         }
                     }
-                }
-            }
-            separator
-            if albumType == .home || albumType == .smartAlbum {
-                // 1-1. 앨범에 추가 버튼
-                assetHandleButton(imageName: iconInsertToAlbum) {
-                    dispatchAnimation {
-                        let moveAssetObject = MoveAssetObject(
-                            albumType: self.albumType,
-                            currentAlbum: assetCollection,
-                            selectedItems: [asset],
-                            isHidden: isHiddenAssets)
-                        NotificationCenter.default
-                            .post(name: .showMoveAssetSheetInDetailView,
-                                  object: moveAssetObject)
-                    }
-                }
-            } else if albumType == .album {
-                // 1-2-1. 앨범에서 빼기 버튼
-                assetHandleButton(imageName: "rectangle.stack.badge.minus") {
-                    let alertObject = AlertObject(alertCase: .mediaTakeFromAlbum,
-                                                  album: assetCollection,
-                                                  folder: nil,
-                                                  selectedItems: [asset],
-                                                  isDetailView: true
-                                                  
-                    )
-                    NotificationCenter.default
-                        .post(name: .showAlertInDetailView, object: alertObject)
-                }
-                separator
-                // 1-2-2. 앨범 이동 버튼
-                assetHandleButton(isImage: false, titleName: "이동") {
-                    let moveAssetObject = MoveAssetObject(
-                        albumType: self.albumType,
-                        currentAlbum: assetCollection,
-                        selectedItems: [asset],
-                        isHidden: isHiddenAssets,
-                        isDetailView: true)
-                    NotificationCenter.default
-                        .post(name: .showMoveAssetSheetInDetailView,
-                              object: moveAssetObject)
-                }
-            }
-            Spacer()
-            // 즐겨찾기 버튼
-            assetHandleButton(
-                imageName: asset.isFavorite ? iconFavorite : iconNotFavorite,
-                imageColor: asset.isFavorite ? .color2 : .gray) {
-                    asset.favoriteAsset { bool in
-                        if bool {
+                    separator
+                    if albumType == .home || albumType == .smartAlbum {
+                        // 1-1. 앨범에 추가 버튼
+                        assetHandleButton(imageName: iconInsertToAlbum) {
                             dispatchAnimation {
-                                let object = ItemChangedView(id: assetCollection?.localIdentifier ?? "home",
-                                                             items: [asset.id])
+                                let moveAssetObject = MoveAssetObject(
+                                    albumType: self.albumType,
+                                    currentAlbum: assetCollection,
+                                    selectedItems: [asset],
+                                    isHidden: isHiddenAssets)
                                 NotificationCenter.default
-                                    .post(name: .itemChanged, object: object)
+                                    .post(name: .showMoveAssetSheetInDetailView,
+                                          object: moveAssetObject)
+                            }
+                        }
+                    } else if albumType == .album {
+                        // 1-2-1. 앨범에서 빼기 버튼
+                        assetHandleButton(imageName: "rectangle.stack.badge.minus") {
+                            let alertObject = AlertObject(alertCase: .mediaTakeFromAlbum,
+                                                          album: assetCollection,
+                                                          folder: nil,
+                                                          selectedItems: [asset],
+                                                          isDetailView: true
+                                                          
+                            )
+                            NotificationCenter.default
+                                .post(name: .showAlertInDetailView, object: alertObject)
+                        }
+                        separator
+                        // 1-2-2. 앨범 이동 버튼
+                        assetHandleButton(isImage: false, titleName: "이동") {
+                            let moveAssetObject = MoveAssetObject(
+                                albumType: self.albumType,
+                                currentAlbum: assetCollection,
+                                selectedItems: [asset],
+                                isHidden: isHiddenAssets,
+                                isDetailView: true)
+                            NotificationCenter.default
+                                .post(name: .showMoveAssetSheetInDetailView,
+                                      object: moveAssetObject)
+                        }
+                    }
+                    Spacer()
+                    // 즐겨찾기 버튼
+                    assetHandleButton(
+                        imageName: asset.isFavorite ? iconFavorite : iconNotFavorite,
+                        imageColor: asset.isFavorite ? .color2 : .gray) {
+                            asset.favoriteAsset(bool: !asset.isFavorite) { bool in
+                                if bool {
+                                    //                            dispatchAnimation {
+                                    //                                let object = ChangedItem(asset: [asset])
+                                    //                                NotificationCenter.default
+                                    //                                    .post(name: .assetChanged, object: object)
+                                    //                            }
+                                }
+                            }
+                        }
+                    
+                    separator
+                    if !isHiddenAssets {
+                        // 2-1. 가리기 버튼
+                        assetHandleButton(imageName: iconHide, imageColor: .gray) {
+                            guard let album = photoData.albums[assetCollection?.localIdentifier ?? ""] else { return }
+                            album.hideOrUnhideAsset(assets: [asset],
+                                                    toHide: !asset.isFavorite,
+                                                    isDetailView: true) { bool in
+                                if bool {
+                                    DispatchQueue.main.async {
+                                        NotificationCenter.default
+                                            .post(name: .innerFetchChange, object: album.id)
+                                        NotificationCenter.default
+                                            .post(name: .innerFetchChange, object: "myPhotos")
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // 2-2. 가리기 해제 버튼
+                        assetHandleButton(imageName: iconUnhide, imageColor: .gray) {
+                            let alertObject = AlertObject(alertCase: .mediaUnhide,
+                                                          album: assetCollection,
+                                                          folder: nil,
+                                                          selectedItems: [asset],
+                                                          isHiddenAsset: isHiddenAssets,
+                                                          isDetailView: true)
+                            NotificationCenter.default.post(name: .showAlertInDetailView,
+                                                            object: alertObject)
+                        }
+                        //                }
+                    }
+                    separator
+                    // 이미지 복사 버튼
+                    
+                    assetHandleButton(imageName: "document.on.document", imageColor: .gray) {
+                        let imageManager = PHImageManager()
+                        imageManager.requestImage(for: asset.phAsset, targetSize: CGSize(width: .max, height: .max), contentMode: .aspectFit, options: nil) { image, _ in
+                            UIPasteboard.general.image = image
+                            dispatchAnimation {
+                                copyDone = true
                             }
                         }
                     }
-            }
-                        
-            separator
-            if !isHiddenAssets {
-                // 2-1. 가리기 버튼
-                assetHandleButton(imageName: iconHide, imageColor: .gray) {
-                    guard let album = photoData.albums[assetCollection?.localIdentifier ?? ""] else { return }
-                    album.hideOrUnhideAsset(assets: [asset],
-                                            toHide: !asset.isFavorite,
-                                            isDetailView: true) { bool in
-                        if bool {
-                            DispatchQueue.main.async {
-                                NotificationCenter.default
-                                    .post(name: .innerFetchChange, object: album.id)
-                                NotificationCenter.default
-                                    .post(name: .innerFetchChange, object: "myPhotos")
-                            }
-                        }
-                    }
+                    // 3. 공유 버튼
+                    //            separator
+                    //                .opacity(0.2)
+                    //            assetHandleButton(imageName: "square.and.arrow.up", imageColor: .gray) {
+                    //            }
+                }
+                .foregroundStyle(.gray)
+                .background {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.black)
+                        .frame(height: vcHeight)
                 }
             } else {
-                // 2-2. 가리기 해제 버튼
-                assetHandleButton(imageName: iconUnhide, imageColor: .gray) {
-                    let alertObject = AlertObject(alertCase: .mediaUnhide,
-                                                  album: assetCollection,
-                                                  folder: nil,
-                                                  selectedItems: [asset],
-                                                  isHiddenAsset: isHiddenAssets,
-                                                  isDetailView: true)
-                    NotificationCenter.default.post(name: .showAlertInDetailView,
-                                                    object: alertObject)
-                }
-                //                }
+                EmptyView()
             }
-            // 3. 공유 버튼
-            //            separator
-            //                .opacity(0.2)
-            //            assetHandleButton(imageName: "square.and.arrow.up", imageColor: .gray) {
-            //            }
-        }
-        .foregroundStyle(.gray)
-        .background {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.black)
-                .frame(height: vcHeight)
         }
     }
     var separator: some View {
@@ -177,13 +194,14 @@ struct AssetHandleMenu: View {
 #Preview {
     AssetHandleMenu(assetCollection: nil,
                     isHiddenAssets: false,
-                    asset: MLAsset(phAsset: PHAsset(), isAlbum: false),
+                    asset: MLAsset(phAsset: PHAsset()),
                     reLoadingType: .constant(.none),
-                    selectedItems: .constant([]))
+                    selectedItems: .constant([]),
+                    copyDone: .constant(false))
 }
 
 
-struct ItemChangedView {
-    let id: String
-    let items: [String]
+struct ChangedItem {
+    let assets: [MLAsset]
+    let albumType: AlbumType
 }

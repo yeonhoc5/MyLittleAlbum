@@ -30,12 +30,7 @@ struct InAppPhotosPicker: ViewModifier {
                     )
                     .transition(.opacity)
                     .animation(.easeInOut, value: photoData.homeAlbum != nil)
-                } else {
-                    Circle().fill(Color.gray)
-                        .overlay {
-                            Text("\(pickerObject == nil)")
-                        }
-                }
+                } 
             }
             .onChange(of: pickerObject, perform: { newValue in
                 if newValue != nil {
@@ -57,6 +52,6 @@ struct InAppPhotosPicker: ViewModifier {
 }
 
 struct PickerObject: Equatable {
-    let editToAlbum: MLAlbum
+    let editToAlbum: String
     let imageManager: PHCachingImageManager
 }

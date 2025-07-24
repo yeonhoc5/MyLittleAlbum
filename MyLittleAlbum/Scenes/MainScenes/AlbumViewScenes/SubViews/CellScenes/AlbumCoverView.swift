@@ -10,29 +10,29 @@ import Photos
 
 struct AlbumCoverView: View {
     @EnvironmentObject var photoData: MLPhotoData
-    var sampleMLAlbum: MLAlbum! = nil
+    @ObservedObject var album: MLAlbum
     var assetCollection: PHAssetCollection! = nil
-    var uiMode: UIMode = .fancy
+    let uiMode: UIMode
     let cellType: CellType
     let size: CGSize
-    var colorIndex: Int = 0
-    let spacing: CGFloat = 3
-    var padding: CGFloat = 7
-    let radius: CGFloat = 5
+    let colorIndex: Int
     var albumCell: Namespace.ID
+    let isEditingMode: Bool
+    
+    let spacing: CGFloat = 3
+    let normalPadding: CGFloat = 7
+    let miniPadding: CGFloat = 5
+    let radius: CGFloat = 5
         
     @State var rprstImage1: UIImage!
     @State var rprstImage2: UIImage!
     
     var body: some View {
         Group {
-            switch assetCollection == nil ? uiMode : photoData.uiMode {
-            case .classic: classicAlbumView { size in
-                tempView(size: size) }
-            case .modern: modernAlbumView { size in
-                tempView(size: size) }
-            case .fancy: fancyAlbumView { size in
-                tempView(size: size) }
+            switch uiMode {
+            case .classic: classicAlbumView
+            case .modern: modernAlbumView
+            case .fancy: fancyAlbumView
             }
         }
         .frame(width: size.width, height: size.height)
@@ -69,40 +69,30 @@ struct AlbumCoverView: View {
 }
 
 extension AlbumCoverView {
-    func tempView(size: CGSize) -> some View {
-        ProgressView()
-            .progressViewStyle(.circular)
-            .frame(width: size.width, height: size.height)
-    }
-    func classicAlbumView(tempView: @escaping (CGSize) -> some View) -> some View {
+    var classicAlbumView: some View {
         VStack(spacing: 5) {
             GeometryReader { geoProxy in
                 let innerSize = geoProxy.size
-                if let album = (assetCollection == nil ? sampleMLAlbum : photoData
-                    .albums[assetCollection?.localIdentifier ?? ""]) {
-                    let count = !album.isSample
-                                ? album.fetchResult.count
-                                : (album.sampleCase.returnCount())
-                    Group {
-                        if count > 0 {
-                            animationImageView(uiMode: .classic,
-                                               size: innerSize,
-                                               count: count)
-                        } else {
-                            ZStack(alignment: .bottomTrailing) {
-                                RoundedRectangle(cornerRadius: radius)
-                                    .foregroundStyle(.clear)
-                                emptyTextView(uiMode: .classic,
-                                              width: innerSize.width,
-                                              height: innerSize.height,
-                                              bottomPadding: 0)
-                                .padding(3)
-                            } 
+                let count = (album.sampleCase == .none)
+                            ? album.fetchResult.count
+                            : (album.sampleCase.returnCount())
+                Group {
+                    if count > 0 {
+                        animationImageView(uiMode: .classic,
+                                           size: innerSize,
+                                           count: count)
+                        .matchedGeometryEffect(id: "photo1", in: albumCell)
+                    } else {
+                        ZStack(alignment: .bottomTrailing) {
+                            RoundedRectangle(cornerRadius: radius)
+                                .foregroundStyle(.clear)
+                            emptyTextView(uiMode: .classic,
+                                          width: innerSize.width,
+                                          height: innerSize.height,
+                                          bottomPadding: 0)
+                            .padding(3)
                         }
                     }
-                    .matchedGeometryEffect(id: "photo1", in: albumCell)
-                } else {
-                    tempView(innerSize)
                 }
             }
             titleLabelView(uiMode: .classic, size: size, alignment: .center)
@@ -111,29 +101,22 @@ extension AlbumCoverView {
         .frame(width: size.width, height: size.height)
     }
     
-    func modernAlbumView(tempView: @escaping (CGSize) -> some View) -> some View {
+    var modernAlbumView: some View {
         ZStack(alignment: .bottom) {
             let labelHeight = size.height * 0.35
             Group {
-                if let album = (assetCollection == nil ? sampleMLAlbum : photoData
-                    .albums[assetCollection?.localIdentifier ?? ""]) {
-                    let count = !album.isSample
-                                ? album.fetchResult.count
-                                : (album.sampleCase.returnCount())
-                    if count != 0 {
-                        animationImageView(uiMode: .modern, size: size, count: count)
-                    } else {
-                        emptyTextView(uiMode: .modern,
-                                      width: size.width,
-                                      height: size.height,
-                                      bottomPadding: labelHeight)
-                    }
+                let count = (album.sampleCase == .none)
+                            ? album.fetchResult.count
+                            : (album.sampleCase.returnCount())
+                if count != 0 {
+                    animationImageView(uiMode: .modern, size: size, count: count)
+                        .matchedGeometryEffect(id: "photo1", in: albumCell)
                 } else {
-                    tempView(CGSize(width: size.width,
-                                    height: size.height - labelHeight))
-                        .padding(.bottom, labelHeight)
-                }
-            }
+                    emptyTextView(uiMode: .modern,
+                                  width: size.width,
+                                  height: size.height,
+                                  bottomPadding: labelHeight)
+                }            }
              titleLabelView(uiMode: .modern,
                            size: CGSize(width: size.width, height: labelHeight),
                            alignment: .leading)
@@ -141,60 +124,54 @@ extension AlbumCoverView {
         .cornerRadius(radius)
     }
     
-    func fancyAlbumView(tempView: @escaping (CGSize) -> some View) -> some View {
+    var fancyAlbumView: some View {
         VStack(alignment: .center, spacing: 5) {
             titleLabelView(uiMode: .fancy, size: size, alignment: .topLeading)
+                .padding(.leading, isEditingMode ? 30 : 0)
             GeometryReader { geoProxy in
                 let innerWidth = geoProxy.size.width
                 let innerHeight = geoProxy.size.height
                 let firstWidth = (innerWidth - spacing) * 0.65
                 let secondWidth = (innerWidth - spacing) * 0.35
-                let album = assetCollection == nil ? sampleMLAlbum : photoData
-                    .albums[assetCollection?.localIdentifier ?? ""]
+                let count = (album.sampleCase == .none)
+                            ? album.fetchResult.count
+                            : (album.sampleCase.returnCount())
                 Group {
-                    if let album = album {
-                        let count = !album.isSample
-                                    ? album.fetchResult.count
-                                    : (album.sampleCase.returnCount())
-                        Group {
-                            if count == 0 {
-                                emptyTextView(uiMode: .fancy,
-                                              width: innerWidth,
-                                              height: innerHeight,
-                                              bottomPadding: 0)
-                            } else {
-                                if count == 1 || cellType == .miniAlbum {
-                                    animationImageView(
-                                        uiMode: .fancy,
-                                        size: CGSize(width: innerWidth,
-                                                     height: innerHeight),
-                                        count: count)
-                                } else {
-                                    HStack(spacing: spacing) {
-                                        animationImageView(
-                                            uiMode: .fancy,
-                                            size: CGSize(width: firstWidth,
-                                                         height: innerHeight),
-                                            count: count)
-                                        animationImageView(
-                                            uiMode: .fancy,
-                                            isSecond: true,
-                                            size: CGSize(width: secondWidth,
-                                                         height: innerHeight),
-                                            count: count)
-                                    }
-                                }
+                    if count == 0 {
+                        emptyTextView(uiMode: .fancy,
+                                      width: innerWidth,
+                                      height: innerHeight,
+                                      bottomPadding: 0)
+                    } else {
+                        if count == 1 || cellType == .miniAlbum {
+                            animationImageView(
+                                uiMode: .fancy,
+                                size: CGSize(width: innerWidth,
+                                             height: innerHeight),
+                                count: count)
+                            .matchedGeometryEffect(id: "photo1", in: albumCell)
+                        } else {
+                            HStack(spacing: spacing) {
+                                animationImageView(
+                                    uiMode: .fancy,
+                                    size: CGSize(width: firstWidth,
+                                                 height: innerHeight),
+                                    count: count)
+                                .matchedGeometryEffect(id: "photo1", in: albumCell)
+                                animationImageView(
+                                    uiMode: .fancy,
+                                    isSecond: true,
+                                    size: CGSize(width: secondWidth,
+                                                 height: innerHeight),
+                                    count: count)
                             }
                         }
-                    } else {
-                        tempView(CGSize(width: innerWidth, height: innerHeight))
                     }
                 }
-                .animation(.easeOut, value: album != nil)
                 .transition(.opacity)
             }
         }
-        .padding(padding)
+        .padding(cellType == .album ? normalPadding : miniPadding)
     }
 }
 
@@ -215,7 +192,6 @@ extension AlbumCoverView {
                     cornerBottomT: checkRadius ? (isSecond ? true : false) : true,
                     cornerTopT: checkRadius ? (isSecond ? true : false) : true
                 )
-    //            .matchedGeometryEffect(id: isSecond ? "photo2" : "photo1", in: albumCell)
             } else {
                 tempView(width: size.width,
                          cornerTopL: checkRadius ? (isSecond ? false : true) : true,
@@ -275,10 +251,8 @@ extension AlbumCoverView {
     }
     func fetchingImage(imageNumber: Int, asset: PHAsset, thumbNailSize: CGSize) {
         let imageManager = PHImageManager()
-        let assetRatio = CGFloat(asset.pixelHeight) / CGFloat(asset.pixelWidth)
         let size = CGSize(width: thumbNailSize.width * scale,
                           height: thumbNailSize.height * scale)
-        
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
         options.isSynchronous = true
@@ -321,58 +295,51 @@ extension AlbumCoverView {
     }
     
     func titleLabelView(uiMode: UIMode, size: CGSize, alignment: Alignment) -> some View {
-        let album = sampleMLAlbum == nil ? photoData.albums[assetCollection?.localIdentifier ?? ""] : sampleMLAlbum
-        let title = album?.title ?? "loading..."
-        return Group {
+        Group {
             switch uiMode {
             case .classic:
-                titleText(title, font: .caption, color: .orange, inline: true)
-                    .bold()
+                titleText(album.title, font: .caption.bold(), color: .orange, inline: true)
+                    .padding(.horizontal, spacing)
+                    .matchedGeometryEffect(id: "title", in: albumCell)
+                    .frame(width: size.width, alignment: alignment)
                     .lineLimit(1)
                     .contentTransition(.numericText())
-                    .padding(.horizontal, spacing)
-                    .frame(width: size.width, alignment: alignment)
-                    .matchedGeometryEffect(id: "title", in: albumCell)
             case .modern:
                 ZStack(alignment: .leading) {
                     Color.white.opacity(0.88)
                         .transition(.opacity)
                         .matchedGeometryEffect(id: "titleBack", in: albumCell)
                         .offset(y: uiMode == .modern ? 0 : size.height )
-                    titleText(title,
+                    titleText(album.title,
                               font: Font.system(cellType == .album
                                           ? .subheadline : .caption,
                                           weight: .semibold),
                               color: .fancyBackground,
                               inline: cellType == .album ? false : true)
-                        .contentTransition(.numericText())
-                        .lineLimit(cellType == .album ? 2 : 1,
-                                   reservesSpace: true)
+                        .padding(.horizontal, cellType == .album ? normalPadding : miniPadding)
+                        .matchedGeometryEffect(id: "title", in: albumCell)
+                        .frame(width: size.width, alignment: alignment)
+                        .lineLimit(cellType == .album ? 2 : 1, reservesSpace: true)
                         .lineSpacing(0.1)
                         .kerning(0.4)
-                        .padding(.horizontal, padding)
-                        .frame(width: size.width, alignment: alignment)
-                        .matchedGeometryEffect(id: "title", in: albumCell)
+                        .multilineTextAlignment(.leading)
+                        .contentTransition(.numericText())
                 }
                 .frame(height: size.height)
             case .fancy:
-                titleText(title,
-                          font: cellType == .album
-                          ? .footnote.bold()
-                          : .footnote,
+                titleText(album.title,
+                          font: cellType == .album ? .footnote.bold() : .footnote,
                           color: .white,
                           inline: cellType == .album ? false : true)
-                .contentTransition(.numericText())
+                .matchedGeometryEffect(id: "title", in: albumCell, isSource: false)
                 .lineLimit(cellType == .album ? 2 : 1, reservesSpace: true)
-                .multilineTextAlignment(.leading)
-                .padding(.horizontal, padding)
+                .padding(.horizontal, cellType == .album ? normalPadding : miniPadding)
                 .frame(width: size.width, alignment: alignment)
-                .matchedGeometryEffect(id: "title", in: albumCell)
+                .multilineTextAlignment(.leading)
+                .contentTransition(.numericText())
             }
         }
         .truncationMode(.tail)
-        .opacity(album == nil ? 0.5 : 1)
-        .animation(.easeInOut, value: album != nil)
     }
     
     @ViewBuilder
@@ -396,8 +363,7 @@ extension AlbumCoverView {
     }
     
     func loadPhotos(size: CGSize) {
-        guard let album = photoData.albums[assetCollection.localIdentifier],
-              album.fetchResult.count > 0
+        guard album.fetchResult.count > 0
         else { return }
         let number1 = photoData.randomNum1 % album.fetchResult.count
         var number2 = photoData.randomNum2 % album.fetchResult.count
@@ -417,9 +383,12 @@ extension AlbumCoverView {
 }
 
 #Preview {
-    AlbumCoverView(assetCollection: PHAssetCollection(),
+    AlbumCoverView(album: MLAlbum(isHome: true),
+                   uiMode: .fancy,
                    cellType: .album,
                    size: CGSize(width: 100, height: 150),
-                   albumCell: Namespace().wrappedValue)
+                   colorIndex: 0,
+                   albumCell: Namespace().wrappedValue,
+                   isEditingMode: false)
         .environmentObject(MLPhotoData())
 }

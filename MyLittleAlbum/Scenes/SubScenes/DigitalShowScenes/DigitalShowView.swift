@@ -48,13 +48,13 @@ struct DigitalShowView: View {
                     .onChange(of: digitalShowNumber, perform: { int in
                         phImageQueue.async {
                             imageManger.startCachingImages(
-                                for: [assetArray[int + 1].phAsset],
+                                for: [assetArray[(int + 1) % assetArray.count].phAsset],
                                 targetSize: geoProxy.size,
                                 contentMode: .aspectFit,
                                 options: nil)
-                            if !assetArray.isEmpty {
+                            if int > 1 {
                                 imageManger.stopCachingImages(
-                                    for: [assetArray[int].phAsset],
+                                    for: [assetArray[int-2].phAsset],
                                     targetSize: geoProxy.size,
                                     contentMode: .aspectFit,
                                     options: nil)
@@ -76,7 +76,7 @@ struct DigitalShowView: View {
         .overlay(alignment: .bottom) {
             guideView
                 .padding(.bottom, device == .phone ? 20 : 30)
-                .offset(y: isShowingDigitalShowGuide ? 0 : 200)
+                .offset(y: isShowingDigitalShowGuide ? 0 : 220)
         }
         .gesture(TapGesture(count: 2)
             .onEnded({ _ in

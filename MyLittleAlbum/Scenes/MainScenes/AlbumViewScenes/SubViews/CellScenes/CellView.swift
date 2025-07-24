@@ -15,13 +15,11 @@ struct CellView<Content: View>: View {
     let height: CGFloat
     let content: (CGSize, Namespace.ID) -> Content
     @Namespace var cellNamespace
-    let tapAction: () -> Void
     
     init(uiMode: UIMode,
          cellType: CellType,
          index: Int!,
          width: CGFloat,
-         tapAction: @escaping () -> Void,
          content: @escaping (CGSize, Namespace.ID) -> Content) {
         self.content = content
         self.uiMode = uiMode
@@ -29,7 +27,6 @@ struct CellView<Content: View>: View {
         self.index = index
         self.width = width
         self.height = cellHeight(width: width, uiMode: uiMode, cellType: cellType) - 2
-        self.tapAction = tapAction
     }
     
     var body: some View {
@@ -42,16 +39,10 @@ struct CellView<Content: View>: View {
             }
         }
         .frame(width: abs(width), height: abs(height))
-        .padding(.top, 1)
-        .simultaneousGesture(tapGesture)
     }
 }
 
 extension CellView {
-    var tapGesture: some Gesture {
-        TapGesture(count: 1)
-            .onEnded { _ in tapAction() }
-    }
     @ViewBuilder
     func folderView(uiMode: UIMode) -> some View {
         let color: Color = uiMode == .classic ? .orange : .folder
@@ -111,7 +102,7 @@ extension CellView {
                         RoundedRectangle(cornerRadius: 5)
                             .foregroundStyle(colorSet[index % colorSet.count])
                             .animation(.snappy, value: index)
-                            .matchedGeometryEffect(id: "album", in: cellNamespace)
+                            .matchedGeometryEffect(id: "cell", in: cellNamespace)
                         content(size, cellNamespace)
                     }
                 }
@@ -119,7 +110,7 @@ extension CellView {
                 ZStack {
                     RoundedRectangle(cornerRadius: 5)
                         .foregroundStyle(Color.gray.opacity(0.2))
-                        .matchedGeometryEffect(id: "album", in: cellNamespace)
+                        .matchedGeometryEffect(id: "cell", in: cellNamespace)
                     content(size, cellNamespace)
                 }
             case .classic:
@@ -127,7 +118,7 @@ extension CellView {
                     VStack(spacing: 5) {
                         RoundedRectangle(cornerRadius: 5)
                             .foregroundStyle(Color.gray.opacity(0.2))
-                            .matchedGeometryEffect(id: "album", in: cellNamespace)
+                            .matchedGeometryEffect(id: "cell", in: cellNamespace)
                         titleText(" ", font: .caption, color: .orange, inline: true)
                             .bold().lineLimit(1)
                     }

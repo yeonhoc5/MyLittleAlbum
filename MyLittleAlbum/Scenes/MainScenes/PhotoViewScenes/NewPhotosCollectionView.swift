@@ -17,8 +17,10 @@ struct NewPhotosCollectionView: UIViewRepresentable {
     var assetCollection: PHAssetCollection!
     var isHiddenAssets: Bool = false
     
-    let assetArray: [MLAsset]
+//    let assetArray: [MLAsset]
+    @Binding var assetArray: [MLAsset]
     @Binding var filteringType: FilteringType
+    let belongingType: BelongingType
     
     let geoProxy: GeometryProxy
     let cellWidth: CGFloat
@@ -44,6 +46,12 @@ struct NewPhotosCollectionView: UIViewRepresentable {
     @State var longPressedCell: GridCell?
     
     func makeUIView(context: Context) -> some UIView {
+        dispatchAnimation {
+            print("initiallizing view")
+            mlAssetArray(completion: { array in
+                self.assetArray = array
+            })
+        }
         let layout = UICollectionViewFlowLayout()
         layout.itemSize = CGSize(width: cellWidth, height: cellWidth)
         layout.minimumInteritemSpacing = 1.0
@@ -77,6 +85,7 @@ struct NewPhotosCollectionView: UIViewRepresentable {
         longPressedGesture.delaysTouchesBegan = true
         collectionView.addGestureRecognizer(longPressedGesture)
 
+        
         DispatchQueue.main.async {
             UIView.animate(withDuration: 2) {
                 settingDataSource(cellWidth: cellWidth,
@@ -93,83 +102,89 @@ struct NewPhotosCollectionView: UIViewRepresentable {
     
     func updateUIView(_ uiView: UIViewType, context: Context) {
         if dataSource != nil {
-            // 0. 체인지 업데이트
+            // fetch change 및 item update
             switch reLoadingType {
             case .none: break
-            case .selectedModeChange, .deselectAll, .selectAll, .itemChangedInside:
+            case .selectedModeChange, .selectAll, .deselectAll, .itemChangedInside:
                 selectedReload(reloadType: reLoadingType) {
                     mlAlbum.processingChange(bool: false)
                 }
-            case .belongingChange, .filterChange:
-                fetchLoad(refetch: true) {
-                    mlAlbum.processingChange(bool: false)
-                }
-            case .reFetchInside, .reFetchOutside:
-                if reLoadingType == .reFetchInside {
-                    // 1. selectMode change
-                    if isSelectMode {
-                        DispatchQueue.main.async {
-                            isSelectMode = false
-                            selectedItems.removeAll()
+            case .filterChange, .belongingChange:
+                mlAssetArray { array in
+                    dispatchAnimation {
+                        reLoadingType = .none
+                        self.assetArray = array
+                        fetchLoad(refetch: true) {
+                            mlAlbum.processingChange(bool: false)
                         }
                     }
-                } else if reLoadingType == .reFetchOutside {
-                    // 2. selected items to REMOVE 체크
-                    checkSelectedItems()
                 }
-                dispatchAnimation {
-                    reLoadingType = .none
-                }
-                fetchLoad(refetch: true) {
+                
+            case .reFetchInside:
+                mlAssetArray { array in
                     dispatchAnimation {
-                        mlAlbum.processingChange(bool: false)
+                        reLoadingType = .none
+                        self.assetArray = array
+                        selectedItems.removeAll()
+                        isSelectMode = false
+                        if belongingType == .all || belongingType == .album {
+                            reloadItems(items: selectedItems.map({ .asset($0) }))
+                        }
+                        fetchLoad(refetch: true) {
+                            mlAlbum.processingChange(bool: false)
+                        }
+                    }
+                    
+                }
+//                assetArray = mlAssetArray()
+//                dispatchAnimation {
+//                    reLoadingType = .none
+//                    if belongingType == .all || belongingType == .album {
+//                        reloadItems(items: selectedItems.map({ .asset($0) }))
+//                    }
+//                    isSelectMode = false
+//                    selectedItems.removeAll()
+//                }
+//                fetchLoad(refetch: true) {
+//                    mlAlbum.processingChange(bool: false)
+//                }
+            case .reFetchOutside:
+                mlAssetArray { array in
+                    dispatchAnimation {
+                        reLoadingType = .none
+                        self.assetArray = array
+                        print(array.count)
+                        selectedItems.reversed().forEach { asset in
+                            if !assetArray
+                                .filter ({
+                                    return switch filteringType {
+                                    case .all: true
+                                    case .favorite: $0.isFavorite
+                                    default: FilteringType
+                                            .trueType(type: self.filteringType) == $0.mediaType
+                                    }
+                                })
+                                .contains(asset) {
+                                if let index = selectedItems.firstIndex(of: asset) {
+                                    dispatchAnimation {
+                                        selectedItems.remove(at: index)
+                                    }
+                                }
+                            }
+                        }
+                        fetchLoad(refetch: true) {
+                            mlAlbum.processingChange(bool: false)
+                        }
                     }
                 }
             case .itemChangedOutside:
-                let items: [Item] = refreshItems.map{( .asset($0) )}
-                reloadItems(items: items) {
-                    mlAlbum.processingChange(bool: false)
+                reloadItems(items: refreshItems.map({ .asset($0) }))
+                DispatchQueue.main.async {
+                    refreshItems.removeAll()
                 }
             }
             
-//            switch reLoadingType {
-//            case .reFetchInside, .reFetchOutside, .filterChange, .belongingChange:
-//                if reLoadingType == .reFetchOutside {
-//                    selectedItems.reversed().forEach { asset in
-//                      if !assetArray
-//                            .filter ({
-//                                return switch filteringType {
-//                                case .all: true
-//                                case .favorite: $0.isFavorite
-//                                default: FilteringType
-//                                        .trueType(type: self.filteringType) == $0.mediaType
-//                                }
-//                            })
-//                            .contains(asset) {
-//                            if let index = selectedItems.firstIndex(of: asset) {
-//                                dispatchAnimation {
-//                                    selectedItems.remove(at: index)
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//                dispatchAnimation {
-//                    reLoadingType = .none
-//                }
-//                fetchLoad(refetch: true) {
-//                    dispatchAnimation {
-//                        mlAlbum.processingChange(bool: false)
-//                    }
-//                }
-//            case .selectedModeChange, .selectAll, .deselectAll:
-//                selectedReload(reloadType: reLoadingType) {
-//                    mlAlbum.processingChange(bool: false)
-//                }
-//            default: break
-//            }
-//            
-            // 1. scroll
+            // 1. scroll 이동
             if !assetArray
                 .filter({
                     return switch filteringType {
@@ -215,6 +230,25 @@ struct NewPhotosCollectionView: UIViewRepresentable {
 }
 
 extension NewPhotosCollectionView {
+    func mlAssetArray(completion: @escaping ([MLAsset]) -> Void) {
+       let assetArray = switch albumType {
+       case .album, .smartAlbum:
+           !isHiddenAssets ? mlAlbum.photosArray : mlAlbum.hiddenArray
+       case .home, .picker:
+           switch belongingType {
+           case .all:
+               mlAlbum.photosArray
+           default:
+               mlAlbum.operatedArray(
+                    isHiddenAsset: false,
+                    setOperation: belongingType == .nonAlbum ? .subtraction : .intersection,
+                    assets: Array(photoData.albumsPhotosSet())
+               )
+           }
+       }
+       completion(assetArray
+            .sorted(by: { $0.creationDate < $1.creationDate }))
+   }
     enum Section: Hashable {
         case main
     }
@@ -223,15 +257,16 @@ extension NewPhotosCollectionView {
         case btnAdd
     }
 
-    func settingDataSource(cellWidth: CGFloat,
-                           collectionView: UICollectionView) {
+    func settingDataSource(cellWidth: CGFloat, collectionView: UICollectionView) {
         let requestOptions = PHImageRequestOptions()
         requestOptions.deliveryMode = .fastFormat
         requestOptions.isSynchronous = true
         requestOptions.isNetworkAccessAllowed = true
+        
         self.dataSource = UICollectionViewDiffableDataSource<Section, Item>(
             collectionView: collectionView,
             cellProvider: { (collectionView, indexPath, item) -> UICollectionViewCell? in
+                
                 switch item {
                 case let .asset(asset):
                     let isVideo = asset.mediaType == .video ? true : false
@@ -280,10 +315,10 @@ extension NewPhotosCollectionView {
                 }
         })
         fetchLoad {
-            print("initial Loading done")
+            print("[\(mlAlbum.title)] CollectionView Initial Loading done")
         }
     }
-    func reloadItems(items: [Item], completion: @escaping () -> Void) {
+    func reloadItems(items: [Item]) {
         if let dataSource = self.dataSource {
             var snap = dataSource.snapshot()
             if let _ = snap.indexOfSection(.main) {
@@ -293,11 +328,22 @@ extension NewPhotosCollectionView {
                 }
             }
         }
-        completion()
     }
     func selectedReload(reloadType: ReLoadingType, completion: @escaping () -> Void) {
         var items: [Item] = []
         switch reloadType {
+        case .selectedModeChange, .deselectAll, .itemChangedInside:
+            if selectedItems.count > 0 {
+                items.append(
+                    contentsOf: selectedItems.map { .asset($0) }
+                )
+                DispatchQueue.main.async {
+                    selectedItems.removeAll()
+                }
+            }
+            if albumType == .album && !isHiddenAssets {
+                items.append(.btnAdd)
+            }
         case .selectAll:
             let toSelect = mlAlbum
                 .operatedArray(isHiddenAsset: self.isHiddenAssets,
@@ -311,33 +357,17 @@ extension NewPhotosCollectionView {
                             .trueType(type: self.filteringType) == $0.mediaType
                     }
                 }
-            items.append(contentsOf: toSelect.map( { .asset($0) }))
             DispatchQueue.main.async {
                 self.selectedItems.append(contentsOf: toSelect)
             }
-        case .deselectAll:
-            items.append(contentsOf: selectedItems.map({ .asset($0) }))
-            DispatchQueue.main.async {
-                selectedItems.removeAll()
-            }
-        case .selectedModeChange:
-            if !isSelectMode && !selectedItems.isEmpty {
-                items.append(contentsOf: selectedItems.map({ .asset($0) }))
-                DispatchQueue.main.async {
-                    selectedItems.removeAll()
-                }
-            }
-            if albumType == .album && !isHiddenAssets {
-                items.append(.btnAdd)
-            }
+            items.append(contentsOf: toSelect.map( { .asset($0) }))
         default: break
         }
-        reloadItems(items: items) {
-            dispatchAnimation {
-                self.reLoadingType = .none
-            }
-            completion()
+        dispatchAnimation {
+            self.reLoadingType = .none
         }
+        reloadItems(items: items)
+        completion()
     }
     func fetchLoad(refetch: Bool = false, completion: @escaping () -> Void) {
         var snapshot = dataSource != nil
@@ -361,7 +391,7 @@ extension NewPhotosCollectionView {
             items.append(.btnAdd)
         }
         snapshot.appendItems(items)
-        if self.albumType == .album && !isHiddenAssets {
+        if refetch && albumType == .album && !isHiddenAssets {
             snapshot.reloadItems([.btnAdd])
         }
         if snapshot.itemIdentifiers != dataSource?.snapshot().itemIdentifiers {
@@ -371,26 +401,6 @@ extension NewPhotosCollectionView {
             }
         } else {
             completion()
-        }
-    }
-    func checkSelectedItems() {
-        selectedItems.reversed().forEach { asset in
-          if !assetArray
-                .filter ({
-                    return switch filteringType {
-                    case .all: true
-                    case .favorite: $0.isFavorite
-                    default: FilteringType
-                            .trueType(type: self.filteringType) == $0.mediaType
-                    }
-                })
-                .contains(asset) {
-                if let index = selectedItems.firstIndex(of: asset) {
-                    dispatchAnimation {
-                        selectedItems.remove(at: index)
-                    }
-                }
-            }
         }
     }
 }
@@ -499,7 +509,7 @@ class NewCoordinator: NSObject, UICollectionViewDelegate, UICollectionViewDelega
             } else {
                 self.parent.selectedItems.append(cell.asset)
             }
-            parent.reloadItems(items: [item]) { }
+            parent.reloadItems(items: [item])
         } else {
             switch item {
             case .asset(_):

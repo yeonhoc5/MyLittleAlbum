@@ -11,9 +11,12 @@ import Photos
 struct AlbumListView: View {
     @EnvironmentObject var photoData: MLPhotoData
     // 현재 앨범들이 속한 폴더
-    let phCollectionList: PHCollectionList!
+//    let phCollectionList: PHCollectionList!
+    @ObservedObject var pageFolder: MLFolder
+    let isHome: Bool
     // 레이아웃
     let pageIndex: Int
+    let screenWidth: CGFloat
     let widthOfAlbum: CGFloat
     @State var firstAppear: Bool = true
     // 보여주기 ui 스위칭 프라퍼티
@@ -27,25 +30,21 @@ struct AlbumListView: View {
     @Binding var isPhotosView: Int
     
     var body: some View {
-        let pageFolder = photoData.folders[phCollectionList?.localIdentifier ?? "topFolder"]
-        let albumList = albumList(pageFolder: pageFolder,
-                                  widthOfAlbum: widthOfAlbum)
+        let albumListView = albumListView(widthOfAlbum: widthOfAlbum)
         VStack(spacing: 0) {
             SectionView(sectionType: .album,
                         uiMode: photoData.uiMode,
-                        collectionCount: pageFolder?.albumsArray.count ?? 0,
+                        collectionCount: pageFolder.albumsArray.count,
                         isUnfolded: $isUnfolded)
-                .zIndex(1.0)
-            if pageFolder != nil {
-                albumListLayout(pageFolder: pageFolder,
-                                view: albumList,
-                                mode: isUnfolded,
-                                widthOfAlbum: widthOfAlbum)
-                .onAppear(perform: {
-                    albumViewModeChange(isFirstAppear: firstAppear,
-                                        pageFolder: pageFolder)
-                })
-            }
+                        .zIndex(1.0)
+            albumListLayout(pageFolder: pageFolder,
+                            view: albumListView,
+                            mode: isUnfolded,
+                            widthOfAlbum: widthOfAlbum)
+            .onAppear(perform: {
+                albumViewModeChange(isFirstAppear: firstAppear,
+                                    pageFolder: pageFolder)
+            })
         }
         .onChange(of: photoData.uiMode) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -59,54 +58,46 @@ struct AlbumListView: View {
 
 extension AlbumListView {
     
-    func albumList(pageFolder: MLFolder!,
-                   widthOfAlbum: CGFloat) -> some View {
-        return ForEach(pageFolder?.albumsArray ?? [],
-                       id: \.localIdentifier) { assetCollection in
-            let index = pageFolder?.albumsArray.firstIndex(of: assetCollection) ?? 0
+    func albumListView(widthOfAlbum: CGFloat) -> some View {
+        return ForEach(pageFolder.albumsArray, id: \.self) { assetCollection in
+            let index = pageFolder.albumsArray.firstIndex(of: assetCollection) ?? 0
             viewForEach(assetCollection: assetCollection,
                         widthOfAlbum: widthOfAlbum,
                         index: pageIndex + index)
                 .buttonStyle(ClickScaleEffect())
                 .transition(.scale)
+                .contextMenu {
+                    editAlbumMenu(assetCollection: assetCollection, index: index)
+                }
         }
-       .animation(.easeInOut, value: pageFolder?.albumsArray.count != 0)
+        .animation(.easeInOut, value: !pageFolder.albumsArray.isEmpty)
     }
     // 앨범 리스트 레이아웃 by modeOfAlbumList
     @ViewBuilder
-    func albumListLayout(pageFolder: MLFolder!, view: some View,
+    func albumListLayout(pageFolder: MLFolder, view: some View,
                          mode: Bool, widthOfAlbum: CGFloat) -> some View {
-        let spacing = (screenWidth - 5.0 - (CGFloat(listCount) * widthOfAlbum)) / CGFloat(listCount)
+        let spacing = (self.screenWidth - 5.0 - (CGFloat(listCount) * widthOfAlbum)) / CGFloat(listCount)
         let column = Array(
             repeating: GridItem(.fixed(widthOfAlbum),
                                 spacing: !mode ? 10 : spacing),
-            count: mode ? listCount : pageFolder?.albumsArray.count ?? 0
+            count: mode ? listCount : pageFolder.albumsArray.count
         )
         ScrollViewReader(content: { proxy in
             ScrollView(.horizontal, showsIndicators: false, content: {
                 LazyVGrid(columns: column)  {
                     view
                 }
-                .id("albumViewEdge")
                 .padding(.all, 10)
-//                    .padding(.trailing, 5)
-            })
-            .scrollDisabled(mode)
-            .onReceive(NotificationCenter.default
-                .publisher(for: .scrollToItem)) { output in
-                    if !mode {
-                        if let scrollObject = output.object as? ScrollItem {
-                            if (pageFolder?.albumsArray ?? [])
-                                .compactMap({ $0.localIdentifier })
-                                .contains(scrollObject.identifier) {
-                                withAnimation {
-                                    proxy
-                                        .scrollTo(scrollObject.identifier, anchor: .trailing)
-                                }
-                            }
+                .onChange(of: pageFolder.albumsArray.count) { [oldValue = pageFolder.albumsArray.count] newValue in
+                    if newValue > oldValue && oldValue != 0 {
+                        withAnimation {
+                            proxy
+                                .scrollTo(pageFolder.albumsArray.last?.localIdentifier)
                         }
                     }
                 }
+            })
+            .scrollDisabled(mode)
         })
     }
     
@@ -123,58 +114,59 @@ extension AlbumListView {
             CellView(uiMode: photoData.uiMode,
                      cellType: .album,
                      index: index,
-                     width: widthOfAlbum,
-                     tapAction: {
-                guard let album = photoData.albums[assetCollection.localIdentifier]
-                else { return }
-                if album.frObject(isHiddenAsset: false) != album.photosArray.map({ $0.phAsset }) {
-                    album.generateArray(isHiddenAsset: false) { }
-                }
-            }) { size, cellNameSpace in
+                     width: widthOfAlbum) { size, cellNameSpace in
                 Group {
-                    AlbumCoverView(assetCollection: assetCollection,
-                                   cellType: .album,
-                                   size: size,
-                                   colorIndex: index,
-                                   albumCell: cellNameSpace)
-//                    .matchedGeometryEffect(id: assetCollection.localIdentifier,
-//                                           in: nameSpace)
+                    if let album = photoData.albums[assetCollection.localIdentifier] {
+                        AlbumCoverView(album: album,
+                                       assetCollection: assetCollection,
+                                       uiMode: photoData.uiMode,
+                                       cellType: .album,
+                                       size: size,
+                                       colorIndex: index,
+                                       albumCell: cellNameSpace,
+                                       isEditingMode: isEditingMode)
+                        .matchedGeometryEffect(id: assetCollection.localIdentifier,
+                                               in: nameSpace)
+                    } else {
+                        TempCoverView(title: assetCollection.localizedTitle ?? "Loading...",
+                                      nameSpace: cellNameSpace,
+                                      size: size,
+                                      cellType: .album)
+                    }
                 }
             }
-             .id(assetCollection.localIdentifier)
-             .contextMenu {
-                 editAlbumMenu(assetCollection: assetCollection,
-                               index: index)
-             }
         }
         .disabled(isEditingMode)
         .overlay(alignment: .topLeading) {
             btnDelete(album: assetCollection)
-            .offset(x: -1, y: -1)
+                .offset(x: -1, y: -1)
         }
+        .id(assetCollection.localIdentifier)
     }
     
     func btnDelete(album: PHAssetCollection) -> some View {
-        Group {
-            if processingCollection == album {
-                ProgressView()
-                    .tint(.red)
-                    .progressViewStyle(.circular)
-            } else {
-                Button {
-                    dispatchAnimation {
-                        processingCollection = album
-                    }
-                    deleteAlbumInDepth(assetCollection: album)
-                } label: {
-                    RemoveButtonLabel(shapeType: .rectangle)
-                }
-                .opacity(isEditingMode ? 1:0)
-                .scaleEffect(isEditingMode ? 1:0.1, anchor: .topLeading)
-                .buttonStyle(ClickScaleEffect())
+        Button {
+            dispatchAnimation {
+                processingCollection = album
             }
+            deleteAlbumInDepth(assetCollection: album)
+        } label: {
+            RemoveButtonLabel(shapeType: .rectangle,
+                              isProcessing: processingCollection == album)
         }
+        .opacity(isEditingMode ? 1:0)
+        .scaleEffect(isEditingMode ? 1:0.1, anchor: .topLeading)
+        .buttonStyle(ClickScaleEffect())
     }
+//    func tempCoverView(text: String, size: CGSize, nameSpace: Namespace.ID) -> some View {
+//        VStack(spacing: 10) {
+//            Text(text)
+//                .matchedGeometryEffect(id: "title", in: nameSpace)
+//            ProgressView()
+//                .progressViewStyle(.circular)
+//        }
+//        .frame(width: size.width, height: size.height)
+//    }
 }
 
 // contexMenu funcs
@@ -193,8 +185,7 @@ extension AlbumListView {
     func editAlbumMenu(assetCollection: PHAssetCollection, index: Int) -> some View {
         VStack {
             Button {
-                guard let album = photoData.albums[assetCollection.localIdentifier] else { return }
-                let object = PickerObject(editToAlbum: album,
+                let object = PickerObject(editToAlbum: assetCollection.localIdentifier,
                                           imageManager: PHCachingImageManager())
                 DispatchQueue.main.async {
                     NotificationCenter.default
@@ -219,7 +210,6 @@ extension AlbumListView {
                 ContextMenuItem(title: "앨범 이름 변경하기", image: "pencil")
             }
             Button {
-                guard let pageFolder = photoData.folders[phCollectionList?.localIdentifier ?? "topFolder"] else { return }
                 let moveObject = MoveCollectionObject(
                     currentParent: pageFolder,
                     objectCellType: .album,
@@ -243,10 +233,13 @@ extension AlbumListView {
     }
     
     func deleteAlbumInDepth(assetCollection: PHAssetCollection) {
-        guard let pageFolder = photoData.folders[phCollectionList?.localIdentifier ?? "topFolder"] else { return }
         pageFolder.deleteAlbum(album: assetCollection) { _ in
             dispatchAnimation {
-                processingCollection = nil
+                photoData.removeAlbumValue(album: assetCollection) { 
+                    processingCollection = nil
+                    NotificationCenter.default
+                        .post(name: .outsideFetchChange, object: "myPhotos")
+                }
             }
         }
     }
@@ -255,7 +248,8 @@ extension AlbumListView {
 
 struct AlbumListView_Previews: PreviewProvider {
     static var previews: some View {
-        AlbumView(phCollectionList: nil,
+        AlbumView(pageFolder: MLFolder(collectionList: nil),
+                  phCollectionList: nil,
                   pageIndex: 0,
                   isPhotosView: .constant(0),
                   nameSpace: Namespace().wrappedValue,

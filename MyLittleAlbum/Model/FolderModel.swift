@@ -31,6 +31,7 @@ class Folder: NSObject, Identifiable, ObservableObject {
         PHPhotoLibrary.shared().register(self)
         self.isHome = isHome
         if isHome {
+            self.title = "최상위"
             let fetchOptions = PHFetchOptions()
             fetchOptions.includeHiddenAssets = false
             fetchOptions.wantsIncrementalChangeDetails = true
@@ -50,6 +51,7 @@ class Folder: NSObject, Identifiable, ObservableObject {
     }
     
     deinit {
+        print("deinited Folder : \(self.title)")
         PHPhotoLibrary.shared().unregisterChangeObserver(self)
     }
     
@@ -96,102 +98,93 @@ class Folder: NSObject, Identifiable, ObservableObject {
 
 // MARK: - 2. extenstion [Folder] 폴더 함수
 extension Folder {
-    
+    // folder 타이틀 변경
+    func modifyFolderTitle(_ newName: String, completion: @escaping (Bool) -> Void) {
+        PHPhotoLibrary.shared().performChanges {
+            guard let request = PHCollectionListChangeRequest(for: self.folder) else { return }
+            request.title = newName
+        } completionHandler: { bool, _ in
+            completion(bool)
+        }
+    }
     // 하위에 폴더 생성
-    func createFolder(depth: DepthType, folderToAdd: PHCollectionList!, _ name: String, completion: @escaping (Bool?) -> Void) {
+    func createFolder(folderToAdd: PHCollectionList!,
+                      _ name: String,
+                      completion: @escaping (PHCollectionList?) -> Void) {
         DispatchQueue.main.async {
             PHPhotoLibrary.shared().performChanges {
                 let createFolderRequest = PHCollectionListChangeRequest.creationRequestForCollectionList(withTitle: name)
-                self.placeholder = createFolderRequest.placeholderForCreatedCollectionList
-                //            guard let placeholder = self.placeholder else { return }
-                //            let fetchResult = PHCollectionList.fetchCollectionLists(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
-                switch depth {
-                case .current:
-                    if self.isHome {
-                        guard let addCollectionList = PHCollectionListChangeRequest(forTopLevelCollectionListUserCollections: self.fetchResult ) else { return }
-                        self.changeRequest = addCollectionList
-                        print("folder is Added at Top Folder")
-                    } else {
-                        guard let addCollectionList = PHCollectionListChangeRequest(for: self.folder, childCollections: self.fetchResult ) else { return }
-                        self.changeRequest = addCollectionList
-                        print("folder is Added at Current Depth")
-                    }
-                case .secondary:
-                    let index = self.fetchResult.index(of: folderToAdd)
-                    let secondFolder = self.fetchResult[index] as! PHCollectionList
-                    let secondFetchResult = PHCollectionList.fetchCollections(in: secondFolder, options: nil)
-                    guard let addCollectionList = PHCollectionListChangeRequest(for: secondFolder, childCollections: secondFetchResult ) else { return }
+                self.placeholder = createFolderRequest
+                    .placeholderForCreatedCollectionList
+                if folderToAdd == nil {
+                    // TopFolder
+                    guard let addCollectionList = PHCollectionListChangeRequest(forTopLevelCollectionListUserCollections: self.fetchResult ) else { return }
                     self.changeRequest = addCollectionList
-                    print("folder is Added at Secondary Depth")
-                default:
-                    if let thirdFolder = folderToAdd {
-                        let thirdFetchResult = PHCollectionList.fetchCollections(in: thirdFolder, options: nil)
-                        guard let addCollectionList = PHCollectionListChangeRequest(for: thirdFolder, childCollections: thirdFetchResult ) else { return }
-                        self.changeRequest = addCollectionList
-                        print("folder is Added at Third Depth")
-                    }
+                    print("folder is Added at Top Folder")
+                } else {
+                    // 지정 폴더
+                    guard let addCollectionList = PHCollectionListChangeRequest(for: self.folder, childCollections: self.fetchResult ) else { return }
+                    self.changeRequest = addCollectionList
+                    print("folder is Added at Current Depth")
                 }
                 guard let addRequest = self.changeRequest else { return }
-                addRequest.addChildCollections([self.placeholder] as NSFastEnumeration)
-            } completionHandler: { (success, error) in
+                addRequest.addChildCollections(
+                    [self.placeholder] as NSFastEnumeration
+                )
+            } completionHandler: { [unowned self] (success, error) in
                 print("Finished Adding the folder. \(success ? "Success" : String(describing: error))")
-                //            guard let placeholder = self.placeholder else { return }
-                //            let fetchResult = PHCollectionList.fetchCollectionLists(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
-                //            guard let folder = fetchResult.firstObject else { return }
+                guard let placeholder = self.placeholder else { return }
+                let fetchResult = PHCollectionList.fetchCollectionLists(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
+                guard let folder = fetchResult.firstObject else { return }
                 self.changeRequest = nil
-                completion(success)
+                self.placeholder = nil
+                completion(folder)
             }
         }
     }
+    
+    
     // 하위에 앨범 생성
-    func createAlbum(depth: DepthType, folderToAdd: PHCollectionList!, _ name: String, completion: @escaping (PHAssetCollection?) -> Void) {
+    func createAlbum(folderToAdd: PHCollectionList!,
+                     _ name: String,
+                     completion: @escaping (PHAssetCollection?) -> Void) {
         DispatchQueue.main.async {
             PHPhotoLibrary.shared().performChanges {
                 let createAlbumRequest = PHAssetCollectionChangeRequest.creationRequestForAssetCollection(withTitle: name)
-                self.placeholder = createAlbumRequest.placeholderForCreatedAssetCollection
-                switch depth {
-                case .current:
-                    if self.isHome {
-                        guard let addAssetCollection = PHCollectionListChangeRequest(forTopLevelCollectionListUserCollections: self.fetchResult) else { return }
-                        self.changeRequest = addAssetCollection
-                        print("album is Added at Top Folder")
-                    } else {
-                        guard let firstFolder = folderToAdd,
-                              let addAssetCollection = PHCollectionListChangeRequest(for: firstFolder, childCollections: self.fetchResult) else { return }
-                        self.changeRequest = addAssetCollection
-                        print("album is Added at Current Depth")
-                    }
-                case .secondary:
-                    let index = self.fetchResult.index(of: folderToAdd)
-                    let secondFolder = self.fetchResult[index] as! PHCollectionList
-                    let secondFetchResult = PHCollectionList.fetchCollections(in: secondFolder, options: nil)
-                    guard let addAssetCollection = PHCollectionListChangeRequest(for: secondFolder, childCollections: secondFetchResult) else { return }
+                self.placeholder = createAlbumRequest
+                    .placeholderForCreatedAssetCollection
+                if folderToAdd == nil {
+                    // Top Folder
+                    guard let addAssetCollection = PHCollectionListChangeRequest(forTopLevelCollectionListUserCollections: self.fetchResult) else { return }
                     self.changeRequest = addAssetCollection
-                    print("album is Added at Secondary Depth")
-                default:
-                    if let thirdFolder = folderToAdd {
-                        let thirdFetchResult = PHCollectionList.fetchCollections(in: thirdFolder, options: nil)
-                        guard let addAssetCollection = PHCollectionListChangeRequest(for: thirdFolder, childCollections: thirdFetchResult) else { return }
-                        self.changeRequest = addAssetCollection
-                        print("album is Added at Third Folder")
-                    }
+                    print("album is Added at Top Folder")
+                } else {
+                    // 지정 Folder
+                    guard let firstFolder = folderToAdd,
+                          let addAssetCollection = PHCollectionListChangeRequest(for: firstFolder, childCollections: self.fetchResult) else { return }
+                    self.changeRequest = addAssetCollection
+                    print("album is Added at Current Depth")
                 }
                 self.changeRequest?.addChildCollections([createAlbumRequest.placeholderForCreatedAssetCollection] as NSArray)
-            } completionHandler: { (success, error) in
+            } completionHandler: { [unowned self] (success, error) in
                 print("Finished Adding the album. \(success ? "Success" : String(describing: error))")
                 guard let placeholder = self.placeholder else { return }
                 let fetchResult = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [placeholder.localIdentifier], options: nil)
                 guard let album = fetchResult.firstObject else { return }
-                completion(album)
                 self.changeRequest = nil
+                self.placeholder = nil
+                completion(album)
             }
         }
     }
+    
     // 폴더 삭제
-    func deleteFolder(folder: PHCollectionList!, completion: @escaping (Bool?) -> Void) {
+    func deleteFolder(folder: PHCollectionList!,
+                      completion: @escaping (Bool?) -> Void) {
         DispatchQueue.main.async {
             PHPhotoLibrary.shared().performChanges ({
-                PHCollectionListChangeRequest.deleteCollectionLists([folder] as! NSFastEnumeration)
+                PHCollectionListChangeRequest
+                    .deleteCollectionLists([folder] as! NSFastEnumeration)
             }) { (success, error) in
                 print("Finished removing the album from the folder. \(success ? "Success" : String(describing: error))")
                 completion(success)
@@ -212,7 +205,7 @@ extension Folder {
                     moveRequest?.moveChildCollections(at: from, to: to)
                 }
                 
-            }) { (success, error) in
+            }) { [unowned self] (success, error) in
                 print("Finished Reordeing Collections in folder. \(success ? "Success" : String(describing: error))")
                 if success {
                     DispatchQueue.main.async {
@@ -241,9 +234,9 @@ extension Folder: PHPhotoLibraryChangeObserver {
             print("Change 옵저버 [FOLDER] 1")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 if let change = changeInstance.changeDetails(for: folder) {
-                    let newFolder = change.objectAfterChanges
-                    self.folder = newFolder
-                    self.title = newFolder?.localizedTitle ?? ""
+                    let mlFolder = change.objectAfterChanges
+                    self.folder = mlFolder
+                    self.title = mlFolder?.localizedTitle ?? ""
                 }
             }
         }

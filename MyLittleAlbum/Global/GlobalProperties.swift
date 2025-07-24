@@ -19,11 +19,11 @@ var screenSize: CGSize {
         return size
     }
 }
-var screenWidth: CGFloat {
-    return device == .phone
-    ? min(screenSize.width, screenSize.height)
-    : screenSize.width
-}
+//var screenWidth: CGFloat {
+//    return device == .phone
+//    ? min(screenSize.width, screenSize.height)
+//    : screenSize.width
+//}
 
 
 var scale: CGFloat = {
@@ -53,16 +53,16 @@ let transitionRange: [Int] = [
     3600, 7200, 10800, 21600, 43200, 86400 // 시간~1일
 ]
 
-
-let secondaryLoadingJson = "Loading3.json"
-
 enum UserDefaultsKey: String {
+    case startView
     case uimode
     case useOpeningAni
     case useKnock
     case transitionIndex
     case digitalShowRandom
     case userReadDone
+    case recentAlbums
+    case recentFolders
 }
 
 let tabbarHeight: CGFloat = 80.0
@@ -83,6 +83,8 @@ var navigationbarHeight: CGFloat = {
     let controller = UINavigationController()
     return controller.navigationBar.frame.height
 }()
+
+let widthLimit: CGFloat = 600
 
 
 // 앨범 / 폴더 컨텐츠 레이아웃
@@ -117,7 +119,7 @@ func cellHeight(width: CGFloat, uiMode: UIMode, cellType: CellType) -> CGFloat {
     } else {
         switch uiMode {
         case .classic: ratio = 1.1
-        case .modern: ratio = 1.2
+        case .modern: ratio = 1.21
         case .fancy: ratio = 1.12
         }
     }
@@ -132,30 +134,26 @@ let vcHeight: CGFloat = 40
 let vcHorisontalPadding: CGFloat = 15
 let vcBottomPadding: CGFloat = 30
 
-extension View {
-    
-    func authenticate(albumType: AlbumType, _ resultHandler: @escaping (Bool) -> Void) {
-        let context = LAContext()
-        var error: NSError?
-        if context
-            .canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-                               error: &error) {
-            let reason = "We need to unlock your data."
-            context
-                .evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-                                localizedReason: reason) { success, authenticationError in
-                    resultHandler(success)
-                    //                    returnHiddenAssets(albumType: albumType)
-                    //                    DispatchQueue.main.async {
-                    //                        album.isHidden = true
-                    //                    }
-                }
-        } else {
-            let reason = "We need to unlock your data."
-            context.evaluatePolicy(.deviceOwnerAuthentication,
-                                   localizedReason: reason) { success, authenticationError in
-                resultHandler(success)
-            }
-        }
-    }
-}
+
+
+// MARK: - 아이콘
+let iconHide = "eye.slash.fill"
+let iconUnhide = "eye.fill"
+
+let iconFavorite = "heart.fill"
+let iconNotFavorite = "heart"
+let iconUnfavorite = "heart.slash.fill"
+
+let iconLocked = "lock.fill"
+let iconUnLocked = "lock.open.fill"
+
+// collectionView
+let iconSetting = "gearshape.fill"
+let iconFolderSetting = "folder.fill.badge.gearshape"
+
+// media detailView
+let iconDelete = "trash"
+let iconInsertToAlbum = "rectangle.stack.badge.plus"
+
+let iconImage = "photo.fill"
+let iconVideo = "video.fill"

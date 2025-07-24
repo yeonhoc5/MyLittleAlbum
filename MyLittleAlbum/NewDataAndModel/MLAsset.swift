@@ -11,28 +11,19 @@ import Photos
 extension PHAsset: @retroactive Identifiable { }
 
 class MLAsset: NSObject, Identifiable, ObservableObject {
-    let isAlbum: Bool
-    var phAsset: PHAsset {
-        didSet {
-            DispatchQueue.main.async {
-                withAnimation {
-                    self.isFavorite = self.phAsset.isFavorite
-                }
-            }
-        }
-    }
+    var phAsset: PHAsset
     let id: String
-    var mediaType: PHAssetMediaType {
-        get { phAsset.mediaType }
-    }
     var creationDate: Date {
         get { phAsset.creationDate ?? Date() }
     }
-    var isHidden: Bool {
-        get { phAsset.isHidden }
+    var mediaType: PHAssetMediaType {
+        get { phAsset.mediaType }
     }
     var duration: TimeInterval {
         get { phAsset.duration }
+    }
+    var isHidden: Bool {
+        get { phAsset.isHidden }
     }
     @Published var isFavorite: Bool
     
@@ -46,11 +37,10 @@ class MLAsset: NSObject, Identifiable, ObservableObject {
         }
     }
     
-    init(phAsset: PHAsset, isAlbum: Bool) {
+    init(phAsset: PHAsset) {
         self.phAsset = phAsset
         self.id = phAsset.localIdentifier
         self.isFavorite = phAsset.isFavorite
-        self.isAlbum = isAlbum
         super.init()
         PHPhotoLibrary.shared().register(self)
     }
@@ -63,18 +53,23 @@ class MLAsset: NSObject, Identifiable, ObservableObject {
         }
         return false
     }
-    func favoriteAsset(completion: @escaping (Bool) -> Void) {
+    func favoriteAsset(bool: Bool, completion: @escaping (Bool) -> Void) {
         PHPhotoLibrary.shared().performChanges {
             let request = PHAssetChangeRequest(for: self.phAsset)
-            request.isFavorite = !self.isFavorite
+            request.isFavorite = bool
         } completionHandler: { bool, _ in
             if bool {
                 let reNewAsset = PHAsset
                     .fetchAssets(withLocalIdentifiers: [self.id], options: nil)
                     .firstObject ?? self.phAsset
-                self.phAsset = reNewAsset
+                DispatchQueue.main.async {
+                    self.phAsset = reNewAsset
+                    self.isFavorite = reNewAsset.isFavorite
+                    completion(bool)
+                }
+            } else {
+                completion(bool)
             }
-            completion(bool)
         }
     }
 }
@@ -82,23 +77,16 @@ class MLAsset: NSObject, Identifiable, ObservableObject {
 extension MLAsset: PHPhotoLibraryChangeObserver {
     func photoLibraryDidChange(_ changeInstance: PHChange) {
         if let change = changeInstance.changeDetails(for: self.phAsset) {
-            if isAlbum {
-                print("album detected change")
-            }
             if let after = change.objectAfterChanges {
-                if after.isFavorite != self.isFavorite {
-                    print("detected at \(self.isAlbum ? "album" : "not album")")
+                if self.isFavorite != after.isFavorite {
                     DispatchQueue.main.async {
                         self.phAsset = after
                         self.isFavorite = change.objectAfterChanges?.isFavorite ?? self.phAsset.isFavorite
-                        let object = ItemChangedView(id: "elsewhere", items: [self.id])
-                        NotificationCenter.default
-                            .post(name: .itemChanged, object: object)
+//                        let object = ChangedItem(asset: [self], ass)
+//                        NotificationCenter.default
+//                            .post(name: .assetChanged, object: object)
                     }
                 }
-//                else {
-//                    print("detected but favorite same")
-//                }
             }
         }
     }}

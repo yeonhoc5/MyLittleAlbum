@@ -108,7 +108,7 @@ extension SectionFundamentalView {
                     Rectangle()
                         .foregroundStyle(.clear)
                     TabView(selection: $uiMode) {
-                        ForEach(UIMode.allCases) { uimode in
+                        ForEach(UIMode.allCases, id: \.self) { uimode in
                             SkinSampleView(uiMode: uimode,
                                            size: CGSize(width: size.width,
                                                         height: size.height))

@@ -15,10 +15,11 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
     
     // 사용자 기기 사진 접근 권한
     @Published var status: PHAuthorizationStatus!
+    @Published var allPhotosStarted: Bool = false
     
     // (1) 전체 사진   ->  Array/Set
     var allPhotos = PHFetchResult<PHAsset>() {
-        didSet { self.updateAllPhotos() }
+        didSet { updateAllPhotos() }
     }
     // (2-1) 전체 앨범   -  step 1: [앨범] -> [앨범fetchresult]
     var albumsInAllLevels = PHFetchResult<PHAssetCollection>() {
@@ -48,10 +49,11 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
     // 앨범 없는 사진용 배열
     @Published var photosArrayNotInAnyAlbum = [PHAsset]() {
         didSet {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.allPhotosChanged = true
-                print("---->> Not in any Album Photos changed by Some Albums")
-            }
+            DispatchQueue.main
+                .asyncAfter(deadline: .now() + 0.1) {
+                    self.allPhotosChanged = true
+                    print("---->> Not in any Album Photos changed by Some Albums")
+                }
         }
     }
     
@@ -71,8 +73,6 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
     @Published var useOpeningAni: Bool = true
     @Published var useKnock: Bool = true
     @Published var userReadDone: Bool = false
-    @Published var backgroundColor: Color = .fancyBackground
-    @Published var uiModeChanged: Bool = false
     
     @Published var albumAdded: Bool = false
     @Published var folderAdded: Bool = false
@@ -162,8 +162,10 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
                 case .authorized:
                     DispatchQueue.main.async {
                         self.status = newValue
-                        self.fetchAllPhotos()
-                        self.fetchAllAlbums()
+//                        DispatchQueue.global(qos: .userInteractive).async {
+//                            self.fetchAllPhotos()
+//                            self.fetchAllAlbums()
+//                        }
                     }
                     PHPhotoLibrary.shared().register(self)
                 default:
@@ -171,10 +173,10 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
                 }
             }
         case .authorized:
-            DispatchQueue.main.async {
-                self.fetchAllPhotos()
-                self.fetchAllAlbums()
-            }
+//            DispatchQueue.global(qos: .userInteractive).async {
+//                self.fetchAllPhotos()
+//                self.fetchAllAlbums()
+//            }
             PHPhotoLibrary.shared().register(self)
         default:
             print("권한이 없습니다.")
@@ -191,6 +193,9 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
         ]
         self.allPhotos = PHAsset.fetchAssets(with: allPhotosOptions)
         print("[step 3: All Photos Fetched]")
+        DispatchQueue.main.async {
+            self.allPhotosStarted = true
+        }
     }
     
     // 전체 앨범
@@ -204,21 +209,16 @@ class PhotoData: NSObject, ObservableObject, Identifiable {
                                    options: options)
         print("[step 4: All Albums Fetched]")
     }
-    
-    
-    func setUIMode(uimode: UIMode) {
-        self.uiMode = uimode
-        let userDefaults = UserDefaults.standard
-        userDefaults.set(uiMode.rawValue, forKey: "uimode")
-    }
 }
 
 // 앨범이 없는 사진
 extension PhotoData {
     private func updateAllPhotos() {
-        self.allPhotosArray = self.allPhotos
-            .objects(at: IndexSet(integersIn: 0..<self.allPhotos.count))
-        self.setAllPhotos = Set(self.allPhotosArray)
+        DispatchQueue.main.async {
+            self.allPhotosArray = self.allPhotos
+                .objects(at: IndexSet(integersIn: 0..<self.allPhotos.count))
+            self.setAllPhotos = Set(self.allPhotosArray)
+        }
     }
     private func updateAllAlbumsFetchResult() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -306,7 +306,6 @@ extension PhotoData: PHPhotoLibraryChangeObserver {
                             self.changedIndexPath = changed
                                 .map { IndexPath(item: $0, section: 0) }
                         }
-//                        self.allPhotosChanged = true
                     }
                 }
             }

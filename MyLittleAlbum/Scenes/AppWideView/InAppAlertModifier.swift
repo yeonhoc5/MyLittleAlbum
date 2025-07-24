@@ -11,6 +11,7 @@ import Photos
 struct InAppAlertModifier: ViewModifier {
     let notificationName: Notification.Name
     @EnvironmentObject var photoData: MLPhotoData
+    @Environment(\.colorScheme) var colorScheme
     @State var editAlert: EditAlert!
     @State var newText: String = ""
     @State var isShowingMessage: Bool = false
@@ -23,26 +24,9 @@ struct InAppAlertModifier: ViewModifier {
                 if editAlert?.needsTextField ?? false {
                     TextField(editAlert?.placeHolder ?? "",
                               text: $newText)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(colorScheme == .light ? .black : .white)
                 }
-                Button {
-                    switch editAlert.alertCase {
-                    case .mediaTakeFromAlbum, .mediaUnhide, .mediaMoved:
-                        DispatchQueue.main.async {
-                            withAnimation {
-                                NotificationCenter.default
-                                    .post(name: .endProgress, object: nil)
-                                NotificationCenter.default
-                                    .post(name: .showProgressEndDetailView, object: "")
-                            }
-                        }
-                    default: break
-                    }
-                    self.newText = ""
-                    self.editAlert = nil
-                } label: {
-                    Text("취소")
-                }
+                btnCancelAndClose()
                 Button {
                     alertAction(alertCase: editAlert.alertCase,
                                 isDetailView: editAlert.isDetailView)
@@ -54,7 +38,6 @@ struct InAppAlertModifier: ViewModifier {
                 let message = editAlert?.message ?? ""
                 Text(message != "" ? ("\n" + (editAlert?.message ?? "")) : "")
             }
-            .colorScheme(.dark)
             .overlay(content: {
                 if isShowingMessage {
                     Text(newText)
@@ -88,6 +71,8 @@ struct InAppAlertModifier: ViewModifier {
                     default: photoData
                             .albums[alertObject.album?.localIdentifier ?? ""]
                     }
+                    let folder = photoData
+                        .folders[alertObject.folder?.localIdentifier ?? "topFolder"]
                     editAlert = EditAlert(
                         alertCase: alertCase,
                         title: configTitle(
@@ -106,8 +91,7 @@ struct InAppAlertModifier: ViewModifier {
                             album: alertObject.album),
                         buttonDonetitle: configButtonTitle(alertCase),
                         album: album,
-                        folder: photoData
-                            .folders[alertObject.folder?.localIdentifier ?? "topFolder"],
+                        folder: folder,
                         isHiddenAsset: alertObject.isHiddenAsset,
                         selectedItems: alertObject.selectedItems,
                         isDetailView: alertObject.isDetailView
@@ -126,7 +110,33 @@ struct InAppAlertModifier: ViewModifier {
 }
 
 extension InAppAlertModifier{
-    
+    func btnCancelAndClose() -> some View {
+        Button {
+            if editAlert.alertCase == .mediaUnhide {
+                if let editAlbum = editAlert?.album {
+                    DispatchQueue.main.async {
+                        NotificationCenter.default
+                            .post(name: .assetWorkDone, object: editAlbum.id)
+                    }
+                }
+            }
+//                    case .mediaTakeFromAlbum, .mediaUnhide, .mediaMoved:
+//                        DispatchQueue.main.async {
+//                            withAnimation {
+//                                NotificationCenter.default
+//                                    .post(name: .assetWorkDone, object: nil)
+//                                NotificationCenter.default
+//                                    .post(name: .showProgressEndDetailView, object: nil)
+//                            }
+//                        }
+//                    default: break
+//                    }
+            self.newText = ""
+            self.editAlert = nil
+        } label: {
+            Text("취소")
+        }
+    }
     func alertAction(alertCase: AlertCase, isDetailView: Bool) {
         switch alertCase {
         case .addAlbumToFolder:
@@ -135,13 +145,6 @@ extension InAppAlertModifier{
                              newText) { album in
                     if let album = album {
                         photoData.setAlbum(album: album)
-                        DispatchQueue.main.async {
-                            let object = ScrollItem(identifier: album.localIdentifier,
-                                                    collectionType: .album,
-                                                    depth: .current)
-                            NotificationCenter.default
-                                .post(name: .scrollToItem, object: object)
-                        }
                     }
             }
         case .addFolderToFolder:
@@ -149,14 +152,7 @@ extension InAppAlertModifier{
                 .createFolder(folderToAdd: editAlert.folder.phCollectionList,
                               newText) { folder in
                     if let folder = folder {
-                        photoData.setFolders(folder: folder, isNew: true)
-                        DispatchQueue.main.async {
-                            let object = ScrollItem(identifier: folder.localIdentifier,
-                                                    collectionType: .folder,
-                                                    depth: .current)
-                            NotificationCenter.default
-                                .post(name: .scrollToItem, object: object)
-                        }
+                        photoData.setFolders(folder: folder, loadSecondary: false)
                     }
             }
         case .albumNameChange:
@@ -170,17 +166,24 @@ extension InAppAlertModifier{
                     self.newText = "" 
             }
         case .mediaTakeFromAlbum:
-            let id = editAlert.album?.id ?? ""
-            editAlert.album
-                .removeAssetFromAlbum(
+            guard let album = editAlert.album else { return }
+            DispatchQueue.main.async {
+                NotificationCenter.default
+                    .post(name: .assetWorkStart, object: album.id)
+            }
+            album.removeAssetFromAlbum(
                     assets: editAlert.selectedItems,
                     isHidden: editAlert.isHiddenAsset) { bool in
                         if bool {
                             DispatchQueue.main.async {
                                 NotificationCenter.default
-                                    .post(name: .innerFetchChange, object: id)
+                                    .post(name: .innerFetchChange, object: album.id)
                                 NotificationCenter.default
-                                    .post(name: .outsideFetchChange, object: "myPhotos")
+                                    .post(name: .changeRprstPhotos, object: album.id)
+                                if !(editAlert?.isHiddenAsset ?? false) {
+                                    NotificationCenter.default
+                                        .post(name: .outsideFetchChange, object: "myPhotos")
+                                }
                                 if isDetailView {
                                     NotificationCenter.default
                                         .post(name: .detailViewRemoveAsset, object: nil)

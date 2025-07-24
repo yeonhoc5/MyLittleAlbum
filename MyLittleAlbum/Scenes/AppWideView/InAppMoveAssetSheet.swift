@@ -16,28 +16,32 @@ struct InAppMoveAssetSheet: ViewModifier {
         content
             .sheet(isPresented: .constant(moveAssetObject != nil),
                    onDismiss: {
-                moveAssetObject = nil
                 DispatchQueue.main.async {
-                    NotificationCenter.default
-                        .post(name: .endProgress, object: nil)
-
+                    if let object = moveAssetObject {
+                        NotificationCenter.default
+                            .post(name: .assetWorkDone,
+                                  object: object.currentAlbum.localIdentifier)
+                    }
                 }
+                moveAssetObject = nil
             }) {
-                MoveAssetCategoryView(
-                    isShowingSelectFolderSheet: .constant(false),
-                    object: $moveAssetObject,
-                    albumType: moveAssetObject.albumType,
-                    currentAlbum: moveAssetObject.currentAlbum,
-                    isHiddenAssets: moveAssetObject.isHidden,
-                    isDetailView: moveAssetObject.isDetailView,
-                    selectedItems: moveAssetObject.selectedItems,
-                    selectedFolder: nil
-                )
+                if let object = moveAssetObject {
+                    MoveAssetCategoryView(
+                        isShowingSelectFolderSheet: .constant(false),
+                        object: $moveAssetObject,
+                        albumType: object.albumType,
+                        currentAlbum: object.currentAlbum,
+                        isHiddenAssets: object.isHidden,
+                        isDetailView: object.isDetailView,
+                        selectedItems: object.selectedItems,
+                        selectedFolder: nil
+                    )
+                    .interactiveDismissDisabled()
+                }
             }
             .onReceive(NotificationCenter.default
                 .publisher(for: notificationName)) { object in
                     // 미디어 이동 시트
-                    print("step 4")
                     if let assetObject = object.object as? MoveAssetObject {
                         self.moveAssetObject = assetObject
                     }
