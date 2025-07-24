@@ -9,36 +9,56 @@ import SwiftUI
 import Photos
 
 struct DigitalImageView: View {
-    var asset: PHAsset
-    var showStatus: DigitalShowStatus
+    let asset: MLAsset
+    let animationDirection: [Edge]
+    let showStatus: DigitalShowStatus
+    let cachingManager: PHCachingImageManager
+    let size: CGSize
     
     var body: some View {
-        GeometryReader { proxy in
-            let fetchedImage = self.fetchingImage(asset: asset,
-                                                  size: proxy.size)
-            if let image = fetchedImage {
-                ZStack {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: proxy.size.width,
-                               height: proxy.size.height)
-                        .blur(radius: 30.0)
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: proxy.size.width,
-                               height: proxy.size.height)
-                        .transition(
-                            .asymmetric(insertion: .move(edge: .trailing),
-                                        removal: .move(edge: .leading))
-                        )
+        if let image  = fetchingImage(asset: asset.phAsset, size: size) {
+            ZStack {
+                backgroundView(image: image, size: size)
+                Group {
+                    if asset.mediaType == .image {
+                        ImageDetailView(asset: asset,
+                                        imageManager: cachingManager,
+                                        size: size,
+                                        enableZoom: false,
+                                        variableScale: .constant(1),
+                                        currentScale: .constant(1),
+                                        offsetY: .constant(0))
+                        .id(asset.id)
+                    } else {
+                        VideoDetailView(isDigitalShow: true,
+                                        offsetIndex: 0,
+                                        asset: asset,
+                                        imageManager: cachingManager,
+                                        size: size,
+                                        play: .constant(.play),
+                                        hideTools: .constant(true),
+                                        userGesture: .constant(.none),
+                                        offsetY: .constant(0),
+                                        offsetX: .constant(0))
+                        .id(asset.id)
+                    }
                 }
-            } else {
-                Color.clear
+                .transition(.asymmetric(
+                    insertion: .move(edge: animationDirection[0]),
+                    removal: .move(edge: animationDirection[1])
+                ))
             }
         }
-        .ignoresSafeArea()
+    }
+    
+    private func backgroundView(image: UIImage, size: CGSize) -> some View {
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .frame(width: size.width, height: size.height)
+            .blur(radius: 30.0)
+            .transition(.opacity)
+            .id("backPoster")
     }
     
     func fetchingImage(asset: PHAsset, size: CGSize) -> UIImage? {
@@ -54,8 +74,10 @@ struct DigitalImageView: View {
         options.resizeMode = .exact
         let creteriaSize = (widthIsCreteria
                      ? size.width : size.height) * scale
-        let size = CGSize(width: widthIsCreteria ? creteriaSize : .infinity,
-                          height: widthIsCreteria ? .infinity : creteriaSize)
+        let size = CGSize(
+            width: widthIsCreteria ? creteriaSize : .infinity,
+            height: widthIsCreteria ? .infinity : creteriaSize
+        )
         
         imageManager.requestImage(for: asset,
                                   targetSize: size,
@@ -68,6 +90,6 @@ struct DigitalImageView: View {
         return returnImage
     }
 }
-#Preview {
-    DigitalShowView(nameSpace: Namespace().wrappedValue)
-}
+//#Preview {
+//    DigitalShowView(nameSpace: Namespace().wrappedValue)
+//}

@@ -28,7 +28,8 @@ struct RemoveButtonLabel: View {
         }
         .frame(width: width, height: width)
         .clipped()
-        .shadow(color: .black.opacity(0.5), radius: 0.1, x: 0.2, y: 0.2)
+        .shadow(color: .black.opacity(0.5),
+                radius: 1, x: 0.2, y: 0.2)
     }
 }
 

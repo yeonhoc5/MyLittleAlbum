@@ -8,8 +8,7 @@
 import SwiftUI
 
 struct NonAuthorizedView: View {
-    @EnvironmentObject var photoData: PhotoData
-    @ObservedObject var topFolder: Folder
+    @EnvironmentObject var photoData: MLPhotoData
     
     var body: some View {
         Rectangle()
@@ -24,7 +23,7 @@ struct NonAuthorizedView: View {
                                         color: .white)
                             Text("은")
                         }
-                        Text("아이폰의 자체 \"사진\" 앱과 연동하는 앱으로서,\n사용자의 폴더 / 앨범 / 사진 정보를 보여주기 위해")
+                        Text("아이폰의 \"사진\" 앱과 연동하는 앱으로서,\n사용자의 폴더 / 앨범 / 사진 정보를 보여주기 위해")
                         HStack(alignment: .center) {
                             Text("사용자 앨범에 대한")
                             coloredText("\"모든 사진\"", color: .white)
@@ -56,19 +55,19 @@ struct NonAuthorizedView: View {
                     
                 }
             }
-            .onDisappear {
-                if photoData.status == .authorized {
-                    let fetchResult = topFolder.fetchResult
-                    withAnimation {
-                        DispatchQueue.main.async {
-                            topFolder.refreshFolderList(fetchResult)
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            topFolder.refreshAlbumList(fetchResult)
-                        }
-                    }
-                }
-            }
+//            .onDisappear {
+//                if photoData.phAuthorization == .authorized {
+//                    let fetchResult = topFolder.fetchResult
+//                    withAnimation {
+//                        DispatchQueue.main.async {
+//                            photoData.setFolders()
+//                        }
+//                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+//                            photoData.setAlbums()
+//                        }
+//                    }
+//                }
+//            }
     }
     
     var myLittleAlbum: some View {
@@ -109,7 +108,7 @@ struct NonAuthorizedView: View {
 
 struct NonAuthorizedView_Previews: PreviewProvider {
     static var previews: some View {
-        NonAuthorizedView(topFolder: Folder(isHome: true))
-            .environmentObject(PhotoData())
+        NonAuthorizedView()
+            .environmentObject(MLPhotoData())
     }
 }

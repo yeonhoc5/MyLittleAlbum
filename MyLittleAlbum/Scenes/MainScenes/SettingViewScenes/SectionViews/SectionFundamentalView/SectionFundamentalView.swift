@@ -7,7 +7,9 @@
 import SwiftUI
 
 struct SectionFundamentalView<Header: View>: View {
+    @EnvironmentObject var photoData: MLPhotoData
     var header: Header
+    @Binding var startView: Tabs
     @Binding var uiMode: UIMode
     @Binding var useOpeningAni: Bool
     @Binding var settingList: SettingList
@@ -16,12 +18,14 @@ struct SectionFundamentalView<Header: View>: View {
     @Binding var isShowingSettingGuide: Bool
     
     init(header: @escaping () -> Header,
+         startView: Binding<Tabs>,
          uiMode: Binding<UIMode>,
          useOpeningAni: Binding<Bool>,
          settingList: Binding<SettingList>,
          useKnock: Binding<Bool>,
          isShowingSettingGuide: Binding<Bool>) {
         self.header = header()
+        self._startView = startView
         self._uiMode = uiMode
         self._useOpeningAni = useOpeningAni
         self._settingList = settingList
@@ -32,18 +36,21 @@ struct SectionFundamentalView<Header: View>: View {
     
     var body: some View {
         Section {
+            settingStartView
             // 1. ui 스킨 설정
             settingUI
             // 2. 오프닝 애니메이션 사용 설정
-            SettingToggleView(number: 2, title: "오프닝 애니메이션",
+            SettingToggleView(number: 3, title: "오프닝 애니메이션",
                               value: $useOpeningAni,
+                              change: photoData.useOpeningAni != self.useOpeningAni,
                               addGuide: true,
                               showGuide: $isShowingSettingGuide,
                               settingGuide: $settingList,
                               guideList: .opening)
             // 3. 노크 기능 사용 설정
-            SettingToggleView(number: 3, title: "노크 기능",
+            SettingToggleView(number: 4, title: "노크 기능",
                               value: $useKnock,
+                              change: photoData.useKnock != self.useKnock,
                               addGuide: true,
                               showGuide: $isShowingSettingGuide,
                               settingGuide: $settingList,
@@ -69,16 +76,29 @@ struct SectionFundamentalView<Header: View>: View {
 
 
 extension SectionFundamentalView {
+    var settingStartView: some View {
+        HStack(spacing: 30) {
+            Text("❶  시작 페이지")
+            Picker(selection: $startView) {
+                ForEach([Tabs.photo, Tabs.album], id: \.self) {
+                    Text($0.rawValue)
+                }
+            } label: {
+                Text("❶  시작 페이지")
+            }
+            .pickerStyle(.segmented)
+        }
+    }
     var settingUI: some View {
         VStack(content: {
             HStack(spacing: 30) {
-                Text("❶  스킨 설정")
+                Text("❷  스킨 설정")
                 Picker(selection: $uiMode) {
                     ForEach(UIMode.allCases, id: \.self) {
                         Text($0.rawValue)
                     }
                 } label: {
-                    Text("❶  스킨 설정")
+                    Text("❷  스킨 설정")
                 }
                 .pickerStyle(.segmented)
             }
@@ -87,13 +107,40 @@ extension SectionFundamentalView {
                 ZStack(alignment: .center, content: {
                     Rectangle()
                         .foregroundStyle(.clear)
-                    SkinSampleView(uiMode: uiMode,
-                                   size: CGSizeMake(size.width,
-                                                    size.height))
-                        .clipped()
-                        .shadow(radius: 1)
-                        .scaleEffect(0.7)
+                    TabView(selection: $uiMode) {
+                        ForEach(UIMode.allCases) { uimode in
+                            SkinSampleView(uiMode: uimode,
+                                           size: CGSize(width: size.width,
+                                                        height: size.height))
+                                .clipped()
+                                .shadow(radius: 1)
+                                .scaleEffect(0.7)
+                                .tag(uimode)
+                        }
+                    }
+                    .animation(.easeInOut, value: uiMode)
+                    .tabViewStyle(.page(indexDisplayMode: .never))
                 })
+            })
+            .mask({
+                Rectangle()
+                    .fill(LinearGradient(
+                        gradient: Gradient(colors: [
+                            .white.opacity(0),
+                            .white.opacity(0.5),
+                            .white.opacity(0.85),
+                            .white.opacity(1), .white.opacity(1),
+                            .white.opacity(1), .white.opacity(1),
+                            .white.opacity(1), .white.opacity(1),
+                            .white.opacity(1), .white.opacity(1),
+                            .white.opacity(1), .white.opacity(1),
+                            .white.opacity(1), .white.opacity(1),
+                            .white.opacity(1), .white.opacity(1),
+                            .white.opacity(1), .white.opacity(1),
+                            .white.opacity(0.85),
+                            .white.opacity(0.5),
+                            .white.opacity(0)]),
+                        startPoint: .leading, endPoint: .trailing))
             })
             .frame(height: 200)
         })

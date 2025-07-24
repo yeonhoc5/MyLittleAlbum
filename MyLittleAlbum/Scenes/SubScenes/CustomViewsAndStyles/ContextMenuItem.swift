@@ -10,17 +10,20 @@ import SwiftUI
 struct ContextMenuItem: View {
     var title: String! = ""
     var image: String! = ""
-    var color: Color! = .primary
+    var color: Color! = .white
     var body: some View {
-        if image == "" {
-            Text(title)
-                .foregroundColor(color)
-        } else {
-            HStack {
+        Group {
+            if image == "" {
                 Text(title)
-                imageWithScale(systemName: image, scale: .medium)
+            } else {
+                HStack {
+                    Text(title)
+                    imageWithScale(
+                        systemName: image,
+                        scale: .medium)
+                    
+                }
             }
-            .foregroundColor(color)
         }
     }
 }

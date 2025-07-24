@@ -12,14 +12,15 @@ enum DigitalShowStatus {
     case ready
     case playing
     case ended
+    case paused
 }
 
 struct DigitalShowView: View {
-    @EnvironmentObject var photoData: PhotoData
-    @State var title: String = ""
-    @State var photosArray: [PHAsset] = []
+    @State var title: String
+    @State var assetArray: [MLAsset]
     @State var digitalShowNumber: Int = 0
     @State var timer: Timer!
+    var transitionSecond: Int
     var nameSpace: Namespace.ID
     @State var isShowingDigitalShowGuide: Bool = false
     
@@ -28,6 +29,7 @@ struct DigitalShowView: View {
     @State var showStatus: DigitalShowStatus = .ready
     @State var startString = "의 디지털 액자 모드를 실행합니다."
     @State var endString = "디지털 액자 모드를 종료합니다."
+    let imageManger = PHCachingImageManager()
     
     @Environment(\.scenePhase) var scenePhase
     
@@ -35,29 +37,56 @@ struct DigitalShowView: View {
         ZStack {
             backgroundView(nameSpace: nameSpace)
             if showStatus == .playing {
-                DigitalImageView(asset: self.photosArray[digitalShowNumber],
-                                 showStatus: showStatus)
-                    .onAppear(perform: {
-                        self.startDigitalShow()
-                        self.showDigitalShowGuide()
+                GeometryReader { geoProxy in
+                    DigitalImageView(
+                        asset: self.assetArray[digitalShowNumber],
+                        animationDirection: animationDirection(number: digitalShowNumber),
+                        showStatus: showStatus,
+                        cachingManager: imageManger,
+                        size: geoProxy.size
+                    )
+                    .onChange(of: digitalShowNumber, perform: { int in
+                        phImageQueue.async {
+                            imageManger.startCachingImages(
+                                for: [assetArray[int + 1].phAsset],
+                                targetSize: geoProxy.size,
+                                contentMode: .aspectFit,
+                                options: nil)
+                            if !assetArray.isEmpty {
+                                imageManger.stopCachingImages(
+                                    for: [assetArray[int].phAsset],
+                                    targetSize: geoProxy.size,
+                                    contentMode: .aspectFit,
+                                    options: nil)
+                            }
+                        }
                     })
+                }
+                .ignoresSafeArea()
+                .onAppear(perform: {
+                    self.startDigitalShow()
+                    self.showDigitalShowGuide()
+                })
             }
             if showStatus != .ended {
                 startMessageView
             }
         }
+        .matchedGeometryEffect(id: "digitalShow", in: nameSpace)
         .overlay(alignment: .bottom) {
             guideView
                 .padding(.bottom, device == .phone ? 20 : 30)
                 .offset(y: isShowingDigitalShowGuide ? 0 : 200)
         }
-        .gesture(TapGesture(count: 2).onEnded({ _ in
-            if showStatus != .ended {
-                withAnimation {
-                    self.endDigitalShow()
+        .gesture(TapGesture(count: 2)
+            .onEnded({ _ in
+                if showStatus != .ended {
+                    withAnimation {
+                        self.endDigitalShow()
+                    }
                 }
-            }
-        }))
+            })
+        )
         .onTapGesture {
             self.showDigitalShowGuide()
         }
@@ -84,7 +113,6 @@ extension DigitalShowView {
         RoundedRectangle(cornerRadius: 20.0)
             .fill(.ultraThinMaterial)
             .ignoresSafeArea()
-            .matchedGeometryEffect(id: "digitalShow", in: nameSpace)
             .overlay {
                 if showStatus == .ended {
                     Text(endString)
@@ -103,7 +131,7 @@ extension DigitalShowView {
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThickMaterial)
+                    .fill(.ultraThinMaterial)
                     .frame(width: 50, height: 40)
                 Text("종료")
                     .foregroundStyle(.white)
@@ -118,7 +146,7 @@ extension DigitalShowView {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("ALBUM")
                         .foregroundStyle(.white.opacity(0.7))
-                    Text("\"\(photoData.digitalShowTitle)\"")
+                    Text("\"\(title)\"")
                         .font(.system(size: 30, weight: .heavy))
                         .foregroundStyle(Color.color3)
                         .shadow(color: .black, radius: 4, x: 1, y: 1)
@@ -130,7 +158,7 @@ extension DigitalShowView {
                     HStack(alignment: .top, spacing: 10) {
                         Text("ALBUM")
                             .foregroundStyle(.white.opacity(0.7))
-                        Text("\"\(photoData.digitalShowTitle)\"")
+                        Text("\"\(title)\"")
                             .font(.system(size: 30, weight: .heavy))
                             .foregroundStyle(Color.color3)
                             .shadow(color: .black, radius: 4, x: 1, y: 1)
@@ -143,7 +171,6 @@ extension DigitalShowView {
         .scaleEffect(guideScale)
         .opacity(guideOpacity)
         .onAppear {
-            makePhotosArray()
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 withAnimation {
                     if showStatus == .ready {
@@ -162,7 +189,7 @@ extension DigitalShowView {
     
     var guideView: some View {
         VStack(alignment: .leading, spacing: 10, content: {
-            Text("1. 디지털액자 사용 시 화면 자동 꺼짐이 해제됩니다.")
+            Text("1. 디지털액자 사용 시 기기 자동 잠금이 해제됩니다.")
             if device == .phone {
                 Text("2. 디지털액자를 종료하려면 [종료] 버튼을 누르거나\n화면을 2번 탭해주세요.")
             } else {
@@ -170,35 +197,27 @@ extension DigitalShowView {
             }
         })
         .padding(20)
+        .foregroundStyle(.white)
         .background(content: {
             RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThickMaterial)
+                .fill(.ultraThinMaterial)
         })
-    }
-    
-    func makePhotosArray() {
-        self.photosArray = photoData.digitalPhotoAlbums.compactMap {
-            photoData.isHiddenAsset
-            ? $0.hiddenAssetsArray : $0.photosArray
-        }.flatMap { $0 }
-        if photoData.digitalShowRandom {
-            self.photosArray = self.photosArray.shuffled()
-        }
     }
 }
 
 extension DigitalShowView {
     func startDigitalShow() {
-        self.timer = Timer.scheduledTimer(withTimeInterval: Double(transitionRange[photoData.transitionIndex]),
+        self.timer = Timer.scheduledTimer(withTimeInterval: Double(transitionSecond),
                                           repeats: true) { _ in
-            if self.photosArray.count > 1 {
+            if self.assetArray.count > 1 {
                 withAnimation {
                     self.digitalShowNumber
                     = (self.digitalShowNumber + 1)
-                    % self.photosArray.count
+                    % self.assetArray.count
                 }
             }
         }
+        UIApplication.shared.isIdleTimerDisabled = true
     }
     
     func endDigitalShow() {
@@ -207,12 +226,14 @@ extension DigitalShowView {
                 self.showStatus = .ended
                 self.isShowingDigitalShowGuide = false
                 self.title = ""
-                self.photosArray = []
+                self.imageManger.stopCachingImagesForAllAssets()
+                self.assetArray = []
             }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             withAnimation {
-                photoData.endDisitalShow()
+                NotificationCenter.default
+                    .post(name: .endDigitalShow, object: nil)
             }
         }
         
@@ -221,21 +242,27 @@ extension DigitalShowView {
             self.timer = nil
         }
         self.digitalShowNumber = 0
-        
         UIApplication.shared.isIdleTimerDisabled = false
     }
     func showDigitalShowGuide() {
         withAnimation {
             self.isShowingDigitalShowGuide.toggle()
         }
-        if isShowingDigitalShowGuide == true {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                withAnimation {
-                    if isShowingDigitalShowGuide == true {
-                        self.isShowingDigitalShowGuide = false
-                    }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            withAnimation {
+                if isShowingDigitalShowGuide == true {
+                    self.isShowingDigitalShowGuide = false
                 }
             }
+        }
+    }
+    
+    func animationDirection(number: Int) -> [Edge] {
+        switch number % 4 {
+        case 0: return [.top, .leading]
+        case 1: return [.trailing, .trailing]
+        case 2: return [.leading, .top]
+        default: return [.bottom, .bottom]
         }
     }
     
@@ -246,7 +273,7 @@ extension DigitalShowView {
                     withAnimation {
                         self.digitalShowNumber
                         = (self.digitalShowNumber + 1)
-                        % self.photosArray.count
+                        % self.assetArray.count
                     }
                 } else if value.translation.width > 100 {
                     if self.digitalShowNumber > 0 {
@@ -255,7 +282,7 @@ extension DigitalShowView {
                         }
                     } else {
                         withAnimation {
-                            self.digitalShowNumber = self.photosArray.count - 1
+                            self.digitalShowNumber = self.assetArray.count - 1
                         }
                     }
                 }
@@ -266,6 +293,9 @@ extension DigitalShowView {
 }
 
 #Preview {
-    DigitalShowView(nameSpace: Namespace().wrappedValue)
+    DigitalShowView(title: "디지털뷰",
+                    assetArray: [],
+                    transitionSecond: 5,
+                    nameSpace: Namespace().wrappedValue)
         .environmentObject(PhotoData())
 }

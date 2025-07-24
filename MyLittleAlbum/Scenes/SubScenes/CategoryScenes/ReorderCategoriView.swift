@@ -9,14 +9,12 @@ import SwiftUI
 import Photos
 
 struct ReorderCategoriView: View {
-    
+    @EnvironmentObject var photoData: MLPhotoData
     @State var selectType: CollectionType = .album
-    @Binding var pageFolder: Folder!
-    @Binding var albumArray: [PHAssetCollection]
-    @Binding var folderArray: [PHCollectionList]
+    @Binding var reorderObject: ReorderObject!
+    let pageIdentifier: String
     
-    @Binding var isShowingReorderSheet: Bool
-    @Namespace var ListRow
+    @Namespace var listRow
     
     var body: some View {
         // 앨범
@@ -25,15 +23,10 @@ struct ReorderCategoriView: View {
                 titleView
                 capsuleIndicator
                 orderListView
+                btnCancelAndClose
+                    .padding([.horizontal, .bottom], 20)
             }
             .background(Color.fancyBackground)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("닫기") {
-                        isShowingReorderSheet = false
-                    }
-                }
-            }
             .navigationTitle("순서 조정하기")
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -46,12 +39,16 @@ extension ReorderCategoriView {
     
     var titleView: some View {
         Group {
-            Text("대상 폴더 : ")
-                .font(.system(size: 18, weight: .regular, design: .default))
-            + Text("[\(pageFolder.isHome == true ? "최상위" : pageFolder.title)]")
-                .font(.system(size: 23, weight: .semibold, design: .rounded))
-            + Text(" 폴더")
-                .font(.system(size: 18, weight: .regular, design: .default))
+            if let pageFolder = photoData.folders[pageIdentifier] {
+                Text("대상 폴더 : ")
+                    .font(.system(size: 18, weight: .regular, design: .default))
+                + Text("[\(pageFolder.phCollectionList == nil ? "최상위" : pageFolder.title)]")
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                + Text(" 폴더")
+                    .font(.system(size: 18, weight: .regular, design: .default))
+            } else {
+                Text("")
+            }
         }
         .foregroundColor(.white)
         .frame(width: screenSize.width - 44, alignment: .leading)
@@ -96,18 +93,11 @@ extension ReorderCategoriView {
     var orderListView: some View {
         GeometryReader { proxy in
             TabView(selection: $selectType) {
-                // 앨범 순서만 Scene
-                titleListView(type: .album, size: proxy.size, animationId: ListRow)
-                    .tag(CollectionType.album)
-                    .frame(height: proxy.size.height)
-                // 폴더 순서만 Scene
-                titleListView(type: .folder, size: proxy.size, animationId: ListRow)
-                    .tag(CollectionType.folder)
-                    .frame(height: proxy.size.height)
-                // 통합 순서 Scene
-                titleListView(type: .none, size: proxy.size, animationId: ListRow)
-                    .tag(CollectionType.none)
-                    .frame(height: proxy.size.height)
+                ForEach(CollectionType.allCases, id: \.self) { type in
+                    titleListView(type: type, size: proxy.size, animationId: listRow)
+                        .tag(type)
+                        .frame(height: proxy.size.height)
+                }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .mask {
@@ -116,7 +106,6 @@ extension ReorderCategoriView {
             }
         }
     }
-    
     
     func showListButton(type: CollectionType, text: String, proxy: GeometryProxy) -> some View {
         Button {
@@ -129,73 +118,120 @@ extension ReorderCategoriView {
         .frame(width: (proxy.size.width - 5) / 3, alignment: .center)
     }
 
+    var btnCancelAndClose: some View {
+        Button {
+            DispatchQueue.main.async {
+                withAnimation {
+                    self.reorderObject = nil
+                }
+            }
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                Text("닫 기")
+                    .foregroundStyle(.black)
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(height: 50)
+        .buttonStyle(ClickScaleEffect())
+    }
 }
 
 extension ReorderCategoriView {
-    
     @ViewBuilder
     func titleListView(type: CollectionType, size: CGSize, animationId: Namespace.ID) -> some View {
-        let count = type == .album ? pageFolder.albumArray.count : (type == .none ? pageFolder.fetchResult.count : pageFolder.folderArray.count)
-        let filterType = type == .album ? PHAssetCollection.self : (type == .folder ? PHCollectionList.self : PHCollection.self)
-        let collection = pageFolder.fetchResult
-        if count > 0 {
-            List {
-                ForEach(0..<collection.count, id: \.self) { index in
-                    if collection[index].isKind(of: filterType) {
-                        let reCheckType: CollectionType = collection[index].isKind(of: PHAssetCollection.self) ? .album : .folder
-                        let circleIndex = findCircleIndex(checkType: reCheckType, fetchResult: collection, collection: collection[index])
-                        rowLine(type: reCheckType, collection: collection[index], index: circleIndex)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 0, trailing: 40))
-                            .listRowBackground(Color.white)
-                            .id(collection[index].localIdentifier)
-                    }
-                }
-                .onMove { from, to in
-                    
-                    if to > from.first! {
-                        print("-----------------------------------------------\(from.first ?? 0)뻔째 인덱스가 \(to - 1)번째 인덱스로")
-                        pageFolder.moveCollection(from: from, to: to - 1) { newResult in
-                            if let _ = newResult {
-//                                pageFolder.renewFetchResult()
-//                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-//                                    pageFolder.fetchResult = fetchResult
-//                                    pageFolder.refreshFolderModel(fetchResult)
-//                                }
-                            }
+        if let pageFolder = photoData.folders[pageIdentifier] {
+            let collection = pageFolder.fetchResult
+            let count = switch type {
+                        case .album: pageFolder.albumsArray.count
+                        case .folder: pageFolder.foldersArray.count
+                        case .none: pageFolder.fetchResult.count
                         }
-                    } else {
-                        print("-----------------------------------------------\(from.first ?? 0)뻔째 인덱스가 \(to)번째 인덱스로")
-                        pageFolder.moveCollection(from: from, to: to) { newResult in
-                            if let _ = newResult {
-//                                pageFolder.renewFetchResult()
-//                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-//                                    pageFolder.fetchResult = fetchResult
-//                                    pageFolder.refreshFolderModel(fetchResult)
-//                                }
-                            }
+            let filterType = type == .album
+                        ? PHAssetCollection.self
+                        : (type == .folder ? PHCollectionList.self : PHCollection.self)
+            if count > 0 {
+                List {
+                    ForEach(0..<collection.count, id: \.self) { index in
+                        if collection[index].isKind(of: filterType) {
+                            let reCheckType: CollectionType = collection[index].isKind(of: PHAssetCollection.self) ? .album : .folder
+                            let circleIndex = findCircleIndex(
+                                checkType: reCheckType,
+                                fetchResult: collection,
+                                collection: collection[index])
+                            rowLine(type: reCheckType,
+                                    collection: collection[index],
+                                    index: circleIndex)
+                                .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 0, trailing: 40))
+                                .listRowBackground(Color.white)
+                                .id(collection[index].localIdentifier)
                         }
                     }
+                    .onMove { from, to in
+                        let additional = to > from.first! ? 1 : 0
+                        print("----------\(from.first ?? 0)뻔째 인덱스가 \(to - additional)번째 인덱스로")
+                        pageFolder.moveCollection(from: from, to: to - additional) { bool in
+                            if bool {
+                                if let fromIndex = from.first {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        moveArray(pageFolder: pageFolder,
+                                                  from: collection[fromIndex],
+                                                  to: collection[to - additional])
+                                        
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color.white)
+            } else {
+                let type: CollectionType = (pageFolder.fetchResult.count == 0 ? .none : (pageFolder.albumsArray.isEmpty ? .album : .folder))
+                ZStack {
+                    Color.white
+                        .ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        NoCollectionPhotoView(selectedType: selectType, type: type)
+                        emptyText
+                    }
+                }
+                
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.white)
         } else {
-            let type: CollectionType = (pageFolder.fetchResult.count == 0 ? .none : (pageFolder.countAlbum == 0 ? .album : .folder))
-            ZStack {
-                Color.white
-                    .ignoresSafeArea()
-                VStack(spacing: 20) {
-                    NoCollectionPhotoView(selectedType: selectType, type: type)
-                    emptyText
+            EmptyView()
+        }
+    }
+    func moveArray(pageFolder: MLFolder, from: PHCollection, to: PHCollection) {
+        if let fromFolder = from as? PHCollectionList,
+           let toFolder = to as? PHCollectionList,
+           let arrayFrom = pageFolder.foldersArray.firstIndex(of: fromFolder),
+           let arrayTo = pageFolder.foldersArray.firstIndex(of: toFolder) {
+            let desti = arrayTo > arrayFrom ? arrayTo + 1 : arrayTo
+            DispatchQueue.main.async {
+                withAnimation {
+                    pageFolder.foldersArray
+                        .move(fromOffsets: [arrayFrom], toOffset: desti)
                 }
             }
-            
+        } else if
+            let fromAlbum = from as? PHAssetCollection,
+            let toAlbum = to as? PHAssetCollection,
+            let arrayFrom = pageFolder.albumsArray.firstIndex(of: fromAlbum),
+            let arrayTo = pageFolder.albumsArray.firstIndex(of: toAlbum) {
+            let desti = arrayTo > arrayFrom ? arrayTo + 1 : arrayTo
+               DispatchQueue.main.async {
+                   withAnimation {
+                       pageFolder.albumsArray
+                           .move(fromOffsets: [arrayFrom], toOffset: desti)
+                   }
+               }
         }
     }
     
     func findCircleIndex(checkType: CollectionType, fetchResult: PHFetchResult<PHCollection>, collection: PHCollection) -> Int {
-        
         let arrayCollection = Array(fetchResult.objects(at: IndexSet(0..<fetchResult.count)))
         let renewAlbum = arrayCollection.filter{ $0.isKind(of: PHAssetCollection.self)}.map{ $0 as! PHAssetCollection }
         let renewFolder = arrayCollection.filter{ $0.isKind(of: PHCollectionList.self)}.map{ $0 as! PHCollectionList }
@@ -207,13 +243,19 @@ extension ReorderCategoriView {
     
     
     var emptyText: some View {
-        let adverb = pageFolder.fetchResult.count != 0 ? "여기" : (selectType == .album ? "여기" : (selectType == .folder ? "여긴" : "정말"))
-        let also = pageFolder.fetchResult.count != 0 ? "" : (selectType == .album ? "" : "도")
-        let meow = pageFolder.fetchResult.count != 0 ? "냥" : (selectType == .album ? "냥" : (selectType == .folder ? "냐옹" : "냐~옹!"))
-        let collection = selectType == .folder ? "폴더" : (selectType == .album ? "앨범" : "아무것")
-        let text = "\(adverb) \(collection)\(also) 없다\(meow)"
-        return Text(text)
-            .foregroundColor(.fancyBackground)
+        Group {
+            if let pageFolder = photoData.folders[pageIdentifier] {
+                let adverb = pageFolder.fetchResult.count != 0 ? "여기" : (selectType == .album ? "여기" : (selectType == .folder ? "여긴" : "정말"))
+                let also = pageFolder.fetchResult.count != 0 ? "" : (selectType == .album ? "" : "도")
+                let meow = pageFolder.fetchResult.count != 0 ? "냥" : (selectType == .album ? "냥" : (selectType == .folder ? "냐옹" : "냐~옹!"))
+                let collection = selectType == .folder ? "폴더" : (selectType == .album ? "앨범" : "아무것")
+                let text = "\(adverb) \(collection)\(also) 없다\(meow)"
+                return Text(text)
+                    .foregroundColor(.fancyBackground)
+            } else {
+                return Text("")
+            }
+        }
     }
     
     func rowLine(type: CollectionType, collection: PHCollection, index: Int) -> some View {

@@ -11,6 +11,7 @@ struct SettingToggleView: View {
     var number: Int
     var title: String
     @Binding var value: Bool
+    let change: Bool
 
     var textTrue: String = "On"
     var textFalse: String = "Off"
@@ -28,8 +29,12 @@ struct SettingToggleView: View {
                     if addGuide {
                         Button(action: {
                             withAnimation {
-                                settingGuide = guideList
-                                showGuide = true
+                                if settingGuide != guideList {
+                                    settingGuide = guideList
+                                    showGuide = true
+                                } else {
+                                    showGuide = false
+                                }
                             }
                         }, label: {
                             Image(systemName: "questionmark.circle")
@@ -39,7 +44,7 @@ struct SettingToggleView: View {
                     }
                     Spacer()
                     Text(value ? textTrue : textFalse)
-                        .foregroundColor(.blue)
+                        .foregroundColor(change ? .blue : .black)
                         .bold()
                         .frame(width: 30, alignment: .leading)
                 }
@@ -60,6 +65,7 @@ struct SettingToggleView: View {
     SettingToggleView(number: 1, 
                       title: "토글뷰",
                       value: .constant(true),
+                      change: false,
                       showGuide: .constant(false),
                       settingGuide: .constant(.opening),
                       guideList: .opening

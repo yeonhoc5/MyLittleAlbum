@@ -8,255 +8,342 @@
 import SwiftUI
 import Photos
 
+// 기본적으로 앨범씬에서 폴더/앨범 이용용으로 사용
+// - 그 외 사진을 넣을 앨범을 만들 경우 사용
+
 // MARK: - 1st Struct
 struct MoveCollectionCategoryView: View {
-    var isHome: Bool! = false
-    @Binding var isShowingSheet: Bool
-    // 이동시킬 앨범/폴더의 현재 폴더 -> 해당 폴더 및 하위 폴더 disable 처리
-    @Binding var currentFolder: Folder!
+    @EnvironmentObject var photoData: MLPhotoData
+    @Binding var moveObject: MoveCollectionObject!
+    
+    // 원래 위치 폴더
+    let currentParent: MLFolder
+    // 이동시킬 것들
+    var objectCellType: CellType
+    var objectAlbum: PHAssetCollection!
+    var objectFolder: PHCollectionList!
+    
+    var nameSpace: Namespace.ID
+    @State var lowerFolders: [String] = []
+    
     // [마이포토] 탭에서 폴더 지정하여 앨범 생성할 경우
-    var currentAlbum: Album! = nil
-    // 이동시킬 앨범/폴더
-    @ObservedObject var stateChangeObject: StateChangeObject
+//    var currentAlbum: MLAlbum! = nil
+//    var filteringType: FilteringType = .all
     // 이동할 목표지로 선택된 폴더
     @State private var folderToAddCollection: PHCollectionList!
     // 이동할 목표지가 top폴더인지 선택 구분
-    @State var isSelectedTopFolder: Bool = false
+    @State var isTopFolderSelected: Bool = false
     // 버튼 타이틀 체인지
     @State var moveBtnTitle: String = ""
-    
-    @State var albumToAdd: Album!
-    @State var isSettedNewAlbum: Bool = false
+    let width: CGFloat = 70
     
     var body: some View {
-        let collectionType = isHome ? "앨범" : (stateChangeObject.collectionToEdit.isKind(of: PHAssetCollection.self) ? "앨범" : "폴더")
         NavigationView {
-            VStack {
-                moveCollectionTitleView(collectionType: collectionType)
-                GeometryReader { proxy in
-                    List {
-                        topFolderLineView
-                            .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 0, trailing: 40))
-                        subFolderLineView
-                            .listRowInsets(EdgeInsets(top: 0, leading: 40, bottom: 0, trailing: 40))
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.white)
-                    .mask {
-                        RoundedRectangle(cornerRadius: 15)
-                            .frame(width: screenSize.width - 44, height: proxy.size.height)
-                    }
+            VStack(spacing: 5) {
+                moveCollectionTitleView(cellType: objectCellType)
+                VStack(spacing: 10) {
+                    legendView
+                    categoryView()
+                    recentSelectedView()
                 }
+                HStack {
+                    btnCancelAndClose
+                    btnAddAndClose
+                }
+                .padding([.horizontal, .top], 20)
             }
+            .padding(.bottom, 20)
             .background(FancyBackground())
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { toolItemLeading }
-                ToolbarItem(placement: .navigationBarTrailing) { toolItemTrailing }
-            }
         }
-        .onDisappear { currentFolder = nil }
-        .onChange(of: isSettedNewAlbum) { newValue in
-            if newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    addAssetIntoAlbum()
+        .onAppear {
+            if objectCellType == .folder {
+                if let folder = objectFolder {
+                    DispatchQueue.global(qos: .userInteractive).async {
+                        getLowerFolders(folder: folder)
+                    }
                 }
-                isShowingSheet = false
             }
         }
+//        .onChange(of: isSettedMLAlbum) { newValue in
+//            if newValue {
+//                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+//                    addAssetIntoAlbum()
+//                }
+//                isShowingSheet = false
+//            }
+//        }
     }
 }
 
 
 // MARK: - extension 1. subViews
 extension MoveCollectionCategoryView {
-    // View 타이틀
-    func moveCollectionTitleView(collectionType: String) -> some View {
-        VStack(spacing: 5) {
-            Text("폴더를 선택해 주세요.")
-                .font(.title)
-                .foregroundColor(.white)
-            if !isHome {
-                Text("이동할 \(collectionType) : [\(stateChangeObject.collectionToEdit.localizedTitle ?? "")]")
-                    .font(.headline)
-                    .foregroundColor(.gray)
+    func recentSelectedView() -> some View {
+        return VStack(alignment: .leading, spacing: 5) {
+            Text("최근 선택한 폴더 리스트")
+                .foregroundStyle(Color.gray)
+                .padding(.horizontal, 22)
+            SelectableCollectionView(
+                collectionType: .folder,
+                emptytext: "최근 선택한 폴더가 없습니다.",
+                currentAlbum: nil,
+                albumArray: [],
+                albumToAddPhotos: .constant(nil),
+                depthCount: 0,
+                objectFolder: objectFolder,
+                currentParent: currentParent.phCollectionList,
+                folderToAddCollection: $folderToAddCollection,
+                isTopFolderSelected: $isTopFolderSelected,
+                lowers: lowerFolders)
+        }
+    }
+    func categoryView() -> some View {
+        GeometryReader { proxy in
+            ScrollViewReader { scrollProxy in
+                List {
+                    Group {
+                        topFolderLineView
+                        subFolderLineView(scrollProxy: scrollProxy)
+                    }
+                    .listRowBackground(Color.white)
+                    .listRowInsets(
+                        EdgeInsets(top: 0, leading: 40, bottom: 0, trailing: 40)
+                    )
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color.white)
+                .mask {
+                    RoundedRectangle(cornerRadius: 15)
+                        .frame(width: screenSize.width - 44,
+                               height: proxy.size.height)
+                }
             }
         }
-        .padding(.bottom, 10)
     }
-    
-    // 툴바 버튼 - cancel
-    var toolItemLeading: some View {
-        Button("취소") {
-            self.isShowingSheet = false
+    // View 타이틀
+    func moveCollectionTitleView(cellType: CellType) -> some View {
+        let collectionTitle = cellType == .folder ? "폴더" : "앨범"
+        return HStack(spacing: 20) {
+            CellView(uiMode: photoData.uiMode,
+                     cellType: cellType,
+                     index: moveObject?.objectColorIndex ?? 0,
+                     width: width,
+                     tapAction: {
+                
+            }) { size, namespace in
+                Group {
+                    if cellType == .folder {
+                        if let folder = photoData.folders[objectFolder.localIdentifier] {
+                            FolderCoverView(folder: folder,
+                                            uiMode: photoData.uiMode,
+                                            size: size,
+                                            cellNameSpace: namespace)
+                        } else {
+                            EmptyView()
+                        }
+                    } else {
+                        AlbumCoverView(assetCollection: objectAlbum,
+                                       cellType: cellType,
+                                       size: size,
+                                       padding: 5,
+                                       albumCell: namespace)
+                    }
+                }
+            }
+            .matchedGeometryEffect(id: moveObject?.objectIdentifier ?? "",
+                                    in: nameSpace)
+            VStack(alignment: .leading, spacing: 15) {
+                Text("\(collectionTitle)의 위치를 이동합니다.")
+                Text("원하는 위치를 선택해 주세요.")
+            }
+            .foregroundColor(.gray)
+            .font(.headline)
         }
+        .padding(.horizontal, 20)
+        .frame(height: cellHeight(width: width,
+                                  uiMode: photoData.uiMode,
+                                  cellType: .album) + 50 )
     }
 
-    // 툴바 버튼 - 옮기기
-    var toolItemTrailing: some View {
-        let actionTitle = isHome ? "넣기" : "이동하기"
-        return Button("\(moveBtnTitle) \(actionTitle)")  {
-            if isHome {
-                addAlbumAtTheFolderWithPhotos()
-                self.isShowingSheet = false
-            } else {
-                if isSelectedTopFolder {
-                    displaceCollelction(isTopFolder: isSelectedTopFolder)
-                } else {
-                    displaceCollelction(isTopFolder: isSelectedTopFolder, 
-                                        folder: folderToAddCollection)
-                }
-                self.isShowingSheet = false
-            }
-        }
-        .disabled(!isHome && folderToAddCollection == nil && isSelectedTopFolder == false)
-    }
     // 탑폴더 라인
     var topFolderLineView: some View {
-        let collectionType = isHome ? "앨범" : (stateChangeObject.collectionToEdit.isKind(of: PHAssetCollection.self) ? "앨범" : "폴더")
-        return FolderLineView(title: "최상위 폴더", subText: isHome ? "" : "\(currentFolder.folder == nil ? "[이동할 \(collectionType)의 현재 위치]":"")")
-            .listRowBackground(Color.white)
-            .foregroundColor(!isHome && currentFolder.folder == nil ? .disabledColor : (isSelectedTopFolder ? .selectedColor : .nonSelectedColor))
-            .onTapGesture {
-                isSelectedTopFolder.toggle()
-                let letter = isHome ? "에" : "로"
-                moveBtnTitle = isSelectedTopFolder ? "[최상위] 폴더\(letter)" : ""
+        let disable = currentParent.phCollectionList == nil
+        return FolderLineView(isCollectionMoveView: true,
+                              title: "최상위 폴더",
+                              subImage: disable ? "chevron.up.circle.fill" : "",
+                              isSelected: isTopFolderSelected,
+                              albumEmpty: true)
+        .foregroundColor(disable ? .disabledColor
+                                : (isTopFolderSelected
+                                        ? .selectedColor :
+                                        .nonSelectedColor))
+        .onTapGesture {
+            if currentParent.phCollectionList != nil {
+                isTopFolderSelected.toggle()
+                moveBtnTitle = isTopFolderSelected ? "[최상위] 폴더로" : ""
                 folderToAddCollection = nil
             }
-            .disabled(self.isHome ? false : currentFolder.folder == nil)
+        }
+        .disabled(disable)
     }
     // 그 외 라인
-    var subFolderLineView: some View {
-        let collections = PHCollection.fetchTopLevelUserCollections(with: nil)
-        return ForEach(0..<collections.count, id: \.self) { index in
-            if collections[index].isKind(of: PHCollectionList.self) {
-                FolderCategoryView(isHome: isHome,
-                                   stateChangeObject: stateChangeObject,
-                                   currentFolder: isHome ? nil : currentFolder.folder,
-                                   folder: collections[index] as! PHCollectionList,
-                                   selectedCollection: stateChangeObject.collectionToEdit,
-                                   folderToAddCollection: $folderToAddCollection,
-                                   isSelectedTopFolder: $isSelectedTopFolder,
-                                   moveBtnTitle: $moveBtnTitle)
-                .listRowBackground(Color.white)
+    func subFolderLineView(scrollProxy: ScrollViewProxy) -> some View {
+        let topFolders = photoData.folders["topFolder"]?.foldersArray ?? []
+        return ForEach(topFolders, id: \.localIdentifier) { folder in
+            FolderCategoryView(
+                isHome: false,
+                currentFolder: currentParent.phCollectionList,
+                lineFolder: folder,
+                toMoveCollection: objectCellType == .folder ? objectFolder : objectAlbum,
+                isTopFolderSelected: $isTopFolderSelected,
+                folderToAddCollection: $folderToAddCollection,
+                albumToAddPhotos: .constant(nil),
+                inheritedDisable: folder == objectFolder,
+                showAlbumList: false,
+                moveBtnTitle: $moveBtnTitle,
+                scrollProxy: scrollProxy) { selectedFolder in
+//                if folderToAddCollection == nil || folderToAddCollection != selectedFolder {
+//                    folderToAddCollection = selectedFolder
+//                } else {
+//                    folderToAddCollection = nil
+//                }
             }
         }
+    }
+    func chevronDirection(direction: DepthType) -> some View {
+        let image = switch direction {
+        case .current: "chevron.up.circle.fill" // 현재위치
+        case .none: "circle.circle.fill" // 오브젝트 대상
+        case .secondary: "chevron.down.circle.fill" // 하위
+        }
+        let text = switch direction {
+        case .current: "현재 위치"
+        case .none: "이동할 객체"
+        case .secondary: "하위 폴더"
+        }
+        return HStack(spacing: 3) {
+            imageScaledFit(systemName: image, width: 14, height: 14)
+            Text(text)
+                .font(.callout)
+        }
+        .foregroundStyle(.gray.opacity(0.6))
     }
 }
 // MARK: - extension 2. functions
 extension MoveCollectionCategoryView {
-    // [마이 앨범] Tab :  move collection 함수
-    func displaceCollelction(isTopFolder: Bool, folder: PHCollectionList! = nil) {
-        PHPhotoLibrary.shared().performChanges {
-            var addRequest = PHCollectionListChangeRequest()
-            if isTopFolder {
-                let fetchResult = PHCollection.fetchTopLevelUserCollections(with: nil)
-                addRequest = PHCollectionListChangeRequest(forTopLevelCollectionListUserCollections: fetchResult) ?? addRequest
-            } else {
-                let fetchResult = PHCollection.fetchCollections(in: folder, options: nil)
-                addRequest = PHCollectionListChangeRequest(for: folder, childCollections: fetchResult) ?? addRequest
-            }
-            addRequest.addChildCollections([stateChangeObject.collectionToEdit] as NSFastEnumeration)
-        } completionHandler: { success, _ in
-            folderToAddCollection = nil
-            isSelectedTopFolder = false
-        }
-    }
-    // [마이 포토] Tab : 폴더 지정 후 앨범 만들기
-    func addAlbumAtTheFolderWithPhotos() {
-        let folder = isSelectedTopFolder ? Folder(isHome: true) : Folder(folder: folderToAddCollection)
-        let albumName = stateChangeObject.newName == "" ? "새앨범" : stateChangeObject.newName
-        folder.createAlbum(depth: .current, folderToAdd: folder.folder, albumName) { album in
-            if let album = album {
-                self.albumToAdd = Album(album: album)
-                self.isSettedNewAlbum = true
+    var legendView: some View {
+        HStack(spacing: 10) {
+            Spacer()
+            chevronDirection(direction: .current)
+            if objectCellType == .folder {
+                chevronDirection(direction: .none)
+                chevronDirection(direction: .secondary)
             }
         }
+        .padding(.horizontal, 30)
+    }
+    var btnCancelAndClose: some View {
+        Button {
+            moveObject = nil
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                Text("취소")
+                    .foregroundStyle(.black)
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(width: 120, height: 50)
     }
     
-    func addAssetIntoAlbum() {
-        var assetArray: [PHAsset] = []
-        switch currentAlbum.filteringType {
-        case .all: assetArray = currentAlbum.photosArray
-        case .image: assetArray = currentAlbum.photosArray.filter({$0.mediaType == .image})
-        case .video: assetArray = currentAlbum.photosArray.filter({$0.mediaType == .video})
-        }
-        var assets: [PHAsset] = []
-        let indexSet = stateChangeObject.selectedIndexes.sorted(by: { $0 < $1 })
-        for i in indexSet {
-            assets.append(assetArray[i])
-        }
-        
-        DispatchQueue.main.async {
-            albumToAdd.addAsset(assets: assets, stateObject: stateChangeObject)
-            stateChangeObject.selectedIndexes = []
-//            stateChangeObject.assetChanged = true
-            stateChangeObject.assetChanged = .changed
-        }
-    }
-    
-}
-
-// MARK: - 2nd Struct
-struct FolderCategoryView: View {
-    var isHome: Bool
-    @ObservedObject var stateChangeObject: StateChangeObject
-    // 현재 위치
-    var currentFolder: PHCollectionList!
-    // 해당 라인 폴더
-    var folder: PHCollectionList
-    // 이동시킬 앨범/폴더
-    var selectedCollection: PHCollection!
-    // 이동할 목표지로 선택할 폴더
-    @Binding var folderToAddCollection: PHCollectionList!
-    // (폴더 이동의 경우) 이동시킬 폴더의 하위폴더들은 전부 disable 처리
-    var inheritedDisable: Bool = false
-    // 폴더 depth 정보
-    var depthCount = 1
-    
-    @Binding var isSelectedTopFolder: Bool
-    @Binding var moveBtnTitle: String
-    
-    var body: some View {
-        let folderFetchResult = PHCollection.fetchCollections(in: folder, options: nil)
-        if folderFetchResult.objects(at: IndexSet(0..<folderFetchResult.count)).filter({ $0.isKind(of: PHCollectionList.self) }).count != 0 {
-            folderLineView
-            let folderFetchResult = PHCollection.fetchCollections(in: folder, options: nil)
-            ForEach(0..<folderFetchResult.count, id: \.self) { index in
-                if folderFetchResult[index].isKind(of: PHCollectionList.self) {
-                    FolderCategoryView(isHome: isHome,
-                                       stateChangeObject: stateChangeObject,
-                                       currentFolder: currentFolder,
-                                       folder: folderFetchResult[index] as! PHCollectionList,
-                                       selectedCollection: selectedCollection,
-                                       folderToAddCollection: $folderToAddCollection,
-                                       inheritedDisable: isHome ? false : selectedCollection == folder || inheritedDisable,
-                                       depthCount: depthCount + 1,
-                                       isSelectedTopFolder: $isSelectedTopFolder,
-                                       moveBtnTitle: $moveBtnTitle)
+    var btnAddAndClose: some View {
+        let disable = !isTopFolderSelected && folderToAddCollection == nil
+        var tempIndex: Int?
+        return Button {
+            phDataQueue.async {
+                if let destinationFolder = photoData.folders[isTopFolderSelected ? "topFolder" : folderToAddCollection.localIdentifier] {
+                    destinationFolder
+                        .displaceCollelction(
+                            collectionType: objectCellType == .folder ? .folder : .album,
+                            collection: (objectCellType == .folder ? self.objectFolder : self.objectAlbum) as PHCollection) { result in
+                            if result {
+                                if objectCellType == .folder {
+                                    if let index = currentParent.foldersArray.firstIndex(of: objectFolder) {
+                                        tempIndex = index
+                                        dispatchAnimation {
+                                            currentParent.foldersArray.remove(at: index)
+                                        }
+                                        print("제거됨 at: \(currentParent.title) what: \(objectFolder?.localizedTitle ?? "nil")")
+                                    }
+                                } else {
+                                    if let index = currentParent.albumsArray.firstIndex(of: objectAlbum) {
+                                        tempIndex = index
+                                        dispatchAnimation {
+                                            currentParent.albumsArray.remove(at: index)
+                                        }
+                                    }
+                                }
+                                dispatchAnimation {
+                                    currentParent.fetchCollection(needSetting: false)
+                                }
+                            } else {
+                                if let tempIndex = tempIndex {
+                                    if objectCellType == .folder {
+                                        dispatchAnimation {
+                                            currentParent.foldersArray
+                                                .insert(objectFolder, at: tempIndex)
+                                        }
+                                    } else {
+                                        dispatchAnimation {
+                                            currentParent.albumsArray
+                                                .insert(objectAlbum, at: tempIndex)
+                                        }
+                                    }
+                                }
+                            }
+                            self.moveObject = nil
+                    }
+                    // 최근 작업 폴더 저장
+                    DispatchQueue.global(qos: .utility).async {
+                        photoData
+                            .addRecentWorkSpace(id: destinationFolder.id, isAlbum: false)
+                    }
                 }
             }
-        } else {
-            folderLineView
+        } label: {
+            let folder = isTopFolderSelected ? "[최상위] 폴더" : (folderToAddCollection != nil ? folderToAddCollection?.localizedTitle ?? "" : "")
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                FlipViewTransitor(isModeChange: disable) {
+                    VStack {
+                        HStack(spacing: 1) {
+                            Text("\(folder)")
+                                .truncationMode(.middle)
+                                .contentTransition(.numericText())
+                            Text("(으)로")
+                        }
+                        Text("이동하기")
+                    }
+                } flipReverseView: {
+                    Text("폴더를 선택해 주세요.")
+                }
+                .foregroundStyle(disable ? .gray : .white)
+            }
         }
+        .frame(height: 50)
+        .foregroundStyle(disable ? Color.addButton : .blue)
+        .disabled(folderToAddCollection == nil && isTopFolderSelected == false)
+        .animation(.easeOut, value: disable)
     }
     
-    var folderLineView: some View {
-        let collectionType = isHome ? "앨범" : (selectedCollection.isKind(of: PHAssetCollection.self) ? "앨범" : "폴더")
-        let sideText = isHome ? "" : (folder == currentFolder ? "[이동할 \(collectionType)의 현재 위치]" :(selectedCollection == folder ? "[이동할 \(collectionType)]":""))
-        let disable = isHome ? false : (folder == currentFolder || (selectedCollection.isKind(of: PHCollectionList.self) && folder == selectedCollection))
-        return HStack {
-            DepthCircle(count: depthCount)
-            FolderLineView(title: "\(folder.localizedTitle ?? "")", subText: sideText)
+    func getLowerFolders(folder: PHCollectionList) {
+        if let folder = photoData.folders[folder.localIdentifier] {
+            self.lowerFolders
+                .append(contentsOf: folder.foldersArray.map{ $0.localIdentifier })
+            for lower in folder.foldersArray {
+                getLowerFolders(folder: lower)
+            }
         }
-        .listRowBackground(Color.white)
-        .foregroundColor(disable || inheritedDisable ? .disabledColor : (folderToAddCollection == folder ? .selectedColor:.nonSelectedColor))
-        .onTapGesture {
-            folderToAddCollection = folderToAddCollection == folder ? nil : folder
-            isSelectedTopFolder = false
-            let letter = isHome ? "에" : "로"
-            moveBtnTitle = folderToAddCollection == nil ? "" : "[\(folder.localizedTitle ?? "")] 폴더\(letter)"
-        }
-        .disabled(disable || inheritedDisable)
     }
 }

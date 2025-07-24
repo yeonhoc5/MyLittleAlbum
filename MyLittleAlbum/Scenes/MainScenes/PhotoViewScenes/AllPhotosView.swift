@@ -7,41 +7,40 @@
 
 import SwiftUI
 import Photos
-//import PhotosUI // photospicker
 import LocalAuthentication
 
+enum ReLoadingType {
+    case none, initiailFetch, reFetchInside, reFetchOutside
+    case selectedModeChange, selectAll, deselectAll
+    case filterChange, belongingChange, itemChanged
+}
+
 struct AllPhotosView: View {
-    @EnvironmentObject var photoData: PhotoData
-    @StateObject var stateChangeObject = StateChangeObject()
-    @Environment(\.presentationMode) var isPresented: Binding<PresentationMode>
+    @EnvironmentObject var photoData: MLPhotoData
+    @Environment(\.presentationMode) var presentationMode: Binding<PresentationMode>
     @Environment(\.scenePhase) var scenePhase
+    @Environment(\.isPresented) var isPresented
     
+    let imageCachingManger = PHCachingImageManager()
     // 앨범 타입이 album일 경우에만 "피커 버튼" 노출 결정
     var albumType: AlbumType = .album
-    // 보여줄 사진-앨범 프라퍼티 : [나의 앨범]탭에서는 상위에서 부여 / [나의 사진], [사진 관리]탭에서는 본 페이지 진입하여 로딩
-    @State var album: Album!
+    // 보여줄 사진-앨범 프라퍼티 : [나의 앨범]탭에서는 상위에서 부여
+    //                      / [나의 사진], [사진 관리]탭에서는 본 페이지 진입하여 로딩
+    let assetCollection: PHAssetCollection!
+    @State var mlAlbum: MLAlbum!
+    var smartAlbumType: SmartType = .none
     // [나의 사진]탭용 album 세팅용 프라퍼티
+    var isHiddenAsset: Bool
     @State var settingDone: Bool! = true
     // 필터링 1 : ([나의 사진]탭에서만) 전체 / In앨범 / NotIn앨범 필터링
     @State var belongingType: BelongingType = .nonAlbum
     // 필터링 2 : (전체탭) 미디어 타입 필터링
     @State var filteringType: FilteringType = .all
-    @State var filteringTypeChanged: Bool = false
-    // [smartAlbum]탭용 프라퍼티
-    @State var isPrivacy: Bool! = false
-    var smartAlbum: SmartAlbum = .none
-    
-    // 네비게이션 타이틀 (앨범을 여기 넘어와서 로딩할 수 있으므로 album.title을 쓸 수 없음)
-    @State var title = ""
+    // ipad에서 탭바 위치 잡기 위한 뷰 카운팅
     @Binding var isPhotosView: Int
-    
     var nameSpace: Namespace.ID
     // ui에 영향 있는 프라퍼티 -> 바인딩 처리
     @State var edgeToScroll: EdgeToScroll = .none
-    @State var isShowingAlert: Bool = false
-    @State var isShowingSheet: Bool = false
-    @State var isShowingSelectFolderSheet: Bool = false
-    @State var isShowingPhotosPicker: Bool = false
     @State var isShowingShareSheet: Bool = false
     @State var newName: String = ""
     // detail 모드용 프라퍼티
@@ -49,202 +48,247 @@ struct AllPhotosView: View {
     @State var isExpanded: Bool = false
     // asset 선택모드용 프라퍼티
     @State var isSelectMode: Bool = false
-    @State var selectedItemsIndex: [Int] = []
+    @State var selectedItems: [MLAsset] = []
+    @State var refreshItmes: [MLAsset] = []
     @State var isSelectingBySwipe: Bool = false
-    
-    @State var requsetDone: Bool! = false
     // 노크 기능 프라퍼티
+    @State var isReadyHiddenAsset: Bool = false
     @State var showHiddenAssets: Bool = false
-    var isHiddenAssets: Bool = false
+    @State var showEmptyHiddenAsset: Bool = false
+    // 화면 가리기
+    @State var showAuthenticView: Bool = false
+    // 셀 리로드
+    @State var reLoadingType: ReLoadingType = .none
+    @State var showDetailView: Bool = false
     
     var body: some View {
-        ZStack(alignment: device == .phone ? .bottom : .bottomTrailing) {
-            if isPrivacy {
-                // [스마트 앨범]탭용 템프뷰
-                notValidatedView
-                    .onAppear {
-                        DispatchQueue.main
-                            .asyncAfter(deadline: .now() + 0.3) {
-                            authenticate()
-                        }
-                    }
-            } else if settingDone == false {
-                // [나의 사진]탭용 템프뷰
-                RefreshPhotoView()
-                    .task {
-                        if scenePhase != .background {
-                            DispatchQueue.main.async {
-                                readyToShowMyPhotos(type: belongingType)
+        let assetArray = assetArray(albumType: albumType,
+                                    belongingType: belongingType)
+        ZStack {
+            FancyBackground().ignoresSafeArea()
+            GeometryReader { geoProxy in
+                Group {
+                    if mlAlbum == nil {
+                        tempView(geoProxy: geoProxy, onAppear: {
+                            phDataQueue.asyncAfter(
+                                deadline: .now()
+                                + ((albumType == .home || albumType == .picker) ? 0.5 : 0)) {
+                                readyToShowView(albumType: albumType)
                             }
-                        }
-                    }
-            } else {
-                let assetCount = (album?.count ?? 0) == 0
-                if (albumType == .home || albumType == .picker) && assetCount {
-                    AllPhotosAreInAlbumsView()
-                } else {
-                    GeometryReader { geoProxy in
-                        PhotosCollectionView(
-                            stateChangeObject: stateChangeObject,
+                        })
+                    } else {
+                        let columnCount = columnCount(geoProxy: geoProxy)
+                        let cellWidth = (geoProxy.size.width - CGFloat(columnCount - 1))
+                                        / CGFloat(columnCount)
+                        NewPhotosCollectionView(
                             albumType: albumType,
-                            album: album,
-                            hiddenAssets: isHiddenAssets,
-                            edgeToScroll: $edgeToScroll,
-                            filteringTypeChanged: $filteringTypeChanged,
+                            mlAlbum: mlAlbum,
+                            smartAlbumType: smartAlbumType,
+                            isHiddenAssets: isHiddenAsset,
+                            assetArray: assetArray,
+                            filteringType: $filteringType,
+                            geoProxy: geoProxy,
+                            cellWidth: cellWidth,
+                            imageCachingManager: imageCachingManger,
                             isSelectMode: $isSelectMode,
-                            selectedItemsIndex: $selectedItemsIndex,
-                            isShowingPhotosPicker: $isShowingPhotosPicker,
+                            selectedItems: $selectedItems,
+                            refreshItems: $refreshItmes,
                             indexToView: $indexToView,
                             isExpanded: $isExpanded,
-                            insertedIndex: album.insertedIndexPath,
-                            removedIndex: album.removedIndexPath,
-                            changedIndex: album.changedIndexPath,
-                            currentCount: isHiddenAssets
-                                            ? album.hiddenAssetsArray.count
-                                            : album.count,
-                            isSelectingBySwipe: $isSelectingBySwipe,
-                            animationID: nameSpace,
-                            geoProxy: geoProxy)
-                        
-                    }
-                    .navigationDestination(isPresented: $showHiddenAssets) {
-                        AllPhotosView(album: album,
-                                      isPhotosView: $isPhotosView,
-                                      nameSpace: nameSpace,
-                                      isHiddenAssets: true)
-                            .overlay(content: {
-                                if album.hiddenAssetsArray.count == 0 {
-                                    Text("이 앨범에는 가린 항목이 없습니다.")
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                        .padding(.bottom, tabbarHeight + tabbarBottomPadding)
-                                }
-                            })
-                            .onDisappear {
-                                album.hiddenAssetsArray = []
+                            edgeToScroll: $edgeToScroll,
+                            reLoadingType: $reLoadingType)
+                        .overlay(content: {
+                            if isHiddenAsset && assetArray.isEmpty {
+                                emptyHiddenInfoView()
                             }
+                        })
+                        .overlay(alignment: .top, content: {
+                            if showEmptyHiddenAsset {
+                                emptyCapsuleView(size: geoProxy.size, cellWidth: cellWidth)
+                            }
+                        })
+                        .onAppear(perform: {
+                            thumbnailCaching(isStart: true, width: cellWidth)
+                        })
+//                        .onChange(of: presentationMode.wrappedValue.isPresented) { value in
+//                            print("\(mlAlbum.title) [\(isHiddenAsset)] isPresented? : \(value)")
+//                            
+//                        }
+                        .onDisappear(perform: {
+                            if albumType == .album || albumType == .smartAlbum {
+//                                if !PresentationMode.wrappedValue == .isPresented && !showHiddenAssets {
+//                                    DispatchQueue.global(qos: .background).async {
+//                                        print("캐싱 딜리트 [\(mlAlbum.title) \(isHiddenAsset ? " Hidden" : "not Hidden")]")
+//                                        imageCachingManger.stopCachingImagesForAllAssets()
+//                                    }
+//
+//                                }
+                            }
+                        })
                     }
                 }
-                if album != nil {
-                    GeometryReader { geoProxy in
-                        let width = geoProxy.size.width
-                        let spacerWidth = device == .phone ? 0
-                                    : ((width / 4) + (5 * tabbarTopPadding))
-                        HStack {
-                            if device != .phone {
-                                Rectangle()
-                                    .fill(.clear)
-                                    .frame(width: spacerWidth)
-                            }
-                            PhotosGridMenu(stateChangeObject: stateChangeObject,
-                                           albumType: albumType,
-                                           album: album,
-                                           smartAlbumType: smartAlbum,
-                                           isHiddenAssets: isHiddenAssets,
-                                           settingDone: $settingDone,
-                                           belongingType: $belongingType,
-                                           filteringType: $filteringType,
-                                           filteringTypeChanged: $filteringTypeChanged,
-                                           isSelectMode: $isSelectMode,
-                                           selectedItemsIndex: $selectedItemsIndex,
-                                           edgeToScroll: $edgeToScroll,
-                                           isShowingSheet: $isShowingSheet,
-                                           isShowingShareSheet: $isShowingShareSheet,
-                                           isShowingPhotosPicker: $isShowingPhotosPicker,
-                                           nameSpace: nameSpace,
-                                           width: width - spacerWidth)
-                        }
-                        .frame(width: geoProxy.size.width)
-                        .opacity(photoData.isShowingDigitalShow ? 0 : 1)
-                        .onAppear {
-                            if device != .phone {
-                                withAnimation {
-                                    isPhotosView += 1
-                                }
-                            }
-                        }
-                        .onDisappear {
-                            if device != .phone {
-                                withAnimation {
-                                    isPhotosView -= 1
-                                }
-                            }
+                .overlay(alignment: .bottom, content: {
+                    photosGridMenu(assetArray: assetArray,
+                                   filteringType: filteringType,
+                                   width: geoProxy.size.width)
+                })
+                .padding(.bottom, (device == .pad || albumType == .picker)
+                         ? 5 : tabbarHeight - (safeAraBottom ?? 0))
+                .onChange(of: geoProxy.size.width) { _  in
+                    if device == .pad {
+                        DispatchQueue.main.async {
+                            reLoadingType = .reFetchOutside
                         }
                     }
-                    .padding(.horizontal,
-                             device == .phone ? tabbarTopPadding : 0)
-                    .padding(.trailing, device == .phone ? 0 : tabbarBottomPadding)
-                    .frame(height: tabbarHeight)
-                    .opacity(stateChangeObject.isShowingAlert || isShowingPhotosPicker ? 0 : 1)
-                    .padding(.bottom, device == .phone ?
-                             tabbarHeight
-                             + tabbarTopPadding
-                             + tabbarBottomPadding : tabbarBottomPadding)
+                }
+    //            }
+                // 가려진 사진 - 인증 화면
+    //            if album.isHidden {
+    //                viewWithTask(notValidatedView) {
+    //                    DispatchQueue.main
+    //                        .asyncAfter(deadline: .now() + 0.7) {
+    //                            authenticate(albumType: albumType)
+    //                        }
+    //                }
+    //            }
+            }
+        }
+        .ignoresSafeArea(.keyboard)
+//        .edgesIgnoringSafeArea(.horizontal)
+        .fullScreenCover(isPresented: $isExpanded, content: {
+            let assetArray = assetArray
+                .filter {
+                    return switch filteringType {
+                    case .all: true
+                    case .favorite: $0.isFavorite
+                    default: FilteringType
+                            .trueType(type: self.filteringType) == $0.mediaType
+                    }
+                }
+            PhotosDetailView(albumType: self.albumType,
+                             assetCollection: self.assetCollection,
+                             isHiddenAssets: self.isHiddenAsset,
+                             assetArray: assetArray,
+                             indexToView: $indexToView,
+                             isExpanded: $isExpanded,
+                             animationID: nameSpace,
+                             reLoadingType: $reLoadingType,
+                             selectedItems: $selectedItems)
+        })
+        .onDisappear(perform: {
+            DispatchQueue.global(qos: .default).async {
+                if albumType != .smartAlbum {
+                    mlAlbum = nil
+                }
+            }
+        })
+        .onReceive(NotificationCenter.default
+            .publisher(for: .outsideFetchChange), perform: { object in
+                if reLoadingType != .reFetchOutside {
+                    guard let mlAlbum = mlAlbum else { return }
+                    if mlAlbum.id == object.object as? String {
+                        print("\(mlAlbum.title) outter fetch Recieved")
+                        DispatchQueue.main.async {
+                            reLoadingType = .reFetchOutside
+                        }
+                    }
+                }
+            })
+        .onReceive(NotificationCenter.default
+            .publisher(for: .innerFetchChange), perform: { object in
+                if reLoadingType != .reFetchInside {
+                    guard let mlAlbum = mlAlbum else { return }
+                    if mlAlbum.id == object.object as? String {
+                        print("\(mlAlbum.title) innerfetch Recieved")
+                        DispatchQueue.main.async {
+                            reLoadingType = .reFetchInside
+                        }
+                    }
+                }
+        })
+        .onReceive(NotificationCenter.default
+            .publisher(for: .collectionRemoved), perform: { object in
+                guard let assetCollection = object.object as? PHAssetCollection
+                else { return }
+                if assetCollection.localIdentifier == mlAlbum.id {
+                    dispatchAnimation {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            })
+        .onReceive(NotificationCenter.default
+            .publisher(for: .itemChanged), perform: { output in
+                guard let object = output.object as? ItemChangedView else { return }
+//                if object.id != "elsewhere" {
+//                    guard object.id == self.mlAlbum?.id else { return }
+//                }
+                self.refreshItmes = assetArray.filter({ object.items.contains($0.id) })
+                if !refreshItmes.isEmpty {
+                    dispatchAnimation {
+                        reLoadingType = .itemChanged
+                    }
+                }
+        })
+        .onReceive(NotificationCenter.default
+            .publisher(for: .itemChanged), perform: { output in
+                guard let object = output.object as? ItemChangedView,
+                      object.id == self.mlAlbum?.id else { return }
+                print("Got notice at \(mlAlbum?.title ?? "home")")
+                self.refreshItmes = assetArray.filter({ object.items.contains($0.id) })
+                if !refreshItmes.isEmpty {
+                    dispatchAnimation {
+                        reLoadingType = .itemChanged
+                    }
+                }
+        })
+        .navigationDestination(isPresented: $showHiddenAssets) {
+            AllPhotosView(albumType: albumType,
+                          assetCollection: assetCollection,
+                          mlAlbum: mlAlbum,
+                          smartAlbumType: smartAlbumType,
+                          isHiddenAsset: true,
+                          isPhotosView: $isPhotosView,
+                          nameSpace: nameSpace)
+            .onDisappear {
+                mlAlbum.unSetHiddenAssets {
+                    print("hiddenAssets Removed")
                 }
             }
         }
-        .overlay(content: {
-            if photoData.isShowingDigitalShow {
-                RoundedRectangle(cornerRadius: 20.0)
-                    .fill(.ultraThinMaterial)
-                    .ignoresSafeArea()
-                    .matchedGeometryEffect(id: "digitalShow", in: nameSpace)
-            }
-        })
-        .ignoresSafeArea()
         .onAppear(perform: {
-            newName = album != nil ? album.title : ""
+            guard let mlAlbum = mlAlbum else { return }
+            newName = mlAlbum.title
         })
         .onDisappear {
-            if albumType != .home {
-                discardImageCaching()
-                self.filteringType = .all
-                if let album = album {
-                    album.filteringType = .all
-                }
-            }
+//            DispatchQueue
+//                .global(qos: .userInteractive)
+//                .async {
+//                    discardImageCaching()
+//                    if album.isHidden {
+//                        album.hiddenArray = []
+//                        album.isHidden = false
+//                        print("hidden Scene End")
+//                    }
+//                }
+//            if albumType != .home {
+//                self.filteringType = .all
+//                if let album = album {
+//                    album.filteringType = .all
+//                }
+//            }
         }
         .onChange(of: scenePhase, perform: { value in
-            if isHiddenAssets || albumType == .smartAlbum {
-                if value == .background {
-                    isPrivacy = true
-                }
-            }
+//            if album.isHidden {
+//                if value == .background {
+//                    showAuthenticView = true
+//                }
+//            }
         })
-        .onChange(of: self.belongingType, perform: { value in
-            self.settingDone = false
-            readyToShowMyPhotos(type: value)
-        })
-        .onChange(of: isExpanded, perform: { bool in
-            if !bool {
-                stateChangeObject.isSlideShowEnded = true
-            }
-        })
-        .onChange(of: !isHiddenAssets 
-                      ? album?.count ?? 0
-                      : album.hiddenAssetsArray.count,
-                  perform: { newValue in
-            DispatchQueue.main.async {
-                if let album = album {
-                    withAnimation {
-                        if albumType == .home {
-                            if settingDone  {
-                                stateChangeObject.assetChanged = .completed
-                            } else if album.count < newValue! {
-                                stateChangeObject.assetChanged = .done
-                            }
-                        } else if albumType == .smartAlbum {
-                            if isPrivacy {
-                                stateChangeObject.assetChanged = .completed
-                            }
-                        } else if albumType == .album {
-                            stateChangeObject.assetChanged = .completed
-                        } else {
-                            stateChangeObject.assetChanged = .done
-                        }
-                    }
-                }
-            }
-        })
+//        .onChange(of: self.belongingType, perform: { value in
+//            withAnimation {
+//                self.settingDone = false
+//            }
+//        })
         .gesture(DragGesture(minimumDistance: 10, coordinateSpace: .global)
             .onChanged({ value in
                 if isSelectMode {
@@ -253,122 +297,115 @@ struct AllPhotosView: View {
             })
             .onEnded({ value in
                 if value.translation.width > 50 && !self.isSelectMode{
-                    isPresented.wrappedValue.dismiss()
+                    presentationMode.wrappedValue.dismiss()
                 }
                 if self.isSelectingBySwipe {
                     self.isSelectingBySwipe = false
                 }
             }))
-        .fullScreenCover(isPresented: $isExpanded, content: {
-            let assetArray = (!isExpanded ? [] 
-                              : (!isHiddenAssets ? album.photosArray : album.hiddenAssetsArray)
-            )
-                .filter {
-                self.filteringType == .all ? true : (
-                    $0.mediaType == FilteringType.trueType(type: self.filteringType)
-                )
-            }
-            PhotosDetailView(assetArray: assetArray,
-                             indexToView: $indexToView,
-                             isExpanded: $isExpanded,
-                             navigationTitle: "")
-        })
-        .sheet(isPresented: $isShowingSheet) {
-            if albumType == .home || albumType == .album {
-                NavigationView {
-                    if album != nil {
-                        MoveAssetCategoryView(isShowingSheet: $isShowingSheet,
-                                              isShowingSelectFolderSheet: $isShowingSelectFolderSheet,
-                                              stateChangeObject: stateChangeObject,
-                                              albumType: albumType,
-                                              currentAlbum: album,
-                                              isHiddenAssets: isHiddenAssets,
-                                              selectedItemsIndex: $selectedItemsIndex,
-                                              isSelectMode: $isSelectMode)
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $isShowingSelectFolderSheet) {
-            if albumType == .home || albumType == .album {
-                MoveCollectionCategoryView(isHome: true,
-                                           isShowingSheet: $isShowingSelectFolderSheet,
-                                           currentFolder: .constant(nil),
-                                           currentAlbum: album,
-                                           stateChangeObject: stateChangeObject)
-            }
-        }
-        .sheet(isPresented: $isShowingPhotosPicker) {
-            if albumType == .album {
-                GeometryReader { geoProxy in
-                    CustomPhotosPicker(isShowingPhotosPicker: $isShowingPhotosPicker,
-                                       stateChangeObject: stateChangeObject,
-                                       size: geoProxy.size,
-                                       albumToEdit: album)
-                }
-            }
-        }
-        .overlay(content: {
-            if stateChangeObject.assetChanged != .done {
-                CustomProgressView(stateChangeObject: stateChangeObject)
-            }
-        })
+//            .overlay(content: {
+//                if showAuthenticView {
+//                    notValidatedView
+//                        .task {
+//                            DispatchQueue.main
+//                                .asyncAfter(deadline: .now() + 0.7) {
+////                                    authenticate(albumType: albumType)
+//                                    authenticate(albumType: albumType) { bool in
+//                                        
+//                                    }
+//                                }
+//                        }
+//                }
+//            })
+//        })
         .navigationBarHidden(albumType == .home)
-        .navigationTitle("\(isHiddenAssets ? "🫣" : "")\(album?.title ?? "")\(isHiddenAssets ? "🫣" : "")")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(content: {
-            if albumType == .album{
-                if !showHiddenAssets {
-                    ToolbarItem(id: "toctoctoc", placement: .topBarTrailing) {
-                        Rectangle()
-                            .frame(width: 50, height: 40)
-                            .foregroundStyle(Color.fancyBackground)
-                            .onTapGesture(count: 3) {
-                                if photoData.useKnock {
-                                    withAnimation {
-                                        authenticate()
-                                    }
-                                }
-                            }
-                    }
-                } else {
-                    ToolbarItem(id: "toctoctoc", placement: .topBarTrailing) {
-                        Text("가려진 사진 닫기")
-                            .frame(width: 50, height: 40)
-                            .foregroundStyle(Color.fancyBackground)
-                            .onTapGesture(count: 1) {
-                                withAnimation {
-                                    showHiddenAssets = false
-                                }
-                            }
-                    }
+            if (albumType == .album || albumType == .smartAlbum) && !isHiddenAsset {
+                ToolbarItem(id: "knockx3", placement: .topBarTrailing) {
+                    knockHiddenAsset
                 }
             }
-        })
-        .background { FancyBackground() }
-        .edgesIgnoringSafeArea(.trailing)
-        .alert(stateChangeObject.editType == .add ? "선택한 \(selectedItemsIndex.count)개의 항목을\n이 앨범에서 빼냅니다." : "",
-               isPresented: $stateChangeObject.isShowingAlert, actions: {
-            if stateChangeObject.editType == .modify {
-                TextField("변경할 앨범 이름을 입력하세요.", text: $newName)
-                btnCancel()
-                btnModifyTitle()
-            } else if stateChangeObject.editType == .add {
-                btnCancel()
-                btnRomoveAssetFromAlbum()
-            }
-        }, message: {
-            if stateChangeObject.editType == .modify {
-                Text("[\(album.title)]의 이름을 변경합니다.")
-            } else if stateChangeObject.editType == .add {
-                Text("\n항목은 [나의 포토] 탭에서 찾을 수 있습니다.")
+            ToolbarItem(placement: .principal) {
+                getNavigationTitle(albumType: albumType)
             }
         })
+//        .edgesIgnoringSafeArea(.trailing) // 패드
     }
 }
 
 // MARK: - 1. extenstion. subviews
 extension AllPhotosView {
+    func tempView(geoProxy: GeometryProxy, onAppear: @escaping () -> Void) -> some View {
+        Group {
+            switch albumType {
+            case .album: FancyBackground()
+            default: // home / Picker에서 사용
+                lottieLoadingView(
+                    lottie: "photoLoading",
+                    size: CGSize(width: geoProxy.size.width / 3,
+                                 height: geoProxy.size.height / 1.2),
+                    leadingPadding: 0)
+                .frame(width: geoProxy.size.width)
+            }
+        }
+        .onAppear { onAppear() }
+    }
+    func photosGridMenu(assetArray: [MLAsset],
+                        filteringType: FilteringType,
+                        width: CGFloat) -> some View {
+        let spacerWidth = device == .phone
+                        ? 0 : ((width / 3) + (5 * tabbarTopPadding))
+        return HStack {
+            if device == .pad {
+                Rectangle()
+                    .fill(.clear)
+                    .frame(width: spacerWidth)
+            }
+            if let mlAlbum = mlAlbum {
+                PhotosGridMenu(
+//                    pickerObject: .constant(nil),
+                    albumType: albumType,
+                    smartAlbumType: smartAlbumType,
+                    mlAlbum: mlAlbum,
+                    isHiddenAssets: isHiddenAsset,
+                    cachingimageManager: imageCachingManger,
+                    assetArray: assetArray,
+                    belongingType: $belongingType,
+                    filteringType: $filteringType,
+                    isSelectMode: $isSelectMode,
+                    selectedItems: $selectedItems,
+                    refreshItems: $refreshItmes,
+                    edgeToScroll: $edgeToScroll,
+                    isShowingShareSheet: $isShowingShareSheet,
+                    isShowingPhotosPicker: .constant(false),
+                    nameSpace: nameSpace,
+                    width: width - spacerWidth,
+                    reloadingType: $reLoadingType,
+                    isReadyHiddenAsset: isReadyHiddenAsset)
+//            .frame(width: width)
+//            .opacity(photoData.isShowingDigitalShow ? 0 : 1)
+                .onAppear {
+                    withAnimation {
+                        isPhotosView += device != .phone ? 1 : 0
+                    }
+                }
+                .onDisappear {
+                    withAnimation {
+                        isPhotosView -= device != .phone ? 1 : 0
+                    }
+                }
+            } else {
+                EmptyView()
+            }
+        }
+        .frame(height: tabbarHeight)
+        .padding(.horizontal,
+                 device == .phone ? tabbarTopPadding : 0)
+        .padding(.trailing, tabbarBottomPadding)
+        .padding(.bottom, device == .phone ? tabbarTopPadding : 0)
+    }
+    
     var notValidatedView: some View {
         Rectangle()
             .foregroundColor(.fancyBackground)
@@ -376,188 +413,439 @@ extension AllPhotosView {
                 VStack(spacing: 20) {
                     Text("이 사진들을 보려면 사용자 권한이 필요합니다.")
                         .foregroundColor(.gray)
-                    imageScaledFit(systemName: "faceid", width: 80, height: 80)
-                        .foregroundColor(.gray)
-                        .padding(50)
+                    btnFaceID
                         .onTapGesture {
-                            authenticate()
+                            authenticate(albumType: albumType) { bool in
+                                if bool {
+                                    returnHiddenAssets(albumType: albumType)
+                                }
+                            }
                         }
-                    Button("설정하러 가기") {
-                        UIApplication.shared.open(URL(string: "app-settings:root=Privacy")!)
+                    Button("FaceID 사용 설정하러 가기") {
+                        UIApplication.shared
+                            .open(URL(string: "app-settings:root=Privacy")!)
                     }
                 }
             }
             .ignoresSafeArea()
     }
     
-    func btnCancel() -> some View {
-        Button {
-            resetEditStatus()
-            newName = album.title
-        } label: {
-            Text("취소")
-        }
-    }
-    func btnModifyTitle() -> some View {
-        Button {
-            album.modifyAlbumTitle(newName: newName)
-            self.title = album.title
-            resetEditStatus()
-        } label: {
-            Text("저장하기")
-        }
+    var btnFaceID: some View {
+        imageScaledFit(systemName: "faceid", width: 80, height: 80)
+            .padding(40)
+            .overlay(alignment: .topTrailing) {
+                Text("Touch")
+                    .font(.system(size: 10, weight: .regular))
+                    .padding(8)
+                    .background {
+                        Image(systemName: "bubble.left")
+                            .resizable()
+                            .fontWeight(.ultraLight)
+                            .offset(x: 0, y: 3)
+                    }
+                    .offset(x: 0, y: 0)
+                    .opacity(0.7)
+            }
+            .foregroundColor(.gray)
     }
     
-    func btnRomoveAssetFromAlbum() -> some View {
-        Button("앨범에서 빼기") {
-            album.removeAssetFromAlbum(indexSet: selectedItemsIndex,
-                                       isHidden: isHiddenAssets)
-            resetEditStatus()
-            withAnimation {
-                stateChangeObject.assetChanged = .changed
+    var knockHiddenAsset: some View {
+        Rectangle()
+            .frame(width: 50, height: 40)
+            .foregroundStyle(Color.fancyBackground)
+            .onTapGesture(count: 3) {
+                if photoData.useKnock {
+                    authenticate(albumType: albumType) { bool in
+                        if bool {
+                            returnHiddenAssets(albumType: albumType)
+                        }
+                    }
+                }
             }
-        }
     }
 }
 
 // MARK: - 2. extenstion. functions
 extension AllPhotosView {
+    func columnCount(geoProxy: GeometryProxy) -> Int {
+        device == .phone
+            ? cellCount(type: .small)
+            : (albumType == .picker
+                ? cellCount(type: .middel2)
+                : (geoProxy.size.width > geoProxy.size.height
+                   ? cellCount(type: .big)
+                   : cellCount(type: .middle1)
+                  )
+            )
+    }
+//    func authenticate(albumType: AlbumType) {
+//        let context = LAContext()
+//        var error: NSError?
+//        if context
+//            .canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
+//                               error: &error) {
+//            let reason = "We need to unlock your data."
+//            context
+//                .evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
+//                                localizedReason: reason) { success, authenticationError in
+//                if success {
+//                    album.setHiddenAsset { int in
+//                        returnHiddenAssets(albumType: albumType)
+//                    }
+////                    returnHiddenAssets(albumType: albumType)
+////                    DispatchQueue.main.async {
+////                        album.isHidden = true
+////                    }
+//                }
+//            }
+//        } else {
+//            let reason = "We need to unlock your data."
+//            context.evaluatePolicy(.deviceOwnerAuthentication,
+//                                   localizedReason: reason) { success, authenticationError in
+//                if success {
+//                    returnHiddenAssets(albumType: albumType)
+//                }
+//            }
+//        }
+//    }
     
-    func authenticate() {
-        let context = LAContext()
-        var error: NSError?
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            let reason = "We need to unlock your data."
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-                                   localizedReason: reason) { success, authenticationError in
-                if success {
-                    if albumType == .album {
-                        DispatchQueue.main.async {
-                            self.album.fetchOnlyHiddenAssets()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                self.showHiddenAssets = true
+    func returnHiddenAssets(albumType: AlbumType) {
+        guard let mlAlbum = mlAlbum else { return }
+        mlAlbum.setHiddenAsset { count in
+            if count == 0 {
+                withAnimation(Animation.easeInOut(duration: 0.5), {
+                    self.showEmptyHiddenAsset = true
+                })
+            } else {
+                withAnimation {
+                    isReadyHiddenAsset = true
+                }
+//                dispatchAnimation {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    mlAlbum.generateArray(isHiddenAsset: true) {
+                        dispatchAnimation {
+                            self.showHiddenAssets = true
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                            withAnimation {
+                                self.isReadyHiddenAsset = false
                             }
                         }
+                    }
+//                    }
+                }
+//                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+//                    
+//                }
+            }
+        }
+    }
+    
+    func getNavigationTitle(albumType: AlbumType) -> some View {
+        let title = switch albumType {
+        case .home, .picker: "나의 사진"
+        case .smartAlbum, .album:
+            mlAlbum != nil ? "\(self.isHiddenAsset ? "🫣" : "")\(mlAlbum.title)" : " "
+        }
+        return Text(title == "" ? "(No Title)" : title )
+            .contentTransition(.numericText())
+            .foregroundStyle(title == "" ? .gray : .white)
+    }
+    
+//    func readyToShowSmartAlbum(smart: SmartAlbum, result: @escaping (MLAlbum) -> Void) {
+//        var album: MLAlbum!
+//        switch smart.type {
+//        case .smartAlbumFavorites:
+//            album = MLAlbum(smartType: smart.type,
+//                             title: smart.title,
+//                             isHidden: smart.isPrivacy)
+//        case .trashCan:
+//            let fetchOptions = PHFetchOptions()
+//            fetchOptions.includeHiddenAssets = true
+//            fetchOptions.wantsIncrementalChangeDetails = true
+//            let smartAlbums = PHAssetCollection
+//                .fetchAssetCollections(with: .smartAlbum, subtype: .albumRegular, options: fetchOptions)
+//            let titles = smartAlbums.objects(at: IndexSet(0..<smartAlbums.count))
+//                .compactMap { $0.localizedTitle }
+//            if let trashCan = smartAlbums
+//                .objects(at: IndexSet(0..<smartAlbums.count))
+//                .filter({$0.localizedTitle == "Recently Deleted"})
+//                .first {
+//                    album = Album(album: trashCan,
+//                                      title: "최근 삭제한 사진",
+//                                      colorIndex: 0,
+//                                      isHidden: true)
+//            }
+//        case .smartAlbumAllHidden:
+//            album = MLAlbum(smartType: smart.type,
+//                             title: smart.title,
+//                             isHidden: smart.isPrivacy)
+//        default: break
+//        }
+//        result(album)
+//    }
+    
+    func thumbnailCaching(isStart: Bool, width: CGFloat) {
+        guard let mlAlbum = mlAlbum else { return }
+        print("캐싱 \(isStart ? "시작" : "지우기") [\(mlAlbum.title) \(isHiddenAsset ? "HiddenAsset" : "not HiddenAsset")]")
+        let requestOptions = PHImageRequestOptions()
+        requestOptions.deliveryMode = .fastFormat
+        requestOptions.isSynchronous = true
+        requestOptions.isNetworkAccessAllowed = true
+        phImageQueue.async {
+            let objects = (!isHiddenAsset ? mlAlbum.photosArray : mlAlbum.hiddenArray)
+                .compactMap { $0.phAsset }
+                    if isStart {
+                        imageCachingManger
+                            .startCachingImages(
+                                for: objects,
+                                targetSize: CGSize(width: width, height: width),
+                                contentMode: .aspectFill,
+                                options: requestOptions)
                     } else {
-                        readyToShowSmartAlbum()
+                        DispatchQueue.global(qos: .background).async {
+                            imageCachingManger
+                                .stopCachingImages(
+                                    for: objects,
+                                    targetSize: CGSize(width: width, height: width),
+                                    contentMode: .aspectFill,
+                                    options: requestOptions)
+                        }
+                    }
+        }
+    }
+    func emptyHiddenInfoView() -> some View {
+        VStack(spacing: 20) {
+            Text("이 \(albumType == .smartAlbum ? "기기" : "앨범")에는 가린 항목이 없습니다.")
+            .foregroundStyle(.gray)
+            if albumType == .smartAlbum {
+                Button {
+                    dispatchAnimation {
+                        NotificationCenter.default
+                            .post(name: .showInfoView,
+                                  object: Info.hiddenAssets)
+                    }
+                } label: {
+                    Rectangle()
+                        .foregroundStyle(Color.fancyBackground)
+                        .frame(width: 70, height: 70)
+                        .overlay {
+                            imageScaledFit(
+                                systemName: "info.circle.fill",
+                                width: 40,
+                                height: 40)
+                                .foregroundStyle(.blue)
+                                .fontWeight(.thin)
+                        }
+                }
+            }
+        }
+        .offset(y: -tabbarHeight / 2 + tabbarTopPadding)
+    }
+    
+    func viewWithTask(_ view: some View,
+                      condition: Bool! = true,
+                      task: @escaping () -> Void) -> some View {
+        return view
+            .task { if condition { task() } }
+    }
+    
+    func emptyCapsuleView(size: CGSize, cellWidth: CGFloat) -> some View {
+        ZStack {
+            Capsule()
+                .fill(.thinMaterial)
+            HStack {
+                Text("\(albumType == .album ? "이 앨범에는 " : "")가린 항목이 없습니다.")
+                Button {
+                    dispatchAnimation {
+                        NotificationCenter.default
+                            .post(name: .showInfoView,
+                                  object: Info.hiddenAssets)
+                    }
+                } label: {
+                    ZStack {
+                        imageScaledFit(
+                            systemName: "info.circle.fill",
+                            width: 20,
+                            height: 20)
+                    }
+                    .frame(width: 20, height: 20)
+                }
+            }
+        }
+        .frame(height: navigationbarHeight + 10)
+        .frame(maxWidth: device == .phone ? .infinity : widthLimit)
+        .padding(.horizontal, 10)
+        .offset(y: ((cellWidth - navigationbarHeight) / 2) - 5)
+        .transition(.move(edge: .top))
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation {
+                    showEmptyHiddenAsset = false
+                }
+            }
+        }
+    }
+    
+    func readyToShowView(albumType: AlbumType = .album) {
+        switch albumType {
+        case .home, .picker:
+            if let allPhotos = photoData.homeAlbum {
+                print("ok i find the home")
+                if allPhotos.fetchResult.count != allPhotos.photosArray.count {
+                    allPhotos.generateArray(isHiddenAsset: false) {
+                        dispatchAnimation {
+                            self.mlAlbum = allPhotos
+                        }
+                    }
+                } else {
+                    dispatchAnimation {
+                        self.mlAlbum = allPhotos
+                    }
+                }
+            } else {
+                print("no there is no home. i'll set. wait")
+                let allPhotos = MLAlbum(isHome: true)
+                allPhotos.generateArray(isHiddenAsset: false) {
+                    dispatchAnimation {
+                        photoData.homeAlbum = allPhotos
+                        self.mlAlbum = allPhotos
                     }
                 }
             }
-        } else {
-            let reason = "We need to unlock your data."
-            context.evaluatePolicy(.deviceOwnerAuthentication,
-                                   localizedReason: reason) { success, authenticationError in
-                if success {
-                    if albumType == .album {
-                        album.fetchOnlyHiddenAssets()
-                        showHiddenAssets = true
-                    } else {
-                        readyToShowSmartAlbum()
+        case .album:
+            guard let album = photoData.albums[assetCollection?.localIdentifier ?? ""]
+            else { return }
+            if album.fetchResult.count != album.photosArray.count {
+                album.generateArray(isHiddenAsset: false) {
+                    dispatchAnimation {
+                        self.mlAlbum = album
                     }
                 }
-            }
-        }
-    }
-    
-    func readyToShowSmartAlbum() {
-        if albumType == .smartAlbum {
-            let fetchOptions = PHFetchOptions()
-            fetchOptions.includeHiddenAssets = true
-            fetchOptions.wantsIncrementalChangeDetails = true
-            switch smartAlbum {
-            case .none: break
-            case .trashCan:
-                let smartAlbums = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .albumRegular, options: fetchOptions)
-                if let trashCan = smartAlbums.objects(at: IndexSet(0..<smartAlbums.count)).filter({$0.localizedTitle == "Recently Deleted"}).first {
-                    self.album = Album(album: trashCan, title: "최근 삭제한 사진", colorIndex: 0)
-                }
-            case .hiddenAsset:
-                if let hiddenAlbum = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .smartAlbumAllHidden, options: fetchOptions).firstObject {
-                    self.album = Album(album: hiddenAlbum, title: "가린 사진", colorIndex: 0)
+            } else {
+                dispatchAnimation {
+                    self.mlAlbum = album
                 }
             }
-        }
-        withAnimation {
-            isPrivacy = false
+        default: break
         }
     }
     
-    func readyToShowMyPhotos(type: BelongingType) {
-        if albumType == .home {
-            switch type {
-            case .nonAlbum:
-                self.album = Album(assetArray: photoData.photosArrayNotInAnyAlbum,
-                                   title: "앨범 없는 사진함",
-                                   belongingType: .nonAlbum,
-                                   allPhotos: photoData.allPhotos,
-                                   albumsInAllLevels: photoData.albumsInAllLevels,
-                                   arrayAllAlbumFetchResutl: photoData.albumFetchResultArray)
-            case .album:
-                self.album = Album(assetArray: photoData.allPhotosArrayInAllAlbum,
-                                   title: "앨범 있는 사진함",
-                                   belongingType: .album,
-                                   albumsInAllLevels: photoData.albumsInAllLevels,
-                                   arrayAllAlbumFetchResutl: photoData.albumFetchResultArray)
-            default:
-                self.album = Album(assetArray: photoData.allPhotosArray,
-                                   title: "모든 사진함",
-                                   belongingType: .all,
-                                   allPhotos: photoData.allPhotos)
-            }
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            withAnimation {
-                settingDone = true
-            }
-        }
-    }
-    
-    func resetEditStatus() {
-        DispatchQueue.main.async {
-            stateChangeObject.isShowingAlert = false
-            stateChangeObject.editType = .none
-            stateChangeObject.collectionType = .none
-            stateChangeObject.pressedType = .none
-            stateChangeObject.depthType = .none
-            stateChangeObject.collectionToEdit = nil
-            stateChangeObject.isShowingMenu = false
-        }
-    }
-    
-    func discardImageCaching() {
-        print("캐싱 지우기")
-        DispatchQueue.main.async {
-            // 이미지 캐싱 데이터 지우기
-            let imageManger = PHCachingImageManager()
-            imageManger.stopCachingImagesForAllAssets()
-            // 다른 탭으로 이동 시 포토그리드 뷰 벗어나기
-//            isPresented.wrappedValue.dismiss()
-        }
-    }
-    
-    func changeRefreshViewForReducingMemory(type: AlbumType, 
-                                            scenePhase: ScenePhase) {
-        if scenePhase == .background {
-            if type == .home {
-                self.settingDone = false
-                self.album = nil
-                self.filteringType = .all
-            } else if type == .smartAlbum {
-                self.isPrivacy = true
-                self.album = nil
-                self.filteringType = .all
-            }
-        }
-    }
+    func assetArray(albumType: AlbumType,
+                   belongingType: BelongingType) -> [MLAsset] {
+       let assetArray = switch albumType {
+       case .album, .smartAlbum:
+           !isHiddenAsset ? mlAlbum?.photosArray : mlAlbum?.hiddenArray
+       case .home, .picker:
+           switch belongingType {
+           case .all:
+               mlAlbum?.photosArray
+           case .nonAlbum:
+               mlAlbum?.subtractingArray(
+                        isHiddenAsset: false,
+                        subtracting: Array(photoData.albumsPhotosSet()))
+                    .sorted(by: { $0.creationDate < $1.creationDate })
+           case .album:
+               mlAlbum?.intersectingArray(
+                        isHiddenAsset: false,
+                        intersecting: Array(photoData.albumsPhotosSet()))
+                    .sorted(by: { $0.creationDate < $1.creationDate })
+           }
+       }
+       return assetArray ?? []
+   }
 }
 
 struct AllPhotosView_Previews: PreviewProvider {
     static var previews: some View {
-        AllPhotosView(stateChangeObject: StateChangeObject(),
-                      album: Album(assetArray: [], title: "샘플"),
-                      title: "마이 리틀 앨범",
+        AllPhotosView(assetCollection: .init(),
+                      mlAlbum: MLAlbum(sampleID: 0, sampleCase: .none),
+                      isHiddenAsset: false,
                       isPhotosView: .constant(0),
                       nameSpace: Namespace().wrappedValue)
-        .environmentObject(PhotoData())
+        .environmentObject(MLPhotoData())
+    }
+}
+
+extension View {
+    func heroFullScreenCover<Content: View>(
+        showDetailView: Binding<Bool>,
+        content: @escaping () -> Content) -> some View {
+            self
+                .modifier(HelperHeroView(show: showDetailView, overlay: content()))
+    }
+    
+    @ViewBuilder
+    func sheroFullScreenCover<Content: View>(
+        showDetailview: Binding<Bool>,
+        @ViewBuilder content: @escaping () -> Content) -> some View {
+            self
+                .modifier(HelperHeroView(show: showDetailview, overlay: content()))
+    }
+}
+
+fileprivate struct  HelperHeroView<Overlay: View>: ViewModifier {
+    @Binding var show: Bool
+    var overlay: Overlay
+    
+    @State private var hostView: UIHostingController<Overlay>?
+    @State private var parentController: UIViewController?
+    
+    func body(content: Content) -> some View {
+        content
+            .background(content: {
+                ExtractSwiftUIParentController(content: overlay,
+                                               hostView: $hostView) { viewController in
+                    parentController = viewController
+                }
+            })
+            .onAppear {
+                hostView = UIHostingController(rootView: overlay)
+            }
+            .onChange(of: show) { newValue in
+                if newValue {
+                    if let hostView {
+                        hostView.modalPresentationStyle = .overFullScreen
+                        hostView.modalTransitionStyle = .crossDissolve
+                        hostView.view.backgroundColor = .clear
+                        
+                        parentController?.present(hostView, animated: false)
+                    }
+                } else {
+                    hostView?.dismiss(animated: false)
+                }
+            }
+    }
+}
+
+
+fileprivate struct ExtractSwiftUIParentController<Content: View>: UIViewRepresentable {
+    
+    var content: Content
+    @Binding var hostView: UIHostingController<Content>?
+    var parentController: (UIViewController?) -> ()
+    
+    func makeUIView(context: Context) -> UIView {
+        return UIView()
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {
+        hostView?.rootView = content
+        DispatchQueue.main.async {
+            parentController(uiView.superview?.superview?.parentController)
+        }
+    }
+}
+
+public extension UIView {
+    var parentController: UIViewController? {
+        var responder = self.next
+        while responder != nil {
+            if let viewController = responder as? UIViewController {
+                return viewController
+            }
+            responder = responder?.next
+        }
+        return nil
     }
 }

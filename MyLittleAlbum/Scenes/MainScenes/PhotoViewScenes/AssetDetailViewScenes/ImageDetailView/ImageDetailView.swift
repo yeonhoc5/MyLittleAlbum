@@ -7,46 +7,68 @@
 
 import SwiftUI
 import Photos
+import Zoomable
 
 struct ImageDetailView: View {
     @Environment(\.scenePhase) var scenePhase
     
-    let asset: PHAsset
-    let imageManager = PHCachingImageManager()
+    let asset: MLAsset
+    let imageManager: PHCachingImageManager
+    let size: CGSize
+    let enableZoom: Bool
+    
     @Binding var variableScale: CGFloat
     @Binding var currentScale: CGFloat
-    @State var fetchtedImage: UIImage!
+    @State var fetchedImage: UIImage!
     @Binding var offsetY: CGFloat
     @State var widthIsCreteria: Bool = false
     
     var body: some View {
-        if fetchtedImage == nil {
-            ProgressView()
-                .tint(.color1)
-                .progressViewStyle(.circular)
-                .scaleEffect(1.5)
-                .onAppear {
-                    DispatchQueue.main.async {
-                        withAnimation {
-                            fetchtedImage = fetchingImage(asset: asset)
-                        }
-                    }
-                }
+        if fetchedImage == nil {
+            loadingView
         } else {
-            GeometryReader { proxy in
-                ScrollView([.horizontal, .vertical], showsIndicators: false) {
-                    Image(uiImage: (fetchtedImage))
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: proxy.size.width * variableScale,
-                               height: proxy.size.height * variableScale)
-                        .simultaneousGesture(zoomGestureByTab)
-                }
-                .scrollDisabled(variableScale == 1)
-            }
+//            GeometryReader { goeproxy in
+//                HStack {
+//                    Spacer(minLength: 0)
+//                    VStack {
+//                        Spacer(minLength: 0)
+                        Image(uiImage: (fetchedImage))
+                            .resizable()
+                            .scaledToFit()
+                            .modify({ view in
+                                if enableZoom {
+                                    view
+                                        .zoomable(minZoomScale: 1.0,
+                                                  doubleTapZoomScale: 3.0,
+                                                  outOfBoundsColor: .clear)
+                                } else {
+                                    view
+                                }
+                            })
+//                        Spacer(minLength: 0)
+//                    }
+//                    Spacer(minLength: 0)
+//                }
+//            }
         }
     }
-    
+}
+
+extension ImageDetailView {
+    var loadingView: some View {
+        ProgressView()
+            .tint(.white)
+            .controlSize(.large)
+            .progressViewStyle(.circular)
+            .scaleEffect(0.8)
+            .onAppear {
+                DispatchQueue.main.async {
+                    withAnimation {
+                        fetchedImage = fetchingImage(asset: asset.phAsset)
+                    }
+                }
+            }
+    }
     var zoomGestureByTab: some Gesture {
         TapGesture(count: 2)
             .onEnded { _ in
@@ -61,7 +83,6 @@ struct ImageDetailView: View {
                 }
             }
     }
-    
 }
 
 //

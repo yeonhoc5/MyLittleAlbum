@@ -10,20 +10,26 @@ import SwiftUI
 struct SectionDigitalView<Header: View>: View {
     var header: Header
     @Binding var isRandom: Bool
-    @Binding var transitionIndex: Int
+    let randomChanged: Bool
+    let currentIndex: Int
+    @Binding var changedIndex: Int
     
     init(header: @escaping () -> Header,
          isRandom: Binding<Bool>,
-         transitionIndex: Binding<Int>) {
+         randomChanged: Bool,
+         currentIndex: Int,
+         changedIndex: Binding<Int>) {
         self.header = header()
         self._isRandom = isRandom
-        self._transitionIndex = transitionIndex
+        self.randomChanged = randomChanged
+        self.currentIndex = currentIndex
+        self._changedIndex = changedIndex
     }
     
     var body: some View {
         Section {
             // 디지털 액자 - 사진 전환 시간
-            settingTransitionTime(time: transitionRange[transitionIndex])
+            settingTransitionTime
             // 디지털 액자 - 사진 전환 : 랜덤 / 순서대로
             settingPlayOrder(isRandom: $isRandom)
         } header: {
@@ -34,28 +40,52 @@ struct SectionDigitalView<Header: View>: View {
 }
 
 extension SectionDigitalView {
-    func settingTransitionTime(time: Int) -> some View {
-        HStack(content: {
-            Stepper(value: $transitionIndex,
+    var settingTransitionTime: some View {
+        let current = transitionRange[currentIndex]
+        let toChange = transitionRange[changedIndex]
+        return HStack(content: {
+            Stepper(value: $changedIndex,
                     in: 0...(transitionRange.count-1),
                     step: 1) {
                 HStack {
-                    Text("❶  사진 전환 주기")
+                    Text("❶  전환 주기")
                     Spacer()
                     HStack(spacing: 3, content: {
-                        Text("\(time < 60 ? time : (time < 3600 ? time/60 : (time < 86400 ? time/3600 : 1)))")
-                            .foregroundColor( Color.blue)
-                            .bold()
-                        Text("\(time < 60 ? "초" : (time < 3600 ? "분" : (time < 86400 ? "시간" : "일")))")
+                        Text(timeString(current))
+                            .font(.system(.subheadline, design: .rounded, weight: .bold))
+                            .foregroundColor(Color.black)
+                        Text(timeUnit(current))
+                        Group {
+                            if currentIndex != changedIndex {
+                                Text(" → ")
+                                Text(timeString(toChange))
+                                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                    .foregroundColor(Color.blue)
+                                Text(timeUnit(toChange))
+                                    .foregroundColor(Color.blue)
+                            }
+                        }
+                        .contentTransition(.numericText())
                     })
+                    .animation(.easeOut, value: currentIndex != changedIndex)
+                    .transition(.opacity)
                     Spacer()
                 }
             }
         })
     }
+    func timeString(_ time: Int) -> String {
+        return String(time < 60
+                      ? time : (time < 3600
+                                ? time/60 : (time < 86400 ? time/3600 : 1)))
+    }
+    func timeUnit(_ time: Int) -> String {
+        return time < 60 ? "초" : (time < 3600 ? "분" : (time < 86400 ? "시간" : "일"))
+
+    }
     func settingPlayOrder(isRandom: Binding<Bool>) -> some View {
         HStack(spacing: 30) {
-            Text("❷  사진 순서")
+            Text("❷  순서")
             Picker(selection: $isRandom) {
                 Group {
                     Text("차례대로")

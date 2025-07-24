@@ -10,205 +10,197 @@ import Photos
 
 struct CustomPhotosPicker: View {
     @Binding var isShowingPhotosPicker: Bool
-    
-    @EnvironmentObject var photoData: PhotoData
-    @ObservedObject var stateChangeObject: StateChangeObject
-    
-    @State var album: Album!
-    let size: CGSize
-    
-    //    @State var assetArray: [PHAsset]!
-    @State var title: String = "앨범 없는 사진함"
-    @State var assetCount: Int = 0
-    
-    @State var edgeToScroll: EdgeToScroll = .none
-    
-    @State var selectedItemsIndex: [Int] = []
-    
+    @EnvironmentObject var photoData: MLPhotoData
+    @State var mlAlbum: MLAlbum?
+    let albumToEdit: MLAlbum
+    let imageCachingManager: PHCachingImageManager
+
     @State var belongingType: BelongingType = .nonAlbum
     @State var filteringType: FilteringType = .all
-    @State var filteringTypeChanged: Bool = false
-    @State var settingDone: Bool! = false
-    
+    @State var reLoadingType: ReLoadingType = .none
+    @State var edgeToScroll: EdgeToScroll = .none
+    @State var selectedItems: [MLAsset] = []
     @Namespace private var nameSpace
     
-    var albumToEdit: Album
-    
     var body: some View {
+        let assetArray = assetArray(mlAlbum: mlAlbum,
+                                    albumType: .picker,
+                                    belongingType: belongingType)
         NavigationView {
-            VStack {
-                if !settingDone {
-                    loadingView
-                } else {
-                    photoPickerView
+            GeometryReader(content: { geoProxy in
+                let columnCount = columnCount(geoProxy: geoProxy)
+                let cellWidth = (geoProxy.size.width - CGFloat(columnCount - 1))
+                                / CGFloat(columnCount)
+                VStack {
+                    VStack(spacing: 15) {
+                        titleView(belongingType: belongingType)
+                        subTitleView(assetArray: assetArray, size: geoProxy.size)
+                    }
+                    ZStack(alignment: .bottom) {
+                        if let allPhotos = mlAlbum {
+                            photosView(mlAlbum: allPhotos,
+                                       assetArray: assetArray,
+                                       geoProxy: geoProxy,
+                                       cellWidth: cellWidth)
+                            gridMenuView(mlAlbum: allPhotos,
+                                         assetArray: assetArray,
+                                         width: geoProxy.size.width)
+                        } else {
+                            lottieLoadingView(lottie: "photoLoading",
+                                        size: CGSize(width: 100,
+                                                     height: geoProxy.size.height / 2),
+                                        leadingPadding: 0)
+                            .onAppear {
+                                if self.mlAlbum == nil {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        withAnimation {
+                                            self.mlAlbum = photoData.homeAlbum
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-            .background {
-                FancyBackground()
-            }
+            })
+            .background { FancyBackground() }
         }
-    }
-    
+    }           
 }
 
 extension CustomPhotosPicker {
-    var loadingView: some View {
-        RefreshPhotoView(sentence: "Wait.  I'll bring you photos~meow")
-            .scaleEffect(0.9)
-            .background{
-                FancyBackground()
+    func photosView(mlAlbum: MLAlbum, assetArray: [MLAsset], geoProxy: GeometryProxy, cellWidth: CGFloat) -> some View {
+        NewPhotosCollectionView(
+            albumType: .picker,
+            mlAlbum: mlAlbum,
+            smartAlbumType: .none,
+            assetArray: assetArray,
+            filteringType: $filteringType,
+            geoProxy: geoProxy,
+            cellWidth: cellWidth,
+            imageCachingManager: imageCachingManager,
+            isSelectMode: .constant(true),
+            selectedItems: $selectedItems,
+            refreshItems: .constant([]),
+            indexToView: .constant(0),
+            isExpanded: .constant(false),
+            edgeToScroll: $edgeToScroll,
+            reLoadingType: $reLoadingType
+        )
+        .frame(width: geoProxy.size.width)
+        .animation(.easeOut, value: mlAlbum.fetchResult.count == 0)
+        .transition(.opacity)
+    }
+    
+    func gridMenuView(mlAlbum: MLAlbum, assetArray: [MLAsset], width: CGFloat) -> some View {
+        HStack {
+//            if device == .pad {
+//                let spacerWidth = device == .phone
+//                            ? 0
+//                            : ((width / 4) + (5 * tabbarTopPadding))
+//                Rectangle()
+//                    .fill(.clear)
+//                    .frame(width: spacerWidth)
+//            }
+            PhotosGridMenu(
+                albumType: .picker,
+                smartAlbumType: .none,
+                mlAlbum: mlAlbum,
+                cachingimageManager: imageCachingManager,
+                assetArray: assetArray,
+                belongingType: $belongingType,
+                filteringType: $filteringType,
+                isSelectMode: .constant(true),
+                selectedItems: $selectedItems,
+                refreshItems: .constant([]),
+                edgeToScroll: $edgeToScroll,
+                isShowingShareSheet: .constant(false),
+                isShowingPhotosPicker: $isShowingPhotosPicker,
+                albumToEdit: albumToEdit,
+                nameSpace: nameSpace,
+                width: width,
+                reloadingType: $reLoadingType,
+                isReadyHiddenAsset: false)
+            .frame(height: tabbarHeight)
+            .padding(tabbarTopPadding) 
+            .clipped()
+            .shadow(color: Color.fancyBackground.opacity(0.5),
+                    radius: 2, x: 0, y: 0)
+        }    }
+    func titleView(belongingType: BelongingType) -> some View {
+        Group {
+            switch belongingType {
+            case .nonAlbum:
+                Text("앨범에 없는 항목 모음")
+                    .animation(.easeInOut)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            case .all:
+                Text("모든 항목")
+                    .animation(.easeInOut)
+                    .transition(
+                        .move(edge: belongingType == .all ? .leading : .trailing)
+                        .combined(with: .opacity))
+            case .album:
+                Text("앨범 항목 모음")
+                    .animation(.easeInOut)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
             }
-            .onAppear {
-                readyToShowMyPhotos(type: belongingType)
-            }
-    }
-    
-    var photoPickerView: some View {
-        GeometryReader(content: { geoProxy in
-            VStack {
-                HStack {
-                    Text(title)
-                        .foregroundColor(.white)
-                    Text("(\(assetCount)개 항목)")
-                        .foregroundColor(.gray)
-                }
-                .font(Font.system(size: 20, weight: .semibold, design: .rounded))
-                .bold()
-                .padding(.top, 40)
-                .padding(.bottom, 20)
-                ZStack(alignment: .bottom) {
-                    PhotosCollectionView(stateChangeObject: stateChangeObject,
-                                         albumType: .picker,
-                                         album: album,
-                                         edgeToScroll: $edgeToScroll,
-                                         filteringTypeChanged: $filteringTypeChanged,
-                                         isSelectMode: .constant(true),
-                                         selectedItemsIndex: $selectedItemsIndex,
-                                         isShowingPhotosPicker: .constant(false),
-                                         indexToView: .constant(0),
-                                         isExpanded: .constant(false),
-                                         insertedIndex: [],
-                                         removedIndex: [],
-                                         changedIndex: [],
-                                         currentCount: album.count,
-                                         isSelectingBySwipe: .constant(false),
-                                         geoProxy: geoProxy
-                    )
-                    .frame(width: size.width)
-                    GeometryReader { geoProxy in
-                        PhotosGridMenu(stateChangeObject: stateChangeObject,
-                                       albumType: .picker,
-                                       album: album,
-                                       albumToEdit: albumToEdit,
-                                       settingDone: $settingDone,
-                                       belongingType: $belongingType,
-                                       filteringType: $filteringType,
-                                       filteringTypeChanged: $filteringTypeChanged,
-                                       isSelectMode: .constant(true),
-                                       selectedItemsIndex: $selectedItemsIndex,
-                                       edgeToScroll: $edgeToScroll,
-                                       isShowingSheet: .constant(false),
-                                       isShowingShareSheet: .constant(false),
-                                       isShowingPhotosPicker: $isShowingPhotosPicker,
-                                       nameSpace: nameSpace,
-                                       width: geoProxy.size.width)
-                    }
-                    .clipped()
-                    .shadow(color: Color.fancyBackground.opacity(0.5),
-                            radius: 2, x: 0, y: 0)
-                    .padding(.horizontal, tabbarTopPadding)
-                    .frame(width: size.width, height: tabbarHeight)
-                    .padding(.bottom, 20)
-                }
-            }
-        })
-    }
-    
-    var toolbarLeading: some View {
-        Button("취소") {
-            dismissPickerView()
         }
+        .font(Font.system(size: 20, weight: .semibold, design: .rounded))
+        .foregroundColor(.white)
+        .padding(.top, 40)
     }
     
-    var toolbarTrailing: some View {
-        Button {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                addAssetIntoAlbum(indexSet: selectedItemsIndex)
-            }
-        } label: {
-            Text("\(selectedItemsIndex.count)개의 항목 앨범에 넣기")
+    func subTitleView(assetArray: [MLAsset], size: CGSize) -> some View {
+        let imageCount = assetArray.filter { $0.mediaType == .image }.count
+        let videoCount = assetArray.filter { $0.mediaType == .video }.count
+        return HStack {
+            Text("사진: \(mlAlbum != nil ? String(imageCount) : "--")")
+                .foregroundColor(filteringType == .image ? .blue : .gray)
+                .contentTransition(.numericText())
+            Text(" / ")
+            Text("비디오: \(mlAlbum != nil ? String(videoCount) : "--")")
+                .foregroundColor(filteringType == .video ? .blue : .gray)
+                .contentTransition(.numericText())
         }
-        .disabled(selectedItemsIndex.count == 0)
+        .font(.body)
+        .contentTransition(.numericText())
+        .foregroundColor(.gray)
+        .frame(width: size.width)
+        .padding(.bottom, 20)
     }
-    
-    func dismissPickerView() {
-        self.isShowingPhotosPicker = false
-        stateChangeObject.photosPickerCanceled = true
-        selectedItemsIndex.removeAll()
-    }
-    
-    func addAssetIntoAlbum(indexSet: [Int]) {
-        self.isShowingPhotosPicker = false
-        var assetArray: [PHAsset] = []
-        switch album.filteringType {
-        case .all:
-            assetArray = album.photosArray
-        case .image:
-            assetArray = album.photosArray.filter({$0.mediaType == .image})
-        case .video:
-            assetArray = album.photosArray.filter({$0.mediaType == .video})
-        }
-        let sortedIndexSet = indexSet.sorted{ $0 < $1 }
-        var assets: [PHAsset] = []
-        for i in sortedIndexSet {
-            assets.append(assetArray[i])
-        }
-        selectedItemsIndex = []
-        DispatchQueue.main.async {
-            albumToEdit.addAsset(assets: assets, stateObject: stateChangeObject)
-//            stateChangeObject.assetRemoving = true
-        }
-        
-    }
-    
-    func readyToShowMyPhotos(type: BelongingType) {
-        switch belongingType {
-        case .nonAlbum:
-            self.album = Album(albumType: .picker,
-                               assetArray: photoData.photosArrayNotInAnyAlbum,
-                               title: "앨범 없는 사진함",
-                               belongingType: .nonAlbum)
+                
+    func assetArray(mlAlbum: MLAlbum?, albumType: AlbumType, belongingType: BelongingType) -> [MLAsset] {
+        guard let allPhotos = switch belongingType {
+        case .all: mlAlbum?.photosArray
+        case .nonAlbum: mlAlbum?.subtractingArray(
+                        isHiddenAsset: false,
+                        subtracting: Array(photoData.albumsPhotosSet())
+                        )
+                        .sorted(by: { $0.creationDate < $1.creationDate })
         case .album:
-            self.album = Album(albumType: .picker,
-                               assetArray: photoData.allPhotosArrayInAllAlbum,
-                               title: "앨범 있는 사진함",
-                               belongingType: .album)
-        default:
-            self.album = Album(albumType: .picker,
-                               assetArray: photoData.allPhotosArray,
-                               title: "모든 사진함",
-                               belongingType: .all)
+            Array(photoData.albumsPhotosSet())
+                .sorted(by: { $0.creationDate < $1.creationDate })
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            withAnimation {
-                self.title = album.title
-                self.assetCount = album.count
-                self.settingDone = true
-            }
-        }
+        else { return [] }
+        return allPhotos
     }
     
-    
+    func columnCount(geoProxy: GeometryProxy) -> Int {
+        device == .phone ? cellCount(type: .small) : cellCount(type: .middel2)
+    }
 }
 
-struct CustomPhotosPicker_Previews: PreviewProvider {
-    static var previews: some View {
-        CustomPhotosPicker(isShowingPhotosPicker: .constant(true),
-                           stateChangeObject: StateChangeObject(),
-                           album: nil,
-                           size: .zero,
-                           title: "Not in any Album",
-                           albumToEdit: Album(assetArray: [], title: "sample"))
-        .environmentObject(PhotoData())
-    }
-}
+//struct CustomPhotosPicker_Previews: PreviewProvider {
+//    static var previews: some View {
+//        CustomPhotosPicker(isShowingPhotosPicker: .constant(true),
+//                           stateChangeObject: StateChangeObject(),
+//                           album: nil,
+//                           size: .zero,
+//                           imageCachingManager: PHCachingImageManager(),
+//                           title: "Not in any Album",
+////                           albumToEdit: Album(assetArray: [], title: "sample"))
+//                           albumToEdit: MLAlbum(filterSet: Set<PHAsset>()))
+//        .environmentObject(MLPhotoData())
+//    }
+//}

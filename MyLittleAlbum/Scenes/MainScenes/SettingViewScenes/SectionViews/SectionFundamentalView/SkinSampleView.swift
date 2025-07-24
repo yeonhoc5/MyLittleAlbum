@@ -15,73 +15,102 @@ struct SkinSampleView: View {
         let firstWidth = 100.0
         let secondWidth = firstWidth * 0.7
         VStack(alignment: .center, spacing: 10) {
-            switch uiMode {
-            case .classic:
-                HStack(alignment: .top) {
-                    ClassicCell(cellType: .album,
-                                width: firstWidth,
-                                sampleCase: .overTwo)
-                    ClassicCell(cellType: .album,
-                                width: firstWidth)
-                }
-                HStack(alignment: .top, content: {
-                    ClassicCell(cellType: .folder,
-                                width: secondWidth)
-                    ClassicCell(cellType: .miniAlbum,
-                                width: secondWidth,
-                                sampleCase: .overTwo)
-                    ClassicCell(cellType: .miniAlbum,
-                                width: secondWidth)
-                })
-            case .modern:
-                HStack {
-                    ModernCell(cellType: .album,
-                               title: "앨범1",
-                               width: firstWidth,
-                               sampleCase: .one)
-                    ModernCell(cellType: .album,
-                               title: "앨범2",
-                               width: firstWidth)
-                }
-                HStack(alignment: .bottom) {
-                    ModernCell(cellType: .folder, title: "폴더", width: secondWidth)
-                    Group {
-                        ModernCell(cellType: .miniAlbum, title: "미니앨범1",
-                                   width: secondWidth, sampleCase: .one)
-                        ModernCell(cellType: .miniAlbum, title: "미니앨범2", width: secondWidth)
+            HStack(alignment: .top) {
+                if uiMode == .fancy {
+                    CellView(uiMode: uiMode,
+                             cellType: .album,
+                             index: 0,
+                             width: firstWidth, tapAction: {
+                        
+                    }) { size, namespace in
+                        AlbumCoverView(
+                            sampleMLAlbum: MLAlbum(sampleID: 1,
+                                                   sampleCase: .overTwo),
+                            uiMode: uiMode,
+                            cellType: .album,
+                            size: size,
+                            albumCell: namespace,
+                            rprstImage1: UIImage(named: "sampleImage01"),
+                            rprstImage2: UIImage(named: "sampleImage03")
+                        )
                     }
+                }
+                CellView(uiMode: uiMode,
+                         cellType: .album,
+                         index: 1,
+                         width: firstWidth, tapAction: {
                     
+                }) { size, namespace in
+                    AlbumCoverView(
+                        sampleMLAlbum: MLAlbum(sampleID: 2,
+                                        sampleCase: .one),
+                        uiMode: uiMode,
+                        cellType: .album,
+                        size: size,
+                        albumCell: namespace,
+                        rprstImage1: UIImage(named: "sampleImage02")
+                    )
                 }
-            case .fancy:
-                HStack {
-                    ForEach((0..<3)) { int in
-                        FancyCell(cellType: .album,
-                                  title: "앨범\(int+1)",
-                                  colorIndex: int,
-                                  width: firstWidth,
-                                  sampleCase: SampleCase.returnType(int: 2-int))
-                    }
-                }
-                HStack(alignment: .bottom, spacing: 10) {
-                    FancyCell(cellType: .folder,
-                              title: "폴더",
-                              colorIndex: 0,
-                              width: secondWidth)
-                    Group {
-                        ForEach(1..<3) { int in
-                            FancyCell(cellType: .miniAlbum,
-                                      title: "미니앨범\(int)",
-                                      colorIndex: 4 * int,
-                                      width: secondWidth,
-                                      sampleCase: int == 1
-                                      ? .one : SampleCase.none)
-                        }
-                    }
+                CellView(uiMode: uiMode,
+                         cellType: .album,
+                         index: 2,
+                         width: firstWidth, tapAction: {
+                    
+                }) { size, namespace in
+                    AlbumCoverView(
+                        sampleMLAlbum: MLAlbum(sampleID: 3,
+                                         sampleCase: .none),
+                                   uiMode: uiMode,
+                                   cellType: .album,
+                                   size: size,
+                                   albumCell: namespace)
                 }
             }
+            HStack(alignment: .top, content: {
+                CellView(uiMode: uiMode,
+                         cellType: .folder,
+                         index: 0,
+                         width: secondWidth, tapAction: {
+                    
+                }) { size, namespace in
+                    FolderCoverView(folder: MLFolder(sampleID: 1),
+                                    uiMode: uiMode,
+                                    size: size,
+                                    cellNameSpace: namespace)
+                }
+                CellView(uiMode: uiMode,
+                         cellType: .miniAlbum,
+                         index: 3,
+                         width: secondWidth, tapAction: {
+                    
+                }) { size, namespace in
+                    AlbumCoverView(
+                        sampleMLAlbum: MLAlbum(sampleID: 4,
+                                        sampleCase: .one),
+                        uiMode: uiMode,
+                        cellType: .miniAlbum,
+                        size: size,
+                        albumCell: namespace,
+                        rprstImage1: UIImage(named: "sampleImage04")
+                    )
+                }
+                CellView(uiMode: uiMode,
+                         cellType: .miniAlbum,
+                         index: 4,
+                         width: secondWidth, tapAction: {
+                }) { size, namespace in
+                    AlbumCoverView(
+                        sampleMLAlbum: MLAlbum(sampleID: 5,
+                                        sampleCase: .none),
+                        uiMode: uiMode,
+                        cellType: .miniAlbum,
+                        size: size,
+                        albumCell: namespace)
+                }
+//
+            })
         }
     }
-    
     
     func classicImage(width: CGFloat, height: CGFloat) -> some View {
         Image(systemName: "photo")

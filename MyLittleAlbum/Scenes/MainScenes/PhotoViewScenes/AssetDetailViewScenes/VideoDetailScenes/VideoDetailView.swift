@@ -8,57 +8,107 @@
 import SwiftUI
 import Photos
 import AVKit
+import CoreHaptics
+import MediaPlayer
+import LottieUI
+
+enum VideoState {
+    case play, pause, stop
+}
 
 struct VideoDetailView: View {
+    var isDigitalShow: Bool = false
     @Environment(\.scenePhase) var scenePhase
     var offsetIndex: Int
-    var asset: PHAsset
+    var asset: MLAsset
+    let imageManager: PHCachingImageManager
+    let size: CGSize
+    @Namespace var nameSpace
     
     // video properties
     @State var avPlayer: AVPlayer!
-    @State var play: Bool = false
+    @Binding var play: VideoState
+    @State var play2x: Bool = false
     @State var mute: Bool = false
-    @Binding var hidden: Bool
+    @Binding var hideTools: Bool
     @State var timeObserver: Any!
-    @Binding var isSeeking: Bool
-    @State var slider: UISlider = UISlider()
+    
+    @Binding var userGesture: DetailViewGesture
     // uislider의 vlaue가 float임
     @State var sliderValue: Float = 0
     @State var currentTime: Double = 0
     @State var tempSliderPosition: Float = 0
     
-    let imageManager = PHCachingImageManager()
     // offset proverties
     @Binding var offsetY: CGFloat
     @Binding var offsetX: CGFloat
+    @State var needOpacity: Bool = false
+    @State var needOffset: Bool = false
     
     var body: some View {
         if avPlayer == nil {
             loadingView
         } else {
             if let avPlayer = self.avPlayer {
-                GeometryReader { geoproxy in
-                    AVPlayerController(player: avPlayer)
-                        .simultaneousGesture(hideGesture)
-                        .overlay(alignment: .bottom) {
-                            customPlayBack(geo: geoproxy)
-                                .simultaneousGesture(
-                                    seekGesture(current: $currentTime,
-                                                geoProxy: geoproxy)
-                                )
-                                .opacity(self.hidden ? 0 : 1)
-                                .padding(.bottom, 50)
+                AVPlayerController(player: avPlayer)
+                    .onLongPressGesture(minimumDuration: 0.5,
+                                        perform: {
+                        speedPlay(isStart: true)
+                    }, onPressingChanged: { _ in
+                        speedPlay(isStart: false)
+                    })
+                    .padding(.bottom,
+                             accordingToVideoHeight(height: size.height))
+                    .simultaneousGesture(hideGesture)
+                    .overlay(alignment: .topTrailing, content: {
+                        if userGesture == .soundAdjusting {
+                            soundSlider
                         }
-                        .onChange(of: offsetIndex) { newValue in
-                            if newValue != 0 {
-                                removeObserver()
-                                resetVideo()
+                    })
+                    .overlay(alignment: .topLeading, content: {
+                        if play2x {
+                            speedNoticeView
+                        }
+                    })
+                    .overlay(alignment: .bottom) {
+                        if !isDigitalShow {
+                            let width = size.width / (device == .phone ? 1 : 1.5)
+                            let devicePadding = device == .pad ? 0 : (vcHeight + 10)
+                            let yOffset = -vcBottomPadding
+                                - (devicePadding)
+                                + (needOffset
+                                   ? (hideTools ? (devicePadding) : 0) : 0)
+                            HStack {
+                                if device == .pad {
+                                    Spacer()
+                                }
+                                customPlayBack(height: vcHeight)
+                                    .padding(.horizontal, vcHorisontalPadding)
+                                    .frame(width: width)
+                                    .offset(y: yOffset)
+                                    .opacity(needOpacity
+                                             ? (hideTools ? 0 : 1) : 1)
                             }
                         }
-                        .onDisappear {
+                    }
+                    .onAppear(perform: {
+                        if isDigitalShow {
+                            DispatchQueue.main.async {
+                                avPlayer.play()
+                            }
+                        } else {
+                            checkNeedOffset(size: size)
+                        }
+                    })
+                    .onDisappear {
+                        if isDigitalShow {
+                            DispatchQueue.main.async {
+                                avPlayer.pause()
+                            }
+                        } else {
                             if offsetIndex == 0 {
+                                resetVideo(isFullEnded: true)
                                 removeObserver()
-                                resetVideo()
                                 if self.avPlayer != nil {
                                     print("video scene out")
                                     DispatchQueue.main.async {
@@ -67,191 +117,390 @@ struct VideoDetailView: View {
                                 }
                             }
                         }
-                        .onChange(of: sliderValue) { newValue in
-                            if newValue == 1.0 && !isSeeking {
-                                DispatchQueue.main.async {
-                                    removeObserver()
-                                    resetVideo()
-                                }
-                            }
-                            if play {
-                                self.currentTime = getSeconds()
-                            }
-                        }
-                        .onChange(of: scenePhase) { newValue in
-                            if offsetIndex == 0 && newValue == .background {
-                                withAnimation { offsetY = 0 }
-                                DispatchQueue.main.async {
-                                    avPlayer.pause()
-                                }
+                    }
+                    .onChange(of: play2x, perform: { newValue in
+                        avPlayer.rate = newValue ? 2 : 1
+                    })
+                    .onChange(of: mute, perform: { newValue in
+                        avPlayer.isMuted = newValue
+                    })
+                    .onChange(of: sliderValue) { newValue in
+                        if newValue == 1.0 && userGesture == .none {
+                            print("ended")
+                            DispatchQueue.main.async {
+                                resetVideo(isFullEnded: true)
+                                removeObserver()
                             }
                         }
-                        .onChange(of: mute, perform: { newValue in
-                            avPlayer.isMuted = newValue
-                        })
-                }
+                    }
+                    .onChange(of: scenePhase) { newValue in
+                        if offsetIndex == 0 && newValue == .background {
+                            withAnimation { offsetY = 0 }
+                            DispatchQueue.main.async {
+                                self.play = .stop
+                                avPlayer.pause()
+                            }
+                        }
+                    }
+                    .onChange(of: offsetIndex) { newValue in
+                        // 페이지 넘어가면 스탑 & 리셋
+                        if newValue != 0 {
+                            removeObserver()
+                            resetVideo(isFullEnded: true)
+                        } else {
+                            if play == .play {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    withAnimation {
+                                        self.play = .play
+                                    }
+                                    if self.timeObserver == nil {
+                                        addObserverToPlayer()
+                                    }
+                                    // play & pasue by button
+                                    if avPlayer.status == .readyToPlay {
+                                        avPlayer.play()
+                                    }
+                                }
+                            }
+                        }
+                    }
             }
         }
     }
 }
+
 // MARK: - 2. subViews
 extension VideoDetailView {
+    func checkNeedOffset(size: CGSize) {
+        self.needOpacity = size.height
+                        - assetHeight(asset: asset.phAsset)
+                        - statusBarHeight
+                        < tabbarHeight
+        if !needOpacity {
+            needOffset = (size.height
+                          - assetHeight(asset: asset.phAsset)) / 2
+            < (vcHeight * 2) + vcBottomPadding + 15
+        }
+    }
+    var speedNoticeView: some View {
+        HStack {
+            Text("2x")
+            Image(systemName: "forward.fill")
+                .modify { content in
+                    if #available(iOS 18.0, *) {
+                        content
+                            .symbolEffect(.bounce)
+                    }
+                }
+        }
+        .foregroundStyle(.white)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 15)
+        .background {
+            Capsule()
+                .foregroundStyle(.thinMaterial)
+        }
+        .offset(x: 10,
+                y: (hideTools ? 0 : navigationbarHeight)
+                    + statusBarHeight + 10)
+    }
+    var soundSlider: some View {
+        ZStack {
+            Rectangle()
+                .foregroundStyle(.thinMaterial)
+                .frame(height: 150)
+            Rectangle()
+                .foregroundStyle(.white)
+                .frame(height: 150 * MPVolumeView.catchVolume())
+        }
+        .mask(RoundedRectangle(cornerRadius: 10))
+        .frame(width: 20)
+        .padding(.top, navigationbarHeight + statusBarHeight + 10)
+        .padding(.trailing, 10)
+    }
+    func accordingToVideoHeight(height: CGFloat) -> CGFloat {
+        return needOffset
+            ? (!hideTools ? 0
+               : height - assetHeight(asset: asset.phAsset) - (statusBarHeight * 2))
+            : 0
+    }
+    
     var loadingView: some View {
         ProgressView()
-            .tint(.color1)
+            .tint(.white)
+            .controlSize(.large)
             .progressViewStyle(.circular)
-            .scaleEffect(1.5)
+            .scaleEffect(0.8)
             .onAppear {
                 DispatchQueue.main.async {
-                    fetchingVideo(asset: asset)
+                    fetchingVideo(asset: asset.phAsset)
                 }
             }
     }
     // 커스텀 비디오 컨트롤러
-    func customPlayBack(geo: GeometryProxy) -> some View {
-        let iconSize: CGFloat = 30
+    func customPlayBack(height: CGFloat) -> some View {
+        let iconSize: CGFloat = 20
         let innerPadding = 10.0
-        return ZStack {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-            VStack(spacing: 25) {
-                VStack(spacing: 5) {
-                    HStack {
-                        Text("\(durationString(time: getSeconds()))")
-                            .padding(.leading, 5)
-                        Spacer()
-                        Text("\(durationString(time: Double(asset.duration.rounded(.toNearestOrAwayFromZero))))")
-                            .padding(.trailing, 5)
+        return HStack(alignment: .bottom, spacing: 10) {
+            GeometryReader { geometry in
+                ZStack {
+                    // 0. 백그라운드 슬라이더
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(.thinMaterial)
+                        Rectangle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: geometry.size.width * CGFloat(sliderValue))
                     }
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                    CustomSeekBar(value: sliderValue, slider: slider)
+                    .mask(
+                        RoundedRectangle(cornerRadius: 10)
+                    )
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        Group {
+                        // 2. 중지 버튼
+                            btnStopPlay(iconSize: iconSize,
+                                        padding: innerPadding,
+                                        disabled: (sliderValue == 0
+                                                   || sliderValue == 1))
+                                .opacity((sliderValue == 0
+                                          || sliderValue == 1) ? 0.2 : 1)
+                            Spacer(minLength: 0)
+                        // 3. 뒤로 5초 버튼
+                            btnBackward(iconSize: iconSize, padding: innerPadding)
+                            Spacer(minLength: 1.0)
+                            btnPlayToggle(play: $play,
+                                          iconSize: iconSize,
+                                          padding: innerPadding)
+                                .modify { content in
+                                    if #available(iOS 17.0, *) {
+                                        content
+                                            .contentTransition(.symbolEffect)
+                                    }
+                                }
+                            Spacer(minLength: 0)
+                        // 4. 앞으로 5초 버튼
+                            btnForward(iconSize: iconSize,
+                                       padding: innerPadding)
+                        }
+                        .opacity(userGesture == .videoSeeking ? 0 : 1)
+                        .transition(.opacity)
+                        .animation(.linear, value: userGesture == .videoSeeking)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 5)
+                    .disabled(userGesture == .videoSeeking)
+
                 }
-                HStack(spacing: 0) {
-                    btnStopPlay(iconSize: iconSize, 
-                                padding: innerPadding)
-                    .opacity(sliderValue != 0 ? 1 : 0.2)
-                        .disabled(sliderValue == 0)
-                    Spacer(minLength: 1.0)
-                    btnBackward(iconSize: iconSize, 
-                                padding: innerPadding)
-                    Spacer(minLength: 1.0)
-                    btnPlayToggle(play: $play,
-                                  iconSize: iconSize,
-                                  padding: innerPadding)
-                    Spacer(minLength: 1.0)
-                    btnForward(iconSize: iconSize, 
-                               padding: innerPadding)
-                    Spacer(minLength: 1.0)
-                    btnMuteToggle(mute: mute, 
-                                  iconSize: iconSize,
-                                  padding: innerPadding)
-                }
-                .disabled(isSeeking)
+                .simultaneousGesture(
+                    seekGesture(current: $currentTime,
+                                geoProxy: geometry)
+                )
             }
-            .padding(25)
+            .frame(height: height)
+            .overlay(alignment: .topLeading) {
+                HStack(alignment: .lastTextBaseline, spacing: 3) {
+                    let entireTime = Double(asset.duration.rounded(.up))
+                    // 1-1. 재생 시간
+                    processingText(
+                        time: durationString(entire: entireTime,time: getSeconds()))
+                    // 1-2. 영상 전체 시간
+                    processingText(needSlash: true,
+                        time: durationString(entire: entireTime, time: entireTime))
+                }
+                .offset(x: 5, y: -17)
+            }
+//            ZStack(alignment: .bottom) {
+//                if userGesture != .soundAdjusting {
+            //                        btnMuteToggle(mute: mute,
+            //                                      iconSize: iconSize,
+            //                                      padding: innerPadding)
+//            .simultaneousGesture(soundGesture())
+//                RoundedRectangle(cornerRadius: 10)
+//                    .foregroundStyle(.thinMaterial)
+//                    .frame(width: height, height: height)
+//                    .simultaneousGesture(adjustSound())
+            
+            btnMuteToggle(mute: mute,
+                          height: height,
+                          iconSize: iconSize,
+                          padding: innerPadding)
+
+                    
+            
         }
         .foregroundColor(.white)
-        .frame(width: device == .phone ? geo.size.width * 0.9
-                                    : min(geo.size.width, geo.size.height) * 0.7,
-               height: 150)
+    }
+    
+    func soundGesture() -> some Gesture {
+        LongPressGesture(minimumDuration: 1)
+            .onChanged { value in
+                print(value.description)
+            }
     }
     // 버튼 1/4. 재생 토글
-    func btnPlayToggle(play: Binding<Bool>, iconSize: CGFloat, padding: CGFloat) -> some View {
-        let playIcon = play.wrappedValue ? "pause.fill" : "play.fill"
+    func btnPlayToggle(play: Binding<VideoState>, iconSize: CGFloat, padding: CGFloat) -> some View {
         return Button {
-            if !isSeeking {
-                if !play.wrappedValue {
+            if userGesture != .videoSeeking {
+                if sliderValue == 1.0 {
+                    sliderValue = 0
+                    avPlayer?.seek(to: .zero)
+                }
+                if play.wrappedValue != .play {
                     withAnimation(.interactiveSpring()) {
-                        self.play = true
+                        self.play = .play
                     }
                     if self.timeObserver == nil {
                         addObserverToPlayer()
                     }
                     // play & pasue by button
                     if avPlayer.status == .readyToPlay {
-                        avPlayer.play()
+                        if offsetIndex == 0 {
+                            avPlayer.play()
+                        }
                     }
                 } else {
                     withAnimation(.interactiveSpring()) {
-                        self.play = false
+                        self.play = .pause
                     }
                     avPlayer.pause()
                 }
             }
         } label: {
-            imageScaledFit(systemName: playIcon, width: iconSize, height: iconSize)
-                .padding(padding)
+            LabelPlayAndPause(
+                isPlaying: offsetIndex == 0
+                            ? .constant(play.wrappedValue == .play)
+                            : .constant(false),
+                iconSize: iconSize
+            )
+            .padding(.vertical, padding)
+            .padding(.horizontal, padding / 2)
         }
     }
     // 버튼 2/4. 뒤로 5초
     func btnBackward(iconSize: CGFloat, padding: CGFloat) -> some View {
         Button {
-            if !isSeeking {
+            if userGesture != .videoSeeking {
                 if let bool = avPlayer.currentItem?.canStepBackward,
                     bool == true {
-                    currentTime = currentTime - 5
+                    currentTime -= currentTime <= 0 ? 0 : 5
                     avPlayer.seek(to: CMTime(seconds: currentTime, preferredTimescale: 1))
+                    
                 } else {
-                    avPlayer.seek(to: CMTime(seconds: 0, preferredTimescale: 1))
                     currentTime = 0
+                    avPlayer.seek(to: CMTime(seconds: 0,
+                                             preferredTimescale: 1))
                 }
-                DispatchQueue.main.async {
-                    getValue(runningTime: asset.duration, current: currentTime)
+                if play != .play {
+                    sliderValue = Float(currentTime < 0 ? 0 : currentTime / asset.duration)
                 }
             }
         } label: {
             imageScaledFit(systemName: "gobackward.5", width: iconSize, height: iconSize)
-                .padding(padding)
+                .padding(.vertical, padding)
+                .padding(.horizontal, padding / 2)
         }
     }
     // 버튼 3/4. 앞으로 5초
     func btnForward(iconSize: CGFloat, padding: CGFloat) -> some View {
         Button {
-            if !isSeeking {
+            if userGesture != .videoSeeking {
                 if let bool = avPlayer.currentItem?.canStepForward,
                     bool == true {
-                    currentTime += 5
-                    avPlayer.seek(to: CMTime(seconds: currentTime, preferredTimescale: 1))
-                } else {
-                    currentTime = avPlayer.currentItem?.preferredForwardBufferDuration.magnitude ?? 0
+                    currentTime += currentTime >= asset.duration ? 0 : 5
                     avPlayer.seek(to: CMTime(seconds: currentTime,
                                              preferredTimescale: 1))
-                    
+                } else {
+                    currentTime = avPlayer.currentItem?
+                        .preferredForwardBufferDuration.magnitude ?? 0
+                    avPlayer.seek(to: CMTime(seconds: currentTime,
+                                             preferredTimescale: 1))
+                }
+                if play != .play {
+                    sliderValue = Float(currentTime > asset.duration ? 1.0 : currentTime / asset.duration)
                 }
             }
         } label: {
             imageScaledFit(systemName: "goforward.5", width: iconSize, height: iconSize)
-                .padding(padding)
+                .padding(.vertical, padding)
+                .padding(.horizontal, padding / 2)
         }
     }
     // 버튼 4/4. 뮤트 토글
-    func btnMuteToggle(mute: Bool, iconSize: CGFloat, padding: CGFloat) -> some View {
+    func btnMuteToggle(mute: Bool, height: CGFloat, iconSize: CGFloat, padding: CGFloat) -> some View {
         let muteIcon = mute ? "speaker.slash.fill" : "speaker.wave.2.fill"
         return Button {
-            if !isSeeking {
+            if userGesture != .soundAdjusting
+                && userGesture != .videoSeeking {
                 withAnimation(.interactiveSpring()) {
                     self.mute.toggle()
                 }
             }
         } label: {
-            imageScaledFit(systemName: muteIcon, width: iconSize, height: iconSize)
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .foregroundStyle(.thinMaterial)
+                imageScaledFit(systemName: muteIcon,
+                                   width: iconSize,
+                                   height: iconSize)
                 .padding(padding)
+                .matchedGeometryEffect(id: "mute", in: nameSpace)
+                .modify { content in
+                    if #available(iOS 17.0, *) {
+                        content
+                        .contentTransition(.symbolEffect(.replace))
+                    }
+                }
+            }
         }
+        .frame(width: height, height: height)
+        
     }
     
-    func btnStopPlay(iconSize: CGFloat, padding: CGFloat) -> some View {
+    func adjustSound() -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged({ value in
+                print(value.translation.height)
+                if abs(value.translation.height) > 3 {
+                    userGesture = .soundAdjusting
+                    print("ok")
+                    MPVolumeView.setVolume(0.7)
+                } else {
+                    print("no", AVAudioSession.sharedInstance().outputVolume)
+                }
+            })
+            .onEnded { _ in
+                userGesture = .none
+            }
+    }
+    
+    func btnStopPlay(iconSize: CGFloat, padding: CGFloat, disabled: Bool = false) -> some View {
         Button {
+            withAnimation {
+                play = .stop
+            }
             DispatchQueue.main.async {
-                resetVideo()
+                resetVideo(isFullEnded: false)
                 removeObserver()
             }
         } label: {
             imageScaledFit(systemName: "stop.fill", width: iconSize, height: iconSize)
-                .padding(padding)
+                .padding(.vertical, padding)
+                .padding(.horizontal, padding / 2)
         }
+        .disabled(disabled)
     }
-    
+    func processingText(needSlash: Bool = false, time: String) -> some View {
+        HStack(spacing: 3) {
+            if needSlash {
+                Text("/")
+            }
+            Text(time)
+        }
+        .font(.system(.subheadline, design: .monospaced))
+        .contentTransition(.numericText())
+        .foregroundStyle(.gray)
+    }
 }
 
 // MARK: - 3. Vedeo functions
@@ -271,17 +520,17 @@ extension VideoDetailView {
         }
     }
     // 3-2. 재생시간
-                    // 비디오 재생시간 All Cases
-                    //        case 1. 11:05:05
-                    //        case 2.  1:05:10
-                    //        case 3. 11:04
-                    //        case 4.  5:14
-                    //        case 5.  0:05
-    func durationString(time: Double) -> String {
+    // 비디오 재생시간 All Cases
+    //    시간     case 1.  0:00:02 / 11:05:05
+    //    시간     case 2.  0:00:02 / 1:05:10
+    //    분      case 3.    00:02 / 11:04
+    //    분      case 4.     0:02 / 5:14
+    //    초      case 5.     0:02 / 0:05
+    func durationString(entire: Double, time: Double) -> String {
         guard !(time.isNaN || time.isInfinite) else { return "illegal value" }
         let duration: Int = Int(time / 1.0)
-        let hour: String = duration >= 3600 ? "\(duration / 3600):" : ""
-        let minute: String = "\(((duration) % 3600) / 60):"
+        let hour: String = entire < 3600 ? "" : (duration >= 3600 ? "\(duration / 3600):" : "0:")
+        let minute: String = ((entire >= 600 && ((duration) % 3600) / 60 < 10) ? "0" : "") + "\(((duration) % 3600) / 60):"
         let second: String = (duration) % 60 >= 10 ? "\((duration) % 60)" : "0\((duration) % 60)"
         return hour + minute + second
     }
@@ -299,12 +548,19 @@ extension VideoDetailView {
     }
     
     // Reset 비디오 재생
-    func resetVideo() {
-        self.play = false
+    func resetVideo(isFullEnded: Bool = true) {
         DispatchQueue.main.async {
+            play = .stop
             avPlayer?.pause()
             avPlayer?.seek(to: .zero)
-            sliderValue = 0
+            play2x = false
+            if isFullEnded {
+                sliderValue = 0
+            } else {
+                withAnimation {
+                    sliderValue = 0
+                }
+            }
         }
     }
 
@@ -386,9 +642,11 @@ extension VideoDetailView {
     private var hideGesture: some Gesture {
         TapGesture(count: 1)
             .onEnded { _ in
-                DispatchQueue.main.async {
-                    withAnimation(.easeOut(duration: 0.1)) {
-                        self.hidden.toggle()
+                if userGesture == .none {
+                    DispatchQueue.main.async {
+                        withAnimation(.easeOut(duration: 0.1)) {
+                            self.hideTools.toggle()
+                        }
                     }
                 }
             }
@@ -400,20 +658,19 @@ extension VideoDetailView {
         
         return DragGesture(minimumDistance: 1)
             .onChanged { newValue in
-                if !isSeeking {
-                    isSeeking = true
+                if userGesture != .videoSeeking {
                     tempSliderPosition = sliderValue
-                    avPlayer?.pause()
-                    print("on changed", "isSeeking \(isSeeking)")
                 }
-                self.offsetX = 0
-                self.offsetY = 0
+                userGesture = .videoSeeking
+                avPlayer?.pause()
+                                    
                 if let item = avPlayer.currentItem {
                     guard !(item.duration.seconds.isNaN || item.duration.seconds.isInfinite) 
                     else {
                         return
                     }
-                    movedWidth = CGFloat(newValue.translation.width / (geoProxy.size.width * 0.7))
+                    movedWidth = CGFloat(newValue.translation.width
+                                         / (geoProxy.size.width * 0.5))
                     let movePercent = tempSliderPosition + Float(movedWidth)
                     sliderValue = movePercent < 0 ? 0 : (movePercent > 1 ? 1 : movePercent)
                     currentTime = item.duration.seconds * Double(sliderValue)
@@ -425,22 +682,80 @@ extension VideoDetailView {
             .onEnded { newValue in
                 tempSliderPosition = 0
                 DispatchQueue.main.async {
-                    if play {
+                    if play == .play {
                         avPlayer?.play()
                     }
                 }
-                isSeeking = false
+                userGesture = .none
             }
     }
+    
+    // sound adjust Gestrue
+    func soundGesture(current: Binding<Double>, geoProxy: GeometryProxy) -> some Gesture {
+        var movedHeight: CGFloat = 0
+        return DragGesture(minimumDistance: 1)
+            .onChanged { newValue in
+                userGesture = .videoSeeking
+                tempSliderPosition = sliderValue
+                avPlayer?.pause()
+                self.offsetX = 0
+                self.offsetY = 0
+                if let item = avPlayer.currentItem {
+                    guard !(item.duration.seconds.isNaN || item.duration.seconds.isInfinite)
+                    else {
+                        return
+                    }
+                    movedHeight = CGFloat(newValue.translation.width / (geoProxy.size.width * 0.7))
+                    let movePercent = tempSliderPosition + Float(movedHeight)
+                    sliderValue = movePercent < 0 ? 0 : (movePercent > 1 ? 1 : movePercent)
+                    currentTime = item.duration.seconds * Double(sliderValue)
+                    avPlayer?
+                        .seek(to: CMTime(seconds: currentTime,
+                                         preferredTimescale: 1))
+                }
+            }
+            .onEnded { newValue in
+                tempSliderPosition = 0
+                DispatchQueue.main.async {
+                    if play == .play {
+                        avPlayer?.play()
+                    }
+                }
+                userGesture = .none
+            }
+    }
+
+    func assetHeight(asset: PHAsset) -> CGFloat {
+        return screenWidth * CGFloat(asset.pixelHeight) / CGFloat(asset.pixelWidth)
+    }
+    
+    func needOpacity(asset: PHAsset) -> Bool {
+        return screenSize.height
+        - assetHeight(asset: asset)
+        - statusBarHeight
+        > tabbarHeight + 50
+    }
+    func speedPlay(isStart: Bool) {
+        if play == .play {
+            play2x = isStart
+            if isStart {
+                let hapticManager = HapticManager.instance
+                hapticManager.impact(style: .light)
+            }
+        }
+    }
+    
 }
 
 struct VideoDetailView_Previews: PreviewProvider {
     static var previews: some View {
         VideoDetailView(offsetIndex: 0,
-                        asset: PHAsset(),
-//                        navigationTitle: "sample",
-                        hidden: .constant(false),
-                        isSeeking: .constant(false),
+                        asset: MLAsset(phAsset: PHAsset(), isAlbum: true),
+                        imageManager: PHCachingImageManager(),
+                        size: .zero,
+                        play: .constant(.play),
+                        hideTools: .constant(false),
+                        userGesture: .constant(.none),
                         offsetY: .constant(0),
                         offsetX: .constant(0))
         .preferredColorScheme(.dark)

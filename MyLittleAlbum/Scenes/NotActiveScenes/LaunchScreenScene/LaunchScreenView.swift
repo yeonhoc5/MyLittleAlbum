@@ -23,25 +23,31 @@ struct LaunchScreenView: View {
         .autoconnect()
     
     var body: some View {
-        ZStack {
-            // 레이어 1: 백그라운드 컬러
-            FancyBackground()
-                .onAppear { loadVideo() }
-            // 레이어 2: 반짝 텍스트
-            textGrowl
-                .opacity(textGo ? 1 : 0)
-            if videoPlayer != nil {
-            // 레이어 3: 마스크 써클 비디오 [메인 비디오]
-                maskedCircleVideo(player: videoPlayer)
-            // 레이어 4: 타이틀 뷰 [비디오 뜨기 전에]
+        GeometryReader { geometry in
+            ZStack {
+                // 레이어 1: 백그라운드 컬러
+                Color.black
+                    .onAppear { loadVideo() }
+                // 레이어 2: 반짝 텍스트
+                textGrowl(geo: geometry)
+                    .opacity(textGo ? 1 : 0)
+                // 레이어 3: 마스크 써클 비디오 [메인 비디오]
+                if videoPlayer != nil {
+                    maskedCircleVideo(player: videoPlayer,
+                                      geo: geometry)
+                }
+                // 레이어 4: 타이틀 뷰 [비디오 뜨기 전에]
                 BackgroudStateView()
                     .opacity(launchScreenManger.state == .ready ? 1 : 0)
                     .onReceive(animationTimer) { _ in
                         updateAnimation()
-                        launchScreenManger.state = .first
+                        withAnimation {
+                            launchScreenManger.state = .first
+                        }
                     }
             }
         }
+        .ignoresSafeArea()
     }
 }
 
@@ -49,23 +55,23 @@ struct LaunchScreenView: View {
 // subViews
 extension LaunchScreenView {
     // 2. 반짝 텍스트
-    var textGrowl: some View {
-        let width = screenSize.width
-        let height = screenSize.height
+    func textGrowl(geo: GeometryProxy) -> some View {
+        let width = geo.size.width
+        let height = geo.size.height
         return Image("growl")
             .resizable(resizingMode: .tile)
             .frame(width: width, height: height, alignment: .center)
     }
     // 3. 마스크드 써클 비디오
-    func maskedCircleVideo(player: AVPlayer) -> some View {
-        let width = screenSize.width
-        let height = screenSize.height
+    func maskedCircleVideo(player: AVPlayer, geo: GeometryProxy) -> some View {
+        let width = geo.size.width
+        let height = geo.size.height
         return AVPlayerController(player: player)
             .scaledToFill()
             .ignoresSafeArea()
             .frame(width: width, height: height, alignment: .center)
             .mask {
-                Color.fancyBackground
+                Color.black
                     .clipShape(Circle())
                     .ignoresSafeArea()
                     .scaleEffect(maskingScale)

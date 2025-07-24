@@ -8,16 +8,22 @@
 import SwiftUI
 
 struct BackgroudStateView: View {
+    @Namespace var nameSpace
+    
     var body: some View {
-        ZStack {
-            Color.white
+//        let height = device == .phone ? 0.16 : 0.2
+        return ZStack {
+            Color("LaunchBackColor")
                 .ignoresSafeArea()
-            Image("MyLittleAlbum")
+            Image("LaunchCenterImage")
                 .resizable()
                 .scaledToFit()
-                .frame(width: screenSize.width * 0.35)
-                .position(x: screenSize.width / 2, y: screenSize.height / 2 * 0.8)
+                .frame(width: screenSize.height * 0.16)
+                .position(x: screenSize.width / 2,
+                          y: screenSize.height * 0.8 / 2)
+                .transition(.scale)
         }
+        .ignoresSafeArea()
     }
 }
 
