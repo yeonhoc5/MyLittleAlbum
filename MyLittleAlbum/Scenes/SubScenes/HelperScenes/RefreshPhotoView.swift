@@ -9,6 +9,8 @@ import SwiftUI
 
 struct RefreshPhotoView: View {
     var sentence = "you need a Little Refresh time"
+    let task: () -> Void
+    
     var body: some View {
         Rectangle()
             .foregroundColor(.fancyBackground)
@@ -23,11 +25,16 @@ struct RefreshPhotoView: View {
                 }
             }
             .ignoresSafeArea()
+            .onAppear {
+                task()
+            }
     }
 }
 
 struct RefreshPhotoView_Previews: PreviewProvider {
     static var previews: some View {
-        RefreshPhotoView()
+        RefreshPhotoView {
+            
+        }
     }
 }

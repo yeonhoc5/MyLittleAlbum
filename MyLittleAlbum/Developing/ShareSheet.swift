@@ -28,10 +28,11 @@ import Photos
 //
 //}
 
-struct Photo: Transferable {
+struct Photo: Transferable, Identifiable {
     static var transferRepresentation: some TransferRepresentation {
         ProxyRepresentation(exporting: \.image)
         }
+    let id: ObjectIdentifier
     public var image: Image
     public var caption: String
     public var url: URL!

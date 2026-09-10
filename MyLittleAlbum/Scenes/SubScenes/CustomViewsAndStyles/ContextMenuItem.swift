@@ -8,25 +8,29 @@
 import SwiftUI
 
 struct ContextMenuItem: View {
-    var title: String! = ""
-    var image: String! = ""
-    var color: Color! = .primary
-    var body: some View {
-        if image == "" {
-            Text(title)
-                .foregroundColor(color)
-        } else {
-            HStack {
-                Text(title)
-                imageWithScale(systemName: image, scale: .medium)
-            }
-            .foregroundColor(color)
+  var title: String! = ""
+  var image: String! = ""
+  var color: Color! = .white
+  var multiColor: Bool = false
+  var body: some View {
+    Group {
+      if image == "" {
+        Text(title)
+      } else {
+        HStack {
+          Text(title)
+          imageWithScale(
+            systemName: image,
+            scale: .medium)
+          .symbolRenderingMode(multiColor ? .multicolor : .monochrome)
         }
+      }
     }
+  }
 }
 
 struct ContextMenuItem_Previews: PreviewProvider {
-    static var previews: some View {
-        ContextMenuItem()
-    }
+  static var previews: some View {
+    ContextMenuItem()
+  }
 }

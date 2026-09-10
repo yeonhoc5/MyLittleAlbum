@@ -8,24 +8,32 @@
 import SwiftUI
 
 struct CustomProgressView: View {
-    @ObservedObject var stateChangeObject: StateChangeObject
+    var progressName: String = ""
+    @Binding var progressState: ProgressViewState
     var color: Color! = .color1
     var size: CGFloat! = 120
-    var blurStyle: UIBlurEffect.Style = .systemThickMaterialLight
+    var nameSpace: Namespace.ID
     
     var body: some View {
-        BlurView(style: blurStyle)
-            .frame(width: size, height: size)
-            .cornerRadius(10)
-            .opacity(0.9)
-            .shadow(color: .gray.opacity(0.5), radius: 5, x: 0, y: 0)
-            .overlay {
-                if stateChangeObject.assetChanged == .completed {
-                    progressDoneView
-                } else {
-                    progressView
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: 10)
+                .foregroundStyle(.ultraThickMaterial)
+                .colorScheme(.light)
+                .frame(width: size, height: size)
+                .opacity(0.9)
+                .shadow(color: .gray.opacity(0.5),
+                        radius: 5, x: 0, y: 0)
+        }
+        .overlay {
+            Group {
+                switch progressState {
+                case .start: progressView
+                case .done: progressDoneView
+                default: EmptyView()
                 }
             }
+            .transition(.scale)
+        }
     }
 }
 
@@ -33,16 +41,11 @@ extension CustomProgressView {
 
     var progressDoneView: some View {
         Image(systemName: "checkmark")
-            .font(Font.system(size: 55))
+            .font(Font.system(size: 45))
             .foregroundColor(.color1)
             .onAppear {
                 let impactMed = UIImpactFeedbackGenerator(style: .medium)
                 impactMed.impactOccurred()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation {
-                        stateChangeObject.assetChanged = .done
-                    }
-                }
             }
     }
     
@@ -50,7 +53,8 @@ extension CustomProgressView {
     var progressView: some View {
         ProgressView()
             .progressViewStyle(.circular)
-//            .scaleEffect(1.5)
+            .controlSize(.large)
+            .scaleEffect(0.7)
             .tint(color)
     }
 }
@@ -58,13 +62,12 @@ extension CustomProgressView {
 
 struct CustomProgressView_Previews: PreviewProvider {
     static var previews: some View {
-        let stateObject = StateChangeObject()
         FancyBackground()
             .overlay {
-                CustomProgressView(stateChangeObject: stateObject)
-                    .onAppear {
-                        stateObject.assetChanged = .completed
-                    }
+                CustomProgressView(
+                    progressName: "코딩",
+                    progressState: .constant(.done),
+                    nameSpace: Namespace().wrappedValue)
             }
             .preferredColorScheme(.dark)
     }

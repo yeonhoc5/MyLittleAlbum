@@ -9,7 +9,9 @@ import Foundation
 
 
 // ui 체인지용
-enum UIMode: String, CaseIterable {
+enum UIMode: String, Identifiable, CaseIterable {
+    var id: Int { return self.hashValue }
+    
     case classic, modern, fancy
     
     enum Axis {
@@ -27,15 +29,30 @@ enum UIMode: String, CaseIterable {
 }
 
 enum SampleCase: Int {
+    case none
     case overTwo
     case one
-    case none
+    case zero
+    
     
     static func returnType(int: Int) -> Self {
         switch int {
         case 2: return .overTwo
         case 1: return .one
+        case 0: return .zero
         default: return .none
+        }
+    }
+    func returnCount() -> Int {
+        switch self {
+        case .overTwo:
+            return 2
+        case .one:
+            return 1
+        case .zero:
+            return 0
+        case .none:
+            return -1
         }
     }
 }
@@ -44,9 +61,10 @@ enum SampleCase: Int {
 enum Tabs: String, CaseIterable, Identifiable {
     var id: Self { self }
     
-    case photo = "나의 사진"
+//    case photo = "나의 포토"
     case album = "나의 앨범"
-    case other = "사진 관리"
+//    case other = "사진 관리"
+    case share = "공유 앨범"
 }
 
 // cell별 ui 구분
@@ -62,8 +80,8 @@ enum PressedType {
     case none, album, folder
 }
 // 알럿 내용 구분용2
-enum CollectionType {
-    case none, album, folder
+enum CollectionType: CaseIterable {
+    case album, folder, none
 }
 // 알럿 내용 구분용3
 enum DepthType {
@@ -71,7 +89,7 @@ enum DepthType {
 }
 
 enum EditType {
-    case none, add, modify
+    case none, add, modify, remove
 }
 
 enum DeleteType {
@@ -88,15 +106,15 @@ enum ImageSize {
 
 
 enum AlbumType {
-    case home, album, smartAlbum, picker
+    case home, album, share, picker
 }
 
-enum SmartAlbum {
-    case none, trashCan, hiddenAsset
+enum SmartType {
+    case none, trashCan, hiddenAsset, favorite
 }
 
 enum EdgeToScroll {
-    case top, bottom, none
+    case top, bottom, none, number
 }
 
 enum NewToScroll {

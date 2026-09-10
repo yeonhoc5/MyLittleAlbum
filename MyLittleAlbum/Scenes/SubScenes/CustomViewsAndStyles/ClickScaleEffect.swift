@@ -8,12 +8,11 @@
 import SwiftUI
 
 struct ClickScaleEffect: ButtonStyle {
-    
-    var scale: CGFloat = 0.97
-    
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? scale:1.0)
-    }
+  var scale: CGFloat = 0.97
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .scaleEffect(configuration.isPressed ? scale : 1.0)
+      .animation(.snappy, value: configuration.isPressed)
+  }
 }
 

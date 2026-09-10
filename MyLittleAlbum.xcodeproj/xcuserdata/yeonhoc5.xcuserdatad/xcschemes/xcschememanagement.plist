@@ -9,10 +9,22 @@
 			<key>orderHint</key>
 			<integer>0</integer>
 		</dict>
+		<key>MyLittleAlbumPad.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>isShown</key>
+			<true/>
+			<key>orderHint</key>
+			<integer>2</integer>
+		</dict>
 	</dict>
 	<key>SuppressBuildableAutocreation</key>
 	<dict>
 		<key>1A3EA90028F6A3850071CB25</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>1ABD08D32EB88ECC0075814A</key>
 		<dict>
 			<key>primary</key>
 			<true/>
