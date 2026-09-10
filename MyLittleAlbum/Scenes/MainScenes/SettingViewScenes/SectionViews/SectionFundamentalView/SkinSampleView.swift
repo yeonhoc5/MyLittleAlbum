@@ -8,120 +8,120 @@
 import SwiftUI
 
 struct SkinSampleView: View {
-    let uiMode: UIMode
-    let size: CGSize
-    
-    var body: some View {
-        let firstWidth = 100.0
-        let secondWidth = firstWidth * 0.7
-        VStack(alignment: .center, spacing: 10) {
-            HStack(alignment: .top) {
-                if uiMode == .fancy {
-                    CellView(uiMode: uiMode,
-                             cellType: .album,
-                             index: 0,
-                             width: firstWidth) { size, namespace in
-                        AlbumCoverView(
-                            album: MLAlbum(sampleID: 1, sampleCase: .overTwo),
-                            uiMode: uiMode,
-                            cellType: .album,
-                            size: size,
-                            colorIndex: 0,
-                            albumCell: namespace,
-                            isEditingMode: false,
-                            rprstImage1: UIImage(named: "sampleImage01"),
-                            rprstImage2: UIImage(named: "sampleImage03")
-                        )
-                    }
-                }
-                CellView(uiMode: uiMode,
-                         cellType: .album,
-                         index: 1,
-                         width: firstWidth) { size, namespace in
-                    AlbumCoverView(
-                        album: MLAlbum(sampleID: 2, sampleCase: .one),
-                        uiMode: uiMode,
-                        cellType: .album,
-                        size: size,
-                        colorIndex: 0,
-                        albumCell: namespace,
-                        isEditingMode: false,
-                        rprstImage1: UIImage(named: "sampleImage02")
-                    )
-                }
-                CellView(uiMode: uiMode,
-                         cellType: .album,
-                         index: 2,
-                         width: firstWidth) { size, namespace in
-                    AlbumCoverView(
-                        album: MLAlbum(sampleID: 3, sampleCase: .zero),
-                                   uiMode: uiMode,
-                                   cellType: .album,
-                                   size: size,
-                                colorIndex: 0,
-                                   albumCell: namespace,
-                        isEditingMode: false)
-                }
-            }
-            HStack(alignment: .top, content: {
-                CellView(uiMode: uiMode,
-                         cellType: .folder,
-                         index: 0,
-                         width: secondWidth) { size, namespace in
-                    FolderCoverView(folder: MLFolder(sampleID: 1),
-                                    phCollectionList: nil,
-                                    uiMode: uiMode,
-                                    size: size,
-                                    cellNameSpace: namespace)
-                }
-                CellView(uiMode: uiMode,
-                         cellType: .miniAlbum,
-                         index: 3,
-                         width: secondWidth) { size, namespace in
-                    AlbumCoverView(
-                        album: MLAlbum(sampleID: 4,
-                                        sampleCase: .one),
-                        uiMode: uiMode,
-                        cellType: .miniAlbum,
-                        size: size,
-                        colorIndex: 0,
-                        albumCell: namespace,
-                        isEditingMode: false,
-                        rprstImage1: UIImage(named: "sampleImage04")
-                    )
-                }
-                CellView(uiMode: uiMode,
-                         cellType: .miniAlbum,
-                         index: 4,
-                         width: secondWidth) { size, namespace in
-                    AlbumCoverView(
-                        album: MLAlbum(sampleID: 5,
-                                        sampleCase: .zero),
-                        uiMode: uiMode,
-                        cellType: .miniAlbum,
-                        size: size,
-                        colorIndex: 0,
-                        albumCell: namespace,
-                        isEditingMode: false)
-                }
-//
-            })
+  let uiMode: UIMode
+  let size: CGSize
+  
+  var body: some View {
+    let firstWidth = 100.0
+    let secondWidth = firstWidth * 0.7
+    VStack(alignment: .center, spacing: 10) {
+      HStack(alignment: .top) {
+        if uiMode == .fancy {
+          CellView(uiMode: uiMode,
+                   cellType: .album,
+                   index: 0,
+                   width: firstWidth) { uiMode, size, namespace in
+            AlbumCoverView(
+              album: MLAlbum(sampleID: 1, sampleCase: .overTwo),
+              uiMode: uiMode,
+              cellType: .album,
+              size: size,
+              colorIndex: 0,
+              albumCell: namespace,
+              isEditingMode: false,
+              rprstImage1: UIImage(named: "sampleImage01"),
+              rprstImage2: UIImage(named: "sampleImage03")
+            )
+          }
         }
+        CellView(uiMode: uiMode,
+                 cellType: .album,
+                 index: 1,
+                 width: firstWidth) { uiMode, size, namespace in
+          AlbumCoverView(
+            album: MLAlbum(sampleID: 2, sampleCase: .one),
+            uiMode: uiMode,
+            cellType: .album,
+            size: size,
+            colorIndex: 0,
+            albumCell: namespace,
+            isEditingMode: false,
+            rprstImage1: UIImage(named: "sampleImage02")
+          )
+        }
+        CellView(uiMode: uiMode,
+                 cellType: .album,
+                 index: 2,
+                 width: firstWidth) { uiMode, size, namespace in
+          AlbumCoverView(
+            album: MLAlbum(sampleID: 3, sampleCase: .zero),
+            uiMode: uiMode,
+            cellType: .album,
+            size: size,
+            colorIndex: 0,
+            albumCell: namespace,
+            isEditingMode: false)
+        }
+      }
+      HStack(alignment: .top, content: {
+        CellView(uiMode: uiMode,
+                 cellType: .folder,
+                 index: 0,
+                 width: secondWidth) { uiMode, size, namespace in
+          FolderCoverView(folder: MLFolder(sampleID: 1),
+                          subFolder: nil,
+                          uiMode: uiMode,
+                          size: size,
+                          cellNameSpace: namespace)
+        }
+        CellView(uiMode: uiMode,
+                 cellType: .miniAlbum,
+                 index: 3,
+                 width: secondWidth) { uiMode, size, namespace in
+          AlbumCoverView(
+            album: MLAlbum(sampleID: 4,
+                           sampleCase: .one),
+            uiMode: uiMode,
+            cellType: .miniAlbum,
+            size: size,
+            colorIndex: 0,
+            albumCell: namespace,
+            isEditingMode: false,
+            rprstImage1: UIImage(named: "sampleImage04")
+          )
+        }
+        CellView(uiMode: uiMode,
+                 cellType: .miniAlbum,
+                 index: 4,
+                 width: secondWidth) { uiMode, size, namespace in
+          AlbumCoverView(
+            album: MLAlbum(sampleID: 5,
+                           sampleCase: .zero),
+            uiMode: uiMode,
+            cellType: .miniAlbum,
+            size: size,
+            colorIndex: 0,
+            albumCell: namespace,
+            isEditingMode: false)
+        }
+        //
+      })
     }
-    
-    func classicImage(width: CGFloat, height: CGFloat) -> some View {
-        Image(systemName: "photo")
-            .resizable()
-            .frame(width: width, height: height)
-            .foregroundColor(Color.gray)
-            .background {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.white)
-            }
-            .clipped()
-    }
+  }
+  
+  func classicImage(width: CGFloat, height: CGFloat) -> some View {
+    Image(systemName: "photo")
+      .resizable()
+      .frame(width: width, height: height)
+      .foregroundColor(Color.gray)
+      .background {
+        RoundedRectangle(cornerRadius: 10)
+          .fill(Color.white)
+      }
+      .clipped()
+  }
 }
 
 #Preview {
-    SkinSampleView(uiMode: .fancy, size: CGSize(width: 300, height: 150))
+  SkinSampleView(uiMode: .fancy, size: CGSize(width: 300, height: 150))
 }

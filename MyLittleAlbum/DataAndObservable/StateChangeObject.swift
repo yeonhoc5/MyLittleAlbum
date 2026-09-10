@@ -35,7 +35,7 @@ class StateChangeObject: ObservableObject {
     @Published var pressedType: PressedType = .none
     @Published var collectionType: CollectionType = .none
     @Published var editType: EditType = .none
-    @Published var collectionToEdit: PHCollection!
+    @Published var collectionToEdit: SubCollection!
     
     
     // 콜렉션뷰 용 프라퍼티

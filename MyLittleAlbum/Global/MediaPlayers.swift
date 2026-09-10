@@ -11,7 +11,6 @@ extension MPVolumeView {
     static func catchVolume() -> CGFloat {
         let volumeView = MPVolumeView()
         let slider = volumeView.subviews.first(where: { $0 is UISlider }) as? UISlider
-        print(slider)
         return CGFloat(slider?.value ?? 0)
     }
     static func setVolume(_ volume: Float) -> Void {

@@ -7,108 +7,81 @@
 
 import SwiftUI
 import Photos
-import Zoomable
 
-struct ImageDetailView: View {
-    @Environment(\.scenePhase) var scenePhase
-    
-    let asset: MLAsset
-    let imageManager: PHCachingImageManager
-    let size: CGSize
-    
-    @Binding var variableScale: CGFloat
-    @Binding var currentScale: CGFloat
-    @State var fetchedImage: UIImage!
-    @Binding var offsetY: CGFloat
-    @State var widthIsCreteria: Bool = false
-    
-    var body: some View {
-        if fetchedImage == nil {
-            loadingView
-        } else {
-//            GeometryReader { goeproxy in
-//                HStack {
-//                    Spacer(minLength: 0)
-//                    VStack {
-//                        Spacer(minLength: 0)
-                        Image(uiImage: (fetchedImage))
-                            .resizable()
-                            .scaledToFit()
-//                        Spacer(minLength: 0)
-//                    }
-//                    Spacer(minLength: 0)
-//                }
-//            }
+struct ImageDetailView<TempView: View>: View {
+  @Environment(\.scenePhase) var scenePhase
+  
+  let asset: MLAsset
+  let imageManager: PHCachingImageManager
+  let geometry: GeometryProxy
+  @State var fetchedImage: UIImage!
+  let tempView: () -> TempView
+  let resutlMedia: (UIImage) -> Void
+  @Namespace var nameSpace
+  
+  var body: some View {
+    if let image = fetchedImage {
+      Image(uiImage: image)
+        .resizable()
+        .scaledToFit()
+        .onAppear {
+          resutlMedia(image)
         }
-    }
-}
-
-extension ImageDetailView {
-    var loadingView: some View {
-        ProgressView()
-            .tint(.white)
-            .controlSize(.large)
-            .progressViewStyle(.circular)
-            .scaleEffect(0.8)
-            .onAppear {
-                DispatchQueue.main.async {
-                    withAnimation {
-                        fetchedImage = fetchingImage(asset: asset.phAsset)
-                    }
-                }
+    } else {
+      tempView()
+        .opacity(0.5)
+        .onAppear {
+          DispatchQueue.global(qos: .userInteractive).async {
+            withAnimation {
+              fetchingImage(asset: asset.phAsset,
+                            size: geometry.size)
             }
-    }
-    var zoomGestureByTab: some Gesture {
-        TapGesture(count: 2)
-            .onEnded { _ in
-                withAnimation {
-                    if variableScale != 1 {
-                        variableScale = 1
-                        currentScale = 1
-                    } else {
-                        variableScale = 1.5
-                        currentScale = 1.5
-                    }
-                }
-            }
-    }
+          }
+        }
+      }
+  }
 }
 
 //
 extension ImageDetailView {
-    func fetchingImage(asset: PHAsset) -> UIImage {
-        let assetRatio = CGFloat(asset.pixelHeight) / CGFloat(asset.pixelWidth)
-        let screenRatio = size.height / size.width
-        widthIsCreteria = assetRatio <= screenRatio
-        var returnImage: UIImage!
-        let options = PHImageRequestOptions()
-        options.deliveryMode = .opportunistic
-        options.isSynchronous = true
-        options.isNetworkAccessAllowed = true
-        options.resizeMode = .exact
-        let creteriaSize = (widthIsCreteria
-                     ? size.width
-                     : size.height) * scale
-        let size = CGSize(width: widthIsCreteria ? creteriaSize : .infinity,
-                          height: widthIsCreteria ? .infinity : creteriaSize)
-        
-        imageManager.requestImage(for: asset,
-                                  targetSize: size,
-                                  contentMode: .aspectFit,
-                                  options: options) { assetImage, _ in
-            if let image = assetImage {
-                returnImage = image
-            }
+  func fetchingImage(asset: PHAsset, size: CGSize) {
+    let options = PHImageRequestOptions()
+    options.deliveryMode = .opportunistic
+    options.resizeMode = .exact
+    options.isSynchronous = true
+    options.isNetworkAccessAllowed = true
+
+    let creteria = creteriaResult(
+      screenSize: size,
+      size: CGSize(width: asset.pixelWidth,
+                   height: asset.pixelHeight)
+    )
+    let creteriaSize = (creteria == .width ? size.width : size.height) * scale
+    let anotherSize: CGFloat = (
+      creteria == .width
+      ? (CGFloat(asset.pixelHeight) * size.width / CGFloat(asset.pixelWidth))
+      : (CGFloat(asset.pixelWidth) * size.height / CGFloat(asset.pixelHeight))
+    ) * scale
+    let size = CGSize(width: creteria == .width ? creteriaSize : anotherSize,
+                      height: creteria == .height ? creteriaSize : anotherSize)
+    imageManager.requestImage(for: asset,
+                              targetSize: size,
+                              contentMode: .aspectFit,
+                              options: options) { assetImage, _ in
+      if let image = assetImage {
+        dispatchAnimation {
+          self.fetchedImage = image
         }
-        return returnImage
+      }
     }
-    
+  }
+  
 }
 
 
 struct ImageDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-            .environmentObject(PhotoData())
-    }
+  static var previews: some View {
+    ContentView()
+      .environmentObject(PhotoData())
+  }
 }

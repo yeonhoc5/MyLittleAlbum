@@ -8,838 +8,1006 @@
 import SwiftUI
 import Photos
 import LocalAuthentication
-import CoreHaptics
-
-enum ReLoadingType {
-    case none
-    case reFetchInside // item count + selectedItems 제거 + selectMode 체인지
-    case reFetchOutside // item count 체인지
-    case itemChangedInside // selectedItems 제거 + selectMode 체인지
-    case itemChangedOutside // selectedItems 제거
-    case selectedModeChange, selectAll, deselectAll
-    case filterChange, belongingChange
-}
+import VariableBlur
 
 struct AllPhotosView: View {
-    @Environment(\.scenePhase) var scenePhase
-    @Environment(\.isPresented) var isPresented
-    @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var photoData: MLPhotoData
-    let imageCachingManger = PHCachingImageManager()
-    // 앨범 타입이 album일 경우에만 "피커 버튼" 노출 결정
-    var albumType: AlbumType = .album
-    let assetCollection: PHAssetCollection!
-    @State var mlAlbum: MLAlbum!
-    @State var assetArray: [MLAsset] = []
-    var isHiddenAsset: Bool
-    var smartAlbum: SmartAlbum! = nil
-    // [나의 사진]탭용 album 세팅용 프라퍼티
-    // 필터링 1 : ([나의 사진]탭에서만) 전체 / In앨범 / NotIn앨범 필터링
-    @State var belongingType: BelongingType = .nonAlbum
-    // 필터링 2 : (전체탭) 미디어 타입 필터링
-    @State var filteringType: FilteringType = .all
-    // ipad에서 탭바 위치 잡기 위한 뷰 카운팅
-    @Binding var isPhotosView: Int
-    var nameSpace: Namespace.ID
-    // ui에 영향 있는 프라퍼티 -> 바인딩 처리
-    @State var edgeToScroll: EdgeToScroll = .none
-    @State var isShowingShareSheet: Bool = false
-    @State var newName: String = ""
-    // detail 모드용 프라퍼티
-    @State var indexToView: Int = 0
-    @State var isExpanded: Bool = false
-    // asset 선택모드용 프라퍼티
-    @State var isSelectMode: Bool = false
-    @State var selectedItems: [MLAsset] = []
-    @State var refreshItmes: [MLAsset] = []
-    @State var isSelectingBySwipe: Bool = false
-    // 노크 기능 프라퍼티
-    @State var isReadyHiddenAsset: Bool = false
-    @State var showHiddenAssets: Bool = false
-    @State var showEmptyHiddenAsset: Bool = false
-    // 화면 가리기
-    @State var showAuthenticView: Bool = false
-    // 셀 리로드
-    @State var reLoadingType: ReLoadingType = .none
-    @State var showDetailView: Bool = false
-    
-    var body: some View {
-//        let assetArray = assetArray(albumType: albumType,
-//                                    belongingType: belongingType)
-        ZStack {
-            FancyBackground().ignoresSafeArea()
-            GeometryReader { geoProxy in
-                Group {
-                    if mlAlbum == nil {
-                        tempView(geoProxy: geoProxy, onAppear: {
-                            phPhotosQueue.asyncAfter(
-                                deadline: .now()
-                                + ((albumType == .home || albumType == .picker) ? 0.5 : 0)) {
-                                readyToShowView(albumType: albumType)
-                            }
-                        })
-                    } else {
-                        let columnCount = columnCount(geoProxy: geoProxy)
-                        let cellWidth = (geoProxy.size.width - CGFloat(columnCount - 1))
-                                        / CGFloat(columnCount)
-                        NewPhotosCollectionView(
-                            albumType: albumType,
-                            mlAlbum: mlAlbum,
-                            isHiddenAssets: isHiddenAsset,
-                            assetArray: $assetArray,
-                            filteringType: $filteringType,
-                            belongingType: belongingType,
-                            geoProxy: geoProxy,
-                            cellWidth: cellWidth,
-                            imageCachingManager: imageCachingManger,
-                            isSelectMode: $isSelectMode,
-                            selectedItems: $selectedItems,
-                            refreshItems: $refreshItmes,
-                            indexToView: $indexToView,
-                            isExpanded: $isExpanded,
-                            edgeToScroll: $edgeToScroll,
-                            reLoadingType: $reLoadingType)
-                        .overlay(content: {
-                            if isHiddenAsset && assetArray.isEmpty {
-                                emptyHiddenInfoView()
-                            }
-                        })
-                        .overlay(alignment: .top, content: {
-                            if showEmptyHiddenAsset {
-                                emptyCapsuleView(size: geoProxy.size, cellWidth: cellWidth)
-                            }
-                        })
-                        .onAppear(perform: {
-                            thumbnailCaching(isStart: true, width: cellWidth)
-                        })
-//                        .onChange(of: presentationMode.wrappedValue.isPresented) { value in
-//                            print("\(mlAlbum.title) [\(isHiddenAsset)] isPresented? : \(value)")
-//                            
-//                        }
-                        .onDisappear(perform: {
-                            if albumType == .album || albumType == .smartAlbum {
-//                                if !PresentationMode.wrappedValue == .isPresented && !showHiddenAssets {
-//                                    DispatchQueue.global(qos: .background).async {
-//                                        print("캐싱 딜리트 [\(mlAlbum.title) \(isHiddenAsset ? " Hidden" : "not Hidden")]")
-//                                        imageCachingManger.stopCachingImagesForAllAssets()
-//                                    }
-//
-//                                }
-                            }
-                        })
-                    }
+  @Environment(\.scenePhase) var scenePhase
+  @Environment(\.dismiss) var dismiss
+  @EnvironmentObject var photoData: MLPhotoData
+  @ObservedObject var mlAlbum: MLAlbum
+  let isHiddenAsset: Bool
+  let nameSpace: Namespace.ID
+  @Namespace var allPhotosNamespace
+  @Binding var isPhotosView: Int
+  let imageManager = PHCachingImageManager()
+  // view state
+  @State var inited: Bool = false
+  @State var edgeToScroll: EdgeToScroll = .none
+  @State var isReadyVolumeSort: Bool = false
+  @State var readyCount: Int = 0
+  @State var emptyText: String = ""
+  // selectMode
+  @State var isSelectMode: Bool = false
+  @State var selectedItems: [MLAsset] = []
+  @State var isSelectingBySwipe: Bool = false
+  @State var isUnionMode: Bool = true
+  @State var swipeSelectedItems: [MLAsset] = []
+  // view Redraw
+  @State var isShowingFilter: Bool = false
+  @State var filtering: Filtering = Filtering()
+  @State var reLoadingType: ReLoadingType = .none
+  // detailView
+  @State var isExpanded = false
+  @State var indexToView: Int = 0
+  // show Hidden asset view
+  @State var knockCount: Int = 0
+  @State var showEmptyHiddenAsset: Bool = false
+  @State var isReadyHiddenAsset: Bool = false
+  @State var showHiddenAssets: Bool = false
+  // sheet
+  @State var assetAlert: AssetAlert!
+  @State var moveAssetObject: MoveAssetObject!
+  @State var isShowingShareSheet: Bool = false
+  @State var isShowingPhotosPicker: Bool = false
+  @State var isShowingMoveAssetSheet: Bool = false
+  //to refresh
+  @State var refreshItems: [MLAsset] = []
+  @State var assetChanged: Bool = false
+  @State var pointedAsset: UIImage? = nil
+
+  let viewCompletion: (Bool) -> Void
+  
+  var body: some View {
+    let assetArray = filteredAssetArray()
+    return GeometryReader { geoProxy in
+      let columnCount = columnCount(geoProxy: geoProxy)
+      let cellWidth = (geoProxy.size.width - CGFloat(columnCount - 1)) / CGFloat(columnCount)
+      ZStack(alignment: .bottomTrailing) {
+        // background
+        FancyBackground()
+        if isHiddenAsset {
+          availableGlassCardView(cornerR: 38)
+        }
+//        Color.white
+        collectionView(geoProxy: geoProxy,
+                       cellWidth: cellWidth,
+                       assetArray: assetArray.filtered)
+//        ratioChecker  // 화면 비율 체커
+        VariableBlurView(maxBlurRadius: 3,
+                         direction: .blurredBottomClearTop)
+          .frame(height: tabbarHeight * 2 + 25)
+        photosGridMenu(size: geoProxy.size,
+                       assetArray: assetArray)
+        .padding(.bottom, (device == .phone)
+                 ? (tabbarHeight + 10) : 0)
+      }
+      .navigationDestination(isPresented: $showHiddenAssets,
+                             destination: {
+        AllPhotosView(mlAlbum: mlAlbum,
+                      isHiddenAsset: true,
+                      nameSpace: nameSpace,
+                      isPhotosView: $isPhotosView,
+                      viewCompletion: { assetChanged in
+          if #available(iOS 18.0, *) {
+            if assetChanged {
+              dispatchAnimation {
+                self.reLoadingType = .reFetchInside
+              }
+              mlAlbum.unSetHiddenAssets {
+                print("hiddenAssets Removed")
+              }
+            }
+          }
+        })
+        .interactiveDismissDisabled(true) 
+        .modify { view in
+          if #available(iOS 18.0, *) {
+            view
+              .navigationTransition(
+                .zoom(sourceID: "centerCardView", in: nameSpace)
+              )
+          } else {
+            view
+          }
+        }
+        .navigationBarBackButtonHidden()
+        .toolbar {
+          ToolbarItem(placement: .topBarLeading) {
+            Button {
+              withAnimation {
+                showHiddenAssets = false
+              }
+            } label: {
+              Image(systemName: "xmark")
+            }
+
+          }
+        }
+      })
+      .overlay(content: {
+        if filtering.sort == .byVolume && !isReadyVolumeSort {
+          PercentageView(readyCount: readyCount,
+                         allCount: assetArray.filtered.count,
+                         nameSpace: allPhotosNamespace) {
+          }
+        }
+      })
+      .modify({ view in
+        navigationTitleToolbar(view: view)
+      })
+      .overlay(alignment: .center, content: {
+//        ZStack(alignment: .top) {
+//          navigationBlurView(height: safeAreaTopPadding)
+          if showEmptyHiddenAsset {
+            emptyNoticeView(cellWidth: cellWidth)
+              .offset(y: 130)
+              .onAppear {
+                dispatchAnimationDelay(delay: 1.5) {
+                  showEmptyHiddenAsset = false
                 }
-                .overlay(alignment: .bottom, content: {
-                    photosGridMenu(/*assetArray: assetArray,*/
-                                   filteringType: filteringType,
-                                   width: geoProxy.size.width)
-                })
-                .padding(.bottom, (device == .pad || albumType == .picker)
-                         ? 5 : tabbarHeight - (safeAraBottom ?? 0))
-                .onChange(of: geoProxy.size.width) { _  in
-                    if device == .pad {
-                        DispatchQueue.main.async {
-                            reLoadingType = .reFetchOutside
-                        }
-                    }
-                }
-    //            }
-                // 가려진 사진 - 인증 화면
-    //            if album.isHidden {
-    //                viewWithTask(notValidatedView) {
+              }
+          }
+//        }
+      })
+    }
+    .ignoresSafeArea(.all)
+    .ignoresSafeArea(.keyboard)
+    .fullScreenCover(isPresented: $isExpanded,
+                     onDismiss: {
+      dispatchAnimation {
+        self.isExpanded = false
+      }
+    }, content: {
+      PhotosDetailView(
+        albumType: mlAlbum.albumType,
+        localID: mlAlbum.id,
+        isHiddenAssets: self.isHiddenAsset,
+        assetArray: assetArray.filtered,
+        thumbnailManager: imageManager,
+        animationID: allPhotosNamespace,
+        isExpanded: $isExpanded,
+        indexToView: $indexToView) { assetRemoved, assets, index in
+          dispatchAnimation {
+            isExpanded = false
+          }
+          print("assetRemoved in DetailView?: \(assetRemoved)")
+          if assetRemoved {
+            print("reload all")
+            dispatchAnimation {
+              self.reLoadingType = .reFetchInside
+            }
+          } else if !assets.isEmpty {
+            print("reload selected")
+            dispatchAnimation {
+              selectedItems = assets
+              self.reLoadingType = .itemChangedInside
+            }
+          }
+//          DispatchQueue.main.async {
+//            print("ended? \(indexToView)")
+            self.edgeToScroll = .number
+//          }
+        }
+    })
+    .modifier(
+      AssetAlertModifier(assetAlert: $assetAlert,
+                         completion: { assetRemoved in
+                           reloadingAssets(changed: assetRemoved)
+                           mlAlbum.processingChange(bool: false)
+                         })
+    )
+    .modifier(
+      InAppPhotosPicker(
+        openMLAlbumID: mlAlbum.id,
+        isShowingPhotosPicker: $isShowingPhotosPicker,
+        nameSpace: nameSpace,
+        completion: { addedAssets in
+          if !addedAssets.isEmpty {
+            addAssetsIntoAlbum(addedAssets: addedAssets)
+          }
+        })
+    )
+    .modifier(
+      InAppMoveAssetSheet(
+        isShowingMoveAssetSheet: $isShowingMoveAssetSheet,
+        moveAssetObject: $moveAssetObject,
+        assetMoved: { bool in
+          if bool {
+            if mlAlbum.albumType == .home {
+              mlAlbum.processingChange(bool: true)
+            }
+            reloadingAssets(changed: bool)
+          }
+        })
+    )
+    .onReceive(NotificationCenter.default
+      .publisher(for: .innerFetchChange), perform: { output in
+        if reLoadingType != .reFetchInside {
+          if mlAlbum.id == output.object as? String {
+            print("\(mlAlbum.title) innerfetch Recieved")
+            self.reLoadingType = .reFetchInside
+          }
+        }
+      })
+    .onReceive(NotificationCenter.default
+      .publisher(for: .outsideFetchChange), perform: { object in
+        if reLoadingType != .reFetchOutside {
+          if mlAlbum.id == object.object as? String {
+            self.reLoadingType = .reFetchInside
+          }
+        }
+      })
+    .onReceive(NotificationCenter.default
+      .publisher(for: .assetChanged), perform: { output in
+        if let object = output.object as? ChangedItem {
+          if object.albumType == mlAlbum.albumType {
+            DispatchQueue.main.async {
+              self.refreshItems = object.assets
+                .filter({ mlAlbum.photosArray.contains($0) })
+              self.reLoadingType = .itemChangedOutside
+            }
+          }
+        }
+      })
+    //        .onReceive(NotificationCenter.default
+    //            .publisher(for: .collectionRemoved), perform: { object in
+    //                guard let assetCollection = object.object as? PHAssetCollection
+    //                else { return }
+    //                if assetCollection.localIdentifier == mlAlbum.id {
+    //                    dispatchAnimation {
+    //                        dismiss()
+    //                    }
+    //                }
+    //            })
+//    .navigationDestination(isPresented: $showHiddenAssets,
+//                           destination: {
+//      AllPhotosView(mlAlbum: mlAlbum,
+//                    isHiddenAsset: true,
+//                    nameSpace: nameSpace,
+//                    isPhotosView: $isPhotosView,
+//                    viewCompletion: { assetChanged in
+//        if #available(iOS 18.0, *) {
+//          if assetChanged {
+//            dispatchAnimation {
+//              self.reLoadingType = .reFetchInside
+//            }
+//            mlAlbum.unSetHiddenAssets {
+//              print("hiddenAssets Removed")
+//            }
+//          }
+//        }
+//      })
+//    })
+    .onDisappear(perform: {
+      print("dismissed")
+    })
+    .onChange(of: scenePhase, perform: { value in
+      //            if album.isHidden {
+      //                if value == .background {
+      //                    showAuthenticView = true
+      //                }
+      //            }
+    })
+    //    .overlay(content: {
+    //        if showAuthenticView {
+    //            notValidatedView
+    //                .task {
     //                    DispatchQueue.main
     //                        .asyncAfter(deadline: .now() + 0.7) {
-    //                            authenticate(albumType: albumType)
+    //  //                                    authenticate(albumType: albumType)
+    //                            authenticate(albumType: albumType) { bool in
+    //
+    //                            }
     //                        }
     //                }
-    //            }
-            }
-        }
-        .ignoresSafeArea(.keyboard)
-//        .edgesIgnoringSafeArea(.horizontal)
-        .fullScreenCover(isPresented: $isExpanded, content: {
-            let assetArray = assetArray
-                .filter {
-                    return switch filteringType {
-                    case .all: true
-                    case .favorite: $0.isFavorite
-                    default: FilteringType
-                            .trueType(type: self.filteringType) == $0.mediaType
-                    }
-                }
-            PhotosDetailView(albumType: self.albumType,
-                             assetCollection: self.assetCollection,
-                             isHiddenAssets: self.isHiddenAsset,
-                             assetArray: assetArray,
-                             indexToView: $indexToView,
-                             isExpanded: $isExpanded,
-                             animationID: nameSpace,
-                             reLoadingType: $reLoadingType,
-                             selectedItems: $selectedItems)
-        })
-        .onReceive(NotificationCenter.default
-            .publisher(for: .innerFetchChange), perform: { output in
-                if reLoadingType != .reFetchInside {
-                    guard let mlAlbum = mlAlbum else { return }
-                    if mlAlbum.id == output.object as? String {
-                        print("\(mlAlbum.title) innerfetch Recieved")
-                        DispatchQueue.main.async {
-                            reLoadingType = .reFetchInside
-                        }
-                    }
-                }
-        })
-        .onReceive(NotificationCenter.default
-            .publisher(for: .outsideFetchChange), perform: { object in
-                if reLoadingType != .reFetchOutside {
-                    guard let mlAlbum = mlAlbum else { return }
-                    if mlAlbum.id == object.object as? String {
-                        print("\(mlAlbum.title) outter fetch Recieved")
-                        DispatchQueue.main.async {
-                            reLoadingType = .reFetchOutside
-                        }
-                    }
-                }
-            })
-        .onReceive(NotificationCenter.default
-            .publisher(for: .assetChanged), perform: { output in
-                if let object = output.object as? ChangedItem {
-                    if object.albumType == self.albumType {
-                        DispatchQueue.main.async {
-                            refreshItmes = object.assets
-                                .filter({ assetArray.contains($0) })
-                            withAnimation {
-                                reLoadingType = .itemChangedOutside
-                            }
-                        }
-                    }
-                }
-        })
-//        .onReceive(NotificationCenter.default
-//            .publisher(for: .collectionRemoved), perform: { object in
-//                guard let assetCollection = object.object as? PHAssetCollection
-//                else { return }
-//                if assetCollection.localIdentifier == mlAlbum.id {
-//                    dispatchAnimation {
-//                        dismiss()
-//                    }
-//                }
-//            })
-        .navigationDestination(isPresented: $showHiddenAssets) {
-            AllPhotosView(albumType: albumType,
-                          assetCollection: assetCollection,
-                          mlAlbum: mlAlbum,
-                          isHiddenAsset: true,
-                          smartAlbum: smartAlbum,
-                          isPhotosView: $isPhotosView,
-                          nameSpace: nameSpace)
-//            .onDisappear {
-//                mlAlbum.unSetHiddenAssets {
-//                    print("hiddenAssets Removed")
-//                }
-//            }
-        }
-        .onAppear(perform: {
-            guard let mlAlbum = mlAlbum else { return }
-            newName = mlAlbum.title
-        })
-        .onDisappear {
-//            DispatchQueue
-//                .global(qos: .userInteractive)
-//                .async {
-//                    discardImageCaching()
-//                    if album.isHidden {
-//                        album.hiddenArray = []
-//                        album.isHidden = false
-//                        print("hidden Scene End")
-//                    }
-//                }
-//            if albumType != .home {
-//                self.filteringType = .all
-//                if let album = album {
-//                    album.filteringType = .all
-//                }
-//            }
-        }
-        .onChange(of: scenePhase, perform: { value in
-//            if album.isHidden {
-//                if value == .background {
-//                    showAuthenticView = true
-//                }
-//            }
-        })
-        .gesture(DragGesture(minimumDistance: 10, coordinateSpace: .global)
-            .onChanged({ value in
-                if isSelectMode {
-                    self.isSelectingBySwipe = true
-                }
-            })
-            .onEnded({ value in
-                if value.translation.width > 50 && !self.isSelectMode{
-                    dismiss()
-                }
-                if self.isSelectingBySwipe {
-                    self.isSelectingBySwipe = false
-                }
-            }))
-//            .overlay(content: {
-//                if showAuthenticView {
-//                    notValidatedView
-//                        .task {
-//                            DispatchQueue.main
-//                                .asyncAfter(deadline: .now() + 0.7) {
-////                                    authenticate(albumType: albumType)
-//                                    authenticate(albumType: albumType) { bool in
-//                                        
-//                                    }
-//                                }
-//                        }
-//                }
-//            })
-//        })
-        .navigationBarHidden(albumType == .home)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(content: {
-            if (albumType == .album || albumType == .smartAlbum) && !isHiddenAsset {
-                ToolbarItem(id: "knockx3", placement: .topBarTrailing) {
-                    knockHiddenAsset
-                }
-            }
-            ToolbarItem(placement: .principal) {
-                getNavigationTitle(albumType: albumType)
-            }
-        })
-//        .edgesIgnoringSafeArea(.trailing) // 패드
-    }
+    //        }
+    //    })
+    //  })
+  }
+}
+
+struct TempView: View {
+  let completion: () -> Void
+  
+  var body: some View {
+    Rectangle()
+      .foregroundStyle(.orange)
+      .onDisappear {
+        completion()
+      }
+  }
 }
 
 // MARK: - 1. extenstion. subviews
 extension AllPhotosView {
-    func tempView(geoProxy: GeometryProxy, onAppear: @escaping () -> Void) -> some View {
-        Group {
-            switch albumType {
-            case .album: FancyBackground()
-            default: // home / Picker에서 사용
-                lottieLoadingView(
-                    lottie: "photoLoading",
-                    size: CGSize(width: geoProxy.size.width / 3,
-                                 height: geoProxy.size.height / 1.2),
-                    leadingPadding: 0)
-                .frame(width: geoProxy.size.width)
-            }
-        }
-        .onAppear { onAppear() }
+  func modifyAlbumTitleButton() -> some View {
+    Button {
+      let alertObject = AlertObject(
+        alertCase: .albumNameChange,
+        folderType: .userFolder,
+        albumID: mlAlbum.id,
+        folderID: nil)
+      NotificationCenter.default
+        .post(name: .showAlert, object: alertObject)
+    } label: {
+      Image(systemName: iconModify)
+        .scaledToFit()
     }
-    func photosGridMenu(/*assetArray: [MLAsset],*/
-                        filteringType: FilteringType,
-                        width: CGFloat) -> some View {
-        let spacerWidth = device == .phone
-                        ? 0 : ((width / 3) + (5 * tabbarTopPadding))
-        return HStack {
-            if device == .pad {
-                Rectangle()
-                    .fill(.clear)
-                    .frame(width: spacerWidth)
+    .offset(y: -2)
+  }
+  func reloadingAssets(changed: Bool) {
+    if changed {
+      dispatchAnimation {
+        if isHiddenAsset {
+          self.assetChanged = true
+        }
+        self.reLoadingType = .reFetchInside
+        if mlAlbum.albumType == .album {
+          NotificationCenter.default
+            .post(name: .outsideFetchChange, object: "myPhotos")
+        }
+      }
+    }
+  }
+  func filteredAssetArray() -> (all: [MLAsset], filtered: [MLAsset]) {
+    let assetArray = isHiddenAsset ? mlAlbum.hiddenArray : mlAlbum.photosArray
+    if mlAlbum.albumType == .home {
+      let subtracting = filtering.zero == .allAlbums
+                      ? photoData.albumsPhotosSet() : []
+      let homeAssets = assetArray
+        .setSubtraing(by: isHiddenAsset ? [] : subtracting)
+        .filter({ asset in
+          if filtering.first == .allMedia {
+            return true
+          } else {
+            return asset.mediaType == FilterFirst
+              .trueType(type: filtering.first)
+          }
+        })
+      return (homeAssets, assetArray
+        .filter({ asset in
+          if filtering.second == .favorite {
+            return asset.isFavorite
+          } else if filtering.second == .screenshot {
+            return (asset
+              .phAsset.mediaSubtypes
+                      .contains(.photoScreenshot)
+                    || asset
+              .phAsset.mediaSubtypes
+                      .contains(.videoScreenRecording)
+            )
+          } else {
+            return true
+          }
+        })
+        .sorted(by: { assetA, assetB in
+          switch filtering.sort {
+          case .byVolume:
+            if assetA.volume != assetB.volume {
+              return assetA.volume > assetB.volume
             }
-            if let mlAlbum = mlAlbum {
-                PhotosGridMenu(
-                    albumType: albumType,
-                    smartAlbumType: smartAlbum?.smartAlbumType ?? .none,
-                    mlAlbum: mlAlbum,
-                    isHiddenAssets: isHiddenAsset,
-                    cachingimageManager: imageCachingManger,
-                    assetArray: assetArray,
-                    belongingType: $belongingType,
-                    filteringType: $filteringType,
-                    isSelectMode: $isSelectMode,
-                    selectedItems: $selectedItems,
-                    refreshItems: $refreshItmes,
-                    edgeToScroll: $edgeToScroll,
-                    isShowingShareSheet: $isShowingShareSheet,
-                    isShowingPhotosPicker: .constant(false),
-                    nameSpace: nameSpace,
-                    width: width - spacerWidth,
-                    reloadingType: $reLoadingType,
-                    isReadyHiddenAsset: isReadyHiddenAsset)
-//            .frame(width: width)
-//            .opacity(photoData.isShowingDigitalShow ? 0 : 1)
-                .onAppear {
-                    withAnimation {
-                        isPhotosView += device != .phone ? 1 : 0
-                    }
+            if assetA.phAsset.duration != assetB.phAsset.duration {
+              return assetA.duration > assetB.phAsset.duration
+            }
+            return assetA.phAsset.pixelHeight > assetB.phAsset.pixelHeight
+          case .byDate:
+            return assetA.creationDate < assetB.creationDate
+          }
+        }))
+    } else {
+      return (assetArray, assetArray
+        .filter({ asset in
+        if filtering.first == .allMedia {
+          return true
+        } else {
+          return asset.mediaType == FilterFirst
+            .trueType(type: filtering.first)
+        }
+      })
+      .filter({ asset in
+        if filtering.second == .favorite {
+          return asset.isFavorite
+        } else if filtering.second == .screenshot {
+          return (asset.phAsset
+            .mediaSubtypes
+            .contains(.photoScreenshot)
+                  || asset.phAsset
+            .mediaSubtypes
+            .contains(.videoScreenRecording)
+          )
+        } else {
+          return true
+        }
+      })
+      .sorted(by: { assetA, assetB in
+        switch filtering.sort {
+        case .byVolume:
+          if assetA.volume != assetB.volume {
+            return assetA.volume > assetB.volume
+          }
+          if assetA.phAsset.duration != assetB.phAsset.duration {
+            return assetA.duration > assetB.phAsset.duration
+          }
+          return assetA.phAsset.pixelHeight > assetB.phAsset.pixelHeight
+        case .byDate:
+          return assetA.creationDate < assetB.creationDate
+        }
+      }))
+    }
+  }
+  
+  func navigationTitleToolbar(view: some View) -> some View {
+    view
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar(content: {
+        ToolbarItem(placement: .principal) {
+          if mlAlbum.albumType == .home {
+            let width: CGFloat = 150
+            let height: CGFloat = 40
+            let pickerPadding: CGFloat = 10
+            HStack(alignment: .center) {
+              Text("나의 사진\(isHiddenAsset ? "" : (filtering.zero == .allMedia ? "의" : "에서"))")
+                .bold()
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+              ZStack {
+                Group {
+                  if #available(iOS 26.0, *) {
+                    Capsule()
+                      .glassEffect(in: Capsule())
+                  } else {
+                    RoundedRectangle(cornerRadius: 7)
+                  }
                 }
-                .onDisappear {
-                    withAnimation {
-                        isPhotosView -= device != .phone ? 1 : 0
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(width: width - (2 * pickerPadding),
+                       height: height - (pickerPadding / 2))
+                if isHiddenAsset {
+                  Text("가려진 사진")
+                    .font(.caption)
+                    .bold()
+                    .foregroundStyle(Color.fancyBackground)
+                } else {
+                  // picker selected box의 각 패딩 10
+                  Picker("",
+                         selection: .constant(filtering.zero),
+                         content: {
+                    Group {
+                      Text(FilterZero.string(type: .allMedia))
+                        .tag(FilterZero.allMedia)
+                      Text(FilterZero.string(type: .allAlbums))
+                        .tag(FilterZero.allAlbums)
                     }
+                    .font(.caption)
+                    .bold()
+                    .foregroundStyle(Color.fancyBackground)
+                  })
+                  .pickerStyle(.wheel)
+                  .disabled(true)
+                  .frame(width: width, height: height)
+                  .padding(.horizontal, -pickerPadding)
+                  .clipShape(RoundedRectangle(cornerRadius: 7))
                 }
+              }
+            }
+          } else {
+            let title = mlAlbum.title
+            Text("\(self.isHiddenAsset ? "🫣" : "")\(title == "" ? "(No Title)" : title)")
+              .foregroundStyle(title == "" ? .gray : .white)
+              .bold()
+              .contentTransition(.numericText())
+          }
+        }
+        if mlAlbum.albumType == .album {
+          ToolbarItem(placement: .topBarTrailing) {
+            modifyAlbumTitleButton()
+          }
+        }
+      })
+  }
+  
+  func collectionView(geoProxy: GeometryProxy,
+                      cellWidth: CGFloat,
+                      assetArray: [MLAsset]) -> some View {
+    Group {
+      if self.inited {
+        NewPhotosCollectionView(
+          mlAlbum: mlAlbum,
+          albumType: mlAlbum.albumType,
+          isHiddenAssets: isHiddenAsset,
+          assetArray: assetArray,
+          imageManager: imageManager,
+          sampleImages: .constant([:]),
+          geoProxy: geoProxy,
+          cellWidth: cellWidth,
+          edgeToScroll: $edgeToScroll,
+          isReadyVolumeSort: $isReadyVolumeSort,
+          isSelectMode: $isSelectMode,
+          selectedItems: $selectedItems,
+          isSelectingBySwipe: $isSelectingBySwipe,
+          isUnionMode: $isUnionMode,
+          swipeSelectedItems: $swipeSelectedItems,
+          isShowingFilter: $isShowingFilter,
+          filtering: $filtering,
+          reLoadingType: $reLoadingType,
+          isExpanded: $isExpanded,
+          indexToView: $indexToView,
+          isShowingPhotosPicker: $isShowingPhotosPicker,
+          refreshItems: $refreshItems)
+        .overlay {
+          emptyInfoView()
+            .padding(.bottom, tabbarHeight)
+            .transition(.opacity)
+        }
+        .onDisappear {
+          DispatchQueue.global(qos: .default).async {
+            imageManager.stopCachingImagesForAllAssets()
+          }
+        }
+      } else {
+        tempView(geoProxy: geoProxy,
+                 size: cellWidth * 1.5,
+                 needAnimationView: isHiddenAsset
+                 || mlAlbum.albumType == .home) {
+          mlAlbum.fetchChecker(isHidden: isHiddenAsset) { bool in
+            let delay = mlAlbum.albumType == .home ? 1 : 0.1
+            if bool {
+              DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation{
+                  self.inited = true
+                }
+              }
+              thumbnailCaching(width: cellWidth)
             } else {
-                EmptyView()
+              mlAlbum
+                .generateArray(isHidden: isHiddenAsset) {
+                  DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    withAnimation{
+                      self.inited = true
+                    }
+                  }
+                thumbnailCaching(width: cellWidth)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  func addAssetsIntoAlbum(addedAssets: [MLAsset]) {
+    mlAlbum.addAsset(assets: addedAssets) { bool in
+      if bool {
+        dispatchAnimationDelay(delay: 0.5) {
+          self.reLoadingType = .reFetchInside
+          NotificationCenter.default
+            .post(name: .outsideFetchChange, object: "myPhotos")
+        }
+      }
+      mlAlbum.processingChange(bool: false)
+    }
+  }
+  
+  func photosGridMenu(
+    size: CGSize, assetArray: (all: [MLAsset],
+                               filtered: [MLAsset])) -> some View {
+    PhotosGridMenu(mlAlbum: mlAlbum,
+                   isShowingPhotosPicker: $isShowingPhotosPicker,
+                   albumType: mlAlbum.albumType,
+                   isHiddenAssets: isHiddenAsset,
+                   assetArray: assetArray,
+                   edgeToScroll: $edgeToScroll,
+                   isShowingFilter: $isShowingFilter,
+                   isReadyVolumeSort: $isReadyVolumeSort,
+                   isReadyHiddenAsset: $isReadyHiddenAsset,
+                   showHiddenAssets: $showHiddenAssets,
+                   isSelectMode: $isSelectMode,
+                   selectedItems: $selectedItems,
+                   isSelectingBySwipe: $isSelectingBySwipe,
+                   isUnionMode: $isUnionMode,
+                   swipeSelectedItems: $swipeSelectedItems,
+                   filtering: $filtering,
+                   reLoadingType: $reLoadingType,
+                   assetAlert: $assetAlert,
+                   moveAssetObject: $moveAssetObject,
+                   isShowingMoveAssetSheet: $isShowingMoveAssetSheet,
+                   showEmptyNoticeView: $showEmptyHiddenAsset,
+                   isPhotosView: $isPhotosView,
+                   nameSpace: nameSpace,
+                   allPhotosNamespace: allPhotosNamespace,
+                   width: size.width,
+                   readyCount: readyCount,
+                   knockCount: knockCount) {
+      knockingCenterBar()
+    } sortByVolume: {
+      readySortByVolume(assetArray: assetArray.filtered) {
+        dispatchAnimation {
+          self.refreshItems = assetArray.filtered
+          self.isReadyVolumeSort = true
+          dispatchAnimationDelay(delay: 0.5) {
+            self.reLoadingType = .itemChangedOutside
+            self.edgeToScroll = .top
+          }
+        }
+      }
+    } completion: { _ in }
+    
+  }
+  
+  var notValidatedView: some View {
+    Rectangle()
+      .foregroundColor(.fancyBackground)
+      .overlay {
+        VStack(spacing: 20) {
+          Text("이 사진들을 보려면 사용자 권한이 필요합니다.")
+            .foregroundColor(.gray)
+          btnFaceID
+            .onTapGesture {
+              authenticate() { bool in
+                if bool {
+                  returnHiddenAssets(albumType: mlAlbum.albumType)
+                } else {
+                  knock(0) { }
+                }
+              }
+            }
+          Button("FaceID 사용 설정하러 가기") {
+            UIApplication.shared
+              .open(URL(string: "app-settings:root=Privacy")!)
+          }
+        }
+      }
+      .ignoresSafeArea()
+  }
+  func knock(_ count: Int, completion: @escaping () -> Void) {
+    if count == 0 {
+      DispatchQueue.main.async {
+        withAnimation {
+          self.knockCount = 0
+        }
+        completion()
+      }
+    } else {
+      for i in 0...count {
+        DispatchQueue.main
+          .asyncAfter(wallDeadline: .now() + (0.5 * Double(i))) {
+            if i < count {
+              withAnimation {
+                self.knockCount += 1
+              }
+              let hapticManager = HapticManager()
+              hapticManager.impact(style: .light)
+            } else {
+              completion()
             }
         }
-        .frame(height: tabbarHeight)
-        .padding(.horizontal,
-                 device == .phone ? tabbarTopPadding : 0)
-        .padding(.trailing, tabbarBottomPadding)
-        .padding(.bottom, device == .phone ? tabbarTopPadding : 0)
+      }
     }
-    
-    var notValidatedView: some View {
-        Rectangle()
-            .foregroundColor(.fancyBackground)
-            .overlay {
-                VStack(spacing: 20) {
-                    Text("이 사진들을 보려면 사용자 권한이 필요합니다.")
-                        .foregroundColor(.gray)
-                    btnFaceID
-                        .onTapGesture {
-                            authenticate(albumType: albumType) { bool in
-                                if bool {
-                                    returnHiddenAssets(albumType: albumType)
-                                }
-                            }
-                        }
-                    Button("FaceID 사용 설정하러 가기") {
-                        UIApplication.shared
-                            .open(URL(string: "app-settings:root=Privacy")!)
-                    }
-                }
-            }
-            .ignoresSafeArea()
+  }
+  var btnFaceID: some View {
+    imageScaledFit(systemName: "faceid", width: 80, height: 80)
+      .padding(40)
+      .overlay(alignment: .topTrailing) {
+        Text("Touch")
+          .font(.system(size: 10, weight: .regular))
+          .padding(8)
+          .background {
+            Image(systemName: "bubble.left")
+              .resizable()
+              .fontWeight(.ultraLight)
+              .offset(x: 0, y: 3)
+          }
+          .offset(x: 0, y: 0)
+          .opacity(0.7)
+      }
+      .foregroundColor(.gray)
+  }
+  
+  func knockingCenterBar() {
+    if photoData.useKnock && knockCount == 0 {
+      knock(3) {
+        authenticate() { bool in
+          if bool {
+            self.returnHiddenAssets(albumType: mlAlbum.albumType)
+          } else {
+            self.knock(0) { }
+          }
+        }
+      }
     }
-    
-    var btnFaceID: some View {
-        imageScaledFit(systemName: "faceid", width: 80, height: 80)
-            .padding(40)
-            .overlay(alignment: .topTrailing) {
-                Text("Touch")
-                    .font(.system(size: 10, weight: .regular))
-                    .padding(8)
-                    .background {
-                        Image(systemName: "bubble.left")
-                            .resizable()
-                            .fontWeight(.ultraLight)
-                            .offset(x: 0, y: 3)
-                    }
-                    .offset(x: 0, y: 0)
-                    .opacity(0.7)
-            }
-            .foregroundColor(.gray)
-    }
-    
-    var knockHiddenAsset: some View {
-        Rectangle()
-            .frame(width: 50, height: 40)
-            .foregroundStyle(Color.fancyBackground)
-            .onTapGesture(count: 3) {
-                if photoData.useKnock {
-                    authenticate(albumType: albumType) { bool in
-                        if bool {
-                            returnHiddenAssets(albumType: albumType)
-                        }
-                    }
-                }
-            }
-    }
+  }
 }
 
 // MARK: - 2. extenstion. functions
 extension AllPhotosView {
-    func columnCount(geoProxy: GeometryProxy) -> Int {
-        device == .phone
-            ? cellCount(type: .small)
-            : (albumType == .picker
-                ? cellCount(type: .middel2)
-                : (geoProxy.size.width > geoProxy.size.height
-                   ? cellCount(type: .big)
-                   : cellCount(type: .middle1)
-                  )
-            )
+  func readySortByVolume(assetArray: [MLAsset], completion: @escaping () -> Void) {
+    let toReady = assetArray.filter({ $0.volume == 0 })
+    if toReady.isEmpty {
+      completion()
+    } else {
+      DispatchQueue.global(qos: .userInteractive).async {
+        for asset in toReady {
+          if asset.volume == 0 {
+            asset.getFileSize { _ in
+              dispatchAnimation {
+                self.readyCount += 1
+                if readyCount == assetArray.count {
+                  print("sort by Volume ready done")
+                  completion()
+                }
+              }
+            }
+          } else {
+            dispatchAnimation {
+              self.readyCount += 1
+              if readyCount == assetArray.count {
+                print("sort by Volume ready done")
+                completion()
+              }
+            }
+          }
+        }
+      }
     }
-//    func authenticate(albumType: AlbumType) {
-//        let context = LAContext()
-//        var error: NSError?
-//        if context
-//            .canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-//                               error: &error) {
-//            let reason = "We need to unlock your data."
-//            context
-//                .evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics,
-//                                localizedReason: reason) { success, authenticationError in
-//                if success {
-//                    album.setHiddenAsset { int in
-//                        returnHiddenAssets(albumType: albumType)
-//                    }
-////                    returnHiddenAssets(albumType: albumType)
-////                    DispatchQueue.main.async {
-////                        album.isHidden = true
-////                    }
-//                }
-//            }
-//        } else {
-//            let reason = "We need to unlock your data."
-//            context.evaluatePolicy(.deviceOwnerAuthentication,
-//                                   localizedReason: reason) { success, authenticationError in
-//                if success {
-//                    returnHiddenAssets(albumType: albumType)
-//                }
-//            }
-//        }
-//    }
-    
-    func returnHiddenAssets(albumType: AlbumType) {
-        guard let mlAlbum = mlAlbum else { return }
-        mlAlbum.setHiddenAsset { count in
-            if count == 0 {
-                withAnimation(Animation.easeInOut(duration: 0.5), {
-                    self.showEmptyHiddenAsset = true
-                })
-            } else {
-                withAnimation {
-                    isReadyHiddenAsset = true
-                }
-//                dispatchAnimation {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    mlAlbum.generateArray(isHiddenAsset: true) {
-                        dispatchAnimation {
-                            self.showHiddenAssets = true
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            withAnimation {
-                                self.isReadyHiddenAsset = false
-                            }
-                        }
-                    }
-//                    }
-                }
-//                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-//                    
-//                }
+  }
+  func columnCount(geoProxy: GeometryProxy) -> Int {
+    device == .phone
+    ? cellCount(type: .small)
+    : (geoProxy.size.width > geoProxy.size.height
+       ? cellCount(type: .big)
+       : cellCount(type: .middle1)
+      )
+  }
+  
+  func returnHiddenAssets(albumType: AlbumType) {
+    mlAlbum.setHiddenAsset() { count in
+      if count == 0 {
+        dispatchAnimation {
+          self.showEmptyHiddenAsset = true
+          self.knockCount = 0
+        }
+      } else {
+        dispatchAnimation {
+          self.isReadyHiddenAsset = true
+          self.knockCount = 0
+        }
+      }
+    }
+  }
+  
+  func thumbnailCaching(width: CGFloat) {
+    let requestOptions = PHImageRequestOptions()
+    requestOptions.deliveryMode = .fastFormat
+    requestOptions.resizeMode = .exact
+    requestOptions.isSynchronous = true
+    requestOptions.isNetworkAccessAllowed = true
+    let size = CGSize(width: width * scale,
+                      height: width * scale)
+    print("캐싱 시작 : [\(mlAlbum.title) \(isHiddenAsset ? "HiddenAsset" : "not HiddenAsset")]")
+    phImageQueue.async {
+      let objects = (!isHiddenAsset ? mlAlbum.photosArray : mlAlbum.hiddenArray)
+        .compactMap { $0.phAsset }
+      imageManager
+        .startCachingImages(
+          for: objects,
+          targetSize: size,
+          contentMode: .aspectFill,
+          options: requestOptions)
+    }
+  }
+  
+  func emptyInfoView() -> some View {
+    VStack(spacing: 20) {
+      Text(emptyText)
+      if mlAlbum.albumType == .share
+          && isHiddenAsset
+          && !emptyText.isEmpty {
+        Button {
+          dispatchAnimation {
+            NotificationCenter.default
+              .post(name: .showInfoView,
+                    object: Info.hiddenAssets)
+          }
+        } label: {
+          Rectangle()
+            .foregroundStyle(Color.fancyBackground)
+            .frame(width: 70, height: 70)
+            .overlay {
+              imageScaledFit(
+                systemName: "info.circle.fill",
+                width: 40,
+                height: 40)
+              .foregroundStyle(.blue)
+              .fontWeight(.thin)
             }
         }
+      }
     }
-    
-    func getNavigationTitle(albumType: AlbumType) -> some View {
-        let title = switch albumType {
-        case .home, .picker: "나의 사진"
-        case .smartAlbum, .album:
-            mlAlbum != nil ? "\(self.isHiddenAsset ? "🫣" : "")\(mlAlbum.title)" : " "
+    .foregroundStyle(.gray)
+  }
+  
+  func viewWithTask(_ view: some View,
+                    condition: Bool! = true,
+                    task: @escaping () -> Void) -> some View {
+    return view
+      .task { if condition { task() } }
+  }
+  
+  func emptyNoticeView(cellWidth: CGFloat) -> some View {
+    ZStack {
+      Capsule()
+        .availabeGlassEffect(
+          cornerR: (cellWidth - 10) / 2,
+          foreground: .thinMaterial.opacity(0.85), { view in
+            view
+              .foregroundStyle(.ultraThinMaterial)
+        })
+      HStack {
+        Text("이 앨범에는 가린 항목이 없습니다.")
+        Button {
+          dispatchAnimation {
+            NotificationCenter.default
+              .post(name: .showInfoView, object: Info.hiddenAssets)
+          }
+        } label: {
+          ZStack {
+            imageScaledFit(
+              systemName: "info.circle.fill",
+              width: 20,
+              height: 20)
+          }
+          .frame(width: 20, height: 20)
         }
-        return Text(title == "" ? "(No Title)" : title )
-            .contentTransition(.numericText())
-            .foregroundStyle(title == "" ? .gray : .white)
+      }
+      .transition(.scale)
     }
-    
-//    func readyToShowSmartAlbum(smart: SmartAlbum, result: @escaping (MLAlbum) -> Void) {
-//        var album: MLAlbum!
-//        switch smart.type {
-//        case .smartAlbumFavorites:
-//            album = MLAlbum(smartType: smart.type,
-//                             title: smart.title,
-//                             isHidden: smart.isPrivacy)
-//        case .trashCan:
-//            let fetchOptions = PHFetchOptions()
-//            fetchOptions.includeHiddenAssets = true
-//            fetchOptions.wantsIncrementalChangeDetails = true
-//            let smartAlbums = PHAssetCollection
-//                .fetchAssetCollections(with: .smartAlbum, subtype: .albumRegular, options: fetchOptions)
-//            let titles = smartAlbums.objects(at: IndexSet(0..<smartAlbums.count))
-//                .compactMap { $0.localizedTitle }
-//            if let trashCan = smartAlbums
-//                .objects(at: IndexSet(0..<smartAlbums.count))
-//                .filter({$0.localizedTitle == "Recently Deleted"})
-//                .first {
-//                    album = Album(album: trashCan,
-//                                      title: "최근 삭제한 사진",
-//                                      colorIndex: 0,
-//                                      isHidden: true)
-//            }
-//        case .smartAlbumAllHidden:
-//            album = MLAlbum(smartType: smart.type,
-//                             title: smart.title,
-//                             isHidden: smart.isPrivacy)
-//        default: break
-//        }
-//        result(album)
-//    }
-    
-    func thumbnailCaching(isStart: Bool, width: CGFloat) {
-        guard let mlAlbum = mlAlbum else { return }
-        print("캐싱 \(isStart ? "시작" : "지우기") [\(mlAlbum.title) \(isHiddenAsset ? "HiddenAsset" : "not HiddenAsset")]")
-        let requestOptions = PHImageRequestOptions()
-        requestOptions.deliveryMode = .fastFormat
-        requestOptions.isSynchronous = true
-        requestOptions.isNetworkAccessAllowed = true
-        phImageQueue.async {
-            let objects = (!isHiddenAsset ? mlAlbum.photosArray : mlAlbum.hiddenArray)
-                .compactMap { $0.phAsset }
-                    if isStart {
-                        imageCachingManger
-                            .startCachingImages(
-                                for: objects,
-                                targetSize: CGSize(width: width, height: width),
-                                contentMode: .aspectFill,
-                                options: requestOptions)
-                    } else {
-                        imageCachingManger
-                            .stopCachingImages(
-                                for: objects,
-                                targetSize: CGSize(width: width, height: width),
-                                contentMode: .aspectFill,
-                                options: requestOptions)
-                    }
-        }
+    .matchedGeometryEffect(id: "centerCardView", in: nameSpace)
+    .frame(height: cellWidth - 10)
+    .frame(maxWidth: widthLimit)
+    .padding(.horizontal, 15)
+  }
+  var ratioChecker: some View {
+    HStack(spacing: 0) {
+      Rectangle()
+        .foregroundStyle(.yellow)
+      Rectangle()
+        .foregroundStyle(.mint)
     }
-    func emptyHiddenInfoView() -> some View {
-        VStack(spacing: 20) {
-            Text("이 \(albumType == .smartAlbum ? "기기" : "앨범")에는 가린 항목이 없습니다.")
-            .foregroundStyle(.gray)
-            if albumType == .smartAlbum {
-                Button {
-                    dispatchAnimation {
-                        NotificationCenter.default
-                            .post(name: .showInfoView,
-                                  object: Info.hiddenAssets)
-                    }
-                } label: {
-                    Rectangle()
-                        .foregroundStyle(Color.fancyBackground)
-                        .frame(width: 70, height: 70)
-                        .overlay {
-                            imageScaledFit(
-                                systemName: "info.circle.fill",
-                                width: 40,
-                                height: 40)
-                                .foregroundStyle(.blue)
-                                .fontWeight(.thin)
-                        }
-                }
-            }
-        }
-        .offset(y: -tabbarHeight / 2 + tabbarTopPadding)
-    }
-    
-    func viewWithTask(_ view: some View,
-                      condition: Bool! = true,
-                      task: @escaping () -> Void) -> some View {
-        return view
-            .task { if condition { task() } }
-    }
-    
-    func emptyCapsuleView(size: CGSize, cellWidth: CGFloat) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.thinMaterial)
-            HStack {
-                Text("\(albumType == .album ? "이 앨범에는 " : "")가린 항목이 없습니다.")
-                Button {
-                    dispatchAnimation {
-                        NotificationCenter.default
-                            .post(name: .showInfoView, object: Info.hiddenAssets)
-                    }
-                } label: {
-                    ZStack {
-                        imageScaledFit(
-                            systemName: "info.circle.fill",
-                            width: 20,
-                            height: 20)
-                    }
-                    .frame(width: 20, height: 20)
-                }
-            }
-        }
-        .frame(height: navigationbarHeight + 10)
-        .frame(maxWidth: device == .phone ? .infinity : widthLimit)
-        .padding(.horizontal, 10)
-        .offset(y: ((cellWidth - navigationbarHeight) / 2) - 5)
-        .transition(.move(edge: .top))
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                withAnimation {
-                    showEmptyHiddenAsset = false
-                }
-            }
-        }
-    }
-    
-    func readyToShowView(albumType: AlbumType = .album) {
-        switch albumType {
-        case .home, .picker:
-            if let allPhotos = photoData.homeAlbum {
-                print("ok i find the home")
-                if allPhotos.fetchResult.count != allPhotos.photosArray.count {
-                    allPhotos.generateArray(isHiddenAsset: false) {
-                        dispatchAnimation {
-                            self.mlAlbum = allPhotos
-                        }
-                    }
-                } else {
-                    dispatchAnimation {
-                        self.mlAlbum = allPhotos
-                    }
-                }
-            } else {
-                print("no there is no home. i'll set. wait")
-                let allPhotos = MLAlbum(isHome: true)
-                allPhotos.generateArray(isHiddenAsset: false) {
-                    dispatchAnimation {
-                        photoData.homeAlbum = allPhotos
-                        self.mlAlbum = allPhotos
-                    }
-                }
-            }
-        case .album:
-            guard let album = photoData.albums[assetCollection?.localIdentifier ?? ""]
-            else { return }
-            if album.fetchResult.count != album.photosArray.count {
-                album.generateArray(isHiddenAsset: false) {
-                    dispatchAnimation {
-                        self.mlAlbum = album
-                    }
-                }
-            } else {
-                dispatchAnimation {
-                    self.mlAlbum = album
-                }
-            }
-        case .smartAlbum:
-            if let album = photoData.smartAlbums[smartAlbum.id] {
-                album.generateArray(isHiddenAsset: isHiddenAsset) {
-                    dispatchAnimation {
-                        self.mlAlbum = album
-                    }
-                }
-            } else {
-                let album = MLAlbum(
-                    assetCollection: smartAlbum.phAssetCollection,
-                    title: smartAlbum.title,
-                    isPrivacy: smartAlbum.isPrivacy)
-                dispatchAnimation {
-                    let _ = photoData.smartAlbums
-                        .updateValue(album, forKey: album.id)
-                }
-                album.generateArray(isHiddenAsset: isHiddenAsset) {
-                    dispatchAnimation {
-                        self.mlAlbum = album
-                    }
-                }
-            }
-        }
-    }
-    
-    func assetArray(albumType: AlbumType,
-                   belongingType: BelongingType) -> [MLAsset] {
-       let assetArray = switch albumType {
-       case .album, .smartAlbum:
-           !isHiddenAsset ? mlAlbum?.photosArray : mlAlbum?.hiddenArray
-       case .home, .picker:
-           switch belongingType {
-           case .all:
-               mlAlbum?.photosArray
-           default:
-               mlAlbum?.operatedArray(
-                    isHiddenAsset: false,
-                    setOperation: belongingType == .nonAlbum ? .subtraction : .intersection,
-                    assets: Array(photoData.albumsPhotosSet())
-               )
-           }
-       }
-        print("[\(mlAlbum?.title ?? "")]assetArray changed to \(assetArray?.count ?? 0)")
-       return (assetArray ?? [])
-            .sorted(by: { $0.creationDate < $1.creationDate })
-   }
+    //                let testHeight = tabbarHeight * 2 + tabbarTopPadding
+    //                VStack(spacing: 0) {
+    //                    Rectangle()
+    //                        .foregroundStyle(.red.opacity(0.4))
+    //                        .frame(height: tabbarHeight)
+    //                    Rectangle()
+    //                        .foregroundStyle(.yellow.opacity(0.4))
+    //                        .frame(height: tabbarTopPadding)
+    //                    Rectangle()
+    //                        .foregroundStyle(.green.opacity(0.4))
+    //                        .frame(height: tabbarHeight)
+    //                }
+    //                .padding(tabbarBottomPadding)
+  }
+  
 }
 
 struct AllPhotosView_Previews: PreviewProvider {
-    static var previews: some View {
-        AllPhotosView(assetCollection: .init(),
-                      mlAlbum: MLAlbum(sampleID: 0, sampleCase: .none),
-                      isHiddenAsset: false,
-                      isPhotosView: .constant(0),
-                      nameSpace: Namespace().wrappedValue)
-        .environmentObject(MLPhotoData())
-    }
+  static var previews: some View {
+    AllPhotosView(mlAlbum: MLAlbum(sampleID: 0,
+                                   sampleCase: .none),
+                  isHiddenAsset: false,
+                  nameSpace: Namespace().wrappedValue,
+                  isPhotosView: .constant(0),
+                  viewCompletion: { _ in }
+    )
+    .environmentObject(MLPhotoData())
+  }
 }
 
 extension View {
-    func heroFullScreenCover<Content: View>(
-        showDetailView: Binding<Bool>,
-        content: @escaping () -> Content) -> some View {
-            self
-                .modifier(HelperHeroView(show: showDetailView, overlay: content()))
+  func heroFullScreenCover<Content: View>(
+    isShowDetailView: Binding<Bool>,
+    content: @escaping () -> Content) -> some View {
+      self
+        .modifier(HelperHeroView(show: isShowDetailView, overlay: content()))
     }
-    
-    @ViewBuilder
-    func sheroFullScreenCover<Content: View>(
-        showDetailview: Binding<Bool>,
-        @ViewBuilder content: @escaping () -> Content) -> some View {
-            self
-                .modifier(HelperHeroView(show: showDetailview, overlay: content()))
+  
+  @ViewBuilder
+  func sheroFullScreenCover<Content: View>(
+    isShowDetailview: Binding<Bool>,
+    @ViewBuilder content: @escaping () -> Content) -> some View {
+      self
+        .modifier(HelperHeroView(show: isShowDetailview, overlay: content()))
     }
 }
 
 fileprivate struct  HelperHeroView<Overlay: View>: ViewModifier {
-    @Binding var show: Bool
-    var overlay: Overlay
-    
-    @State private var hostView: UIHostingController<Overlay>?
-    @State private var parentController: UIViewController?
-    
-    func body(content: Content) -> some View {
-        content
-            .background(content: {
-                ExtractSwiftUIParentController(content: overlay,
-                                               hostView: $hostView) { viewController in
-                    parentController = viewController
-                }
-            })
-            .onAppear {
-                hostView = UIHostingController(rootView: overlay)
-            }
-            .onChange(of: show) { newValue in
-                if newValue {
-                    if let hostView {
-                        hostView.modalPresentationStyle = .overFullScreen
-                        hostView.modalTransitionStyle = .crossDissolve
-                        hostView.view.backgroundColor = .clear
-                        
-                        parentController?.present(hostView, animated: false)
-                    }
-                } else {
-                    hostView?.dismiss(animated: false)
-                }
-            }
-    }
+  @Binding var show: Bool
+  var overlay: Overlay
+  
+  @State private var hostView: UIHostingController<Overlay>?
+  @State private var parentController: UIViewController?
+  
+  func body(content: Content) -> some View {
+    content
+      .background(content: {
+        ExtractSwiftUIParentController(content: overlay,
+                                       hostView: $hostView) { viewController in
+          parentController = viewController
+        }
+      })
+      .onAppear {
+        hostView = UIHostingController(rootView: overlay)
+      }
+      .onChange(of: show) { newValue in
+        if newValue {
+          if let hostView {
+            hostView.modalPresentationStyle = .overFullScreen
+            hostView.modalTransitionStyle = .crossDissolve
+            hostView.view.backgroundColor = .clear
+            
+            parentController?.present(hostView, animated: false)
+          }
+        } else {
+          hostView?.dismiss(animated: false)
+        }
+      }
+  }
 }
 
 
 fileprivate struct ExtractSwiftUIParentController<Content: View>: UIViewRepresentable {
-    
-    var content: Content
-    @Binding var hostView: UIHostingController<Content>?
-    var parentController: (UIViewController?) -> ()
-    
-    func makeUIView(context: Context) -> UIView {
-        return UIView()
+  
+  var content: Content
+  @Binding var hostView: UIHostingController<Content>?
+  var parentController: (UIViewController?) -> ()
+  
+  func makeUIView(context: Context) -> UIView {
+    return UIView()
+  }
+  
+  func updateUIView(_ uiView: UIView, context: Context) {
+    hostView?.rootView = content
+    DispatchQueue.main.async {
+      parentController(uiView.superview?.superview?.parentController)
     }
-    
-    func updateUIView(_ uiView: UIView, context: Context) {
-        hostView?.rootView = content
-        DispatchQueue.main.async {
-            parentController(uiView.superview?.superview?.parentController)
-        }
-    }
+  }
 }
 
 public extension UIView {
-    var parentController: UIViewController? {
-        var responder = self.next
-        while responder != nil {
-            if let viewController = responder as? UIViewController {
-                return viewController
-            }
-            responder = responder?.next
-        }
-        return nil
+  var parentController: UIViewController? {
+    var responder = self.next
+    while responder != nil {
+      if let viewController = responder as? UIViewController {
+        return viewController
+      }
+      responder = responder?.next
     }
+    return nil
+  }
+}
+
+enum ReLoadingType {
+  case none
+  case reFetchInside // item count + selectedItems 제거 + selectMode 체인지
+  case reFetchOutside // item count 체인지
+  case itemChangedInside // selectedItems 제거 + selectMode 체인지
+  case itemChangedOutside // selectedItems 제거
+  case selectedModeChange, selectAll, deselectAll
+  case filterChange, belongingChange
+}
+
+struct Filtering: Comparable {
+  static func < (lhs: Filtering, rhs: Filtering) -> Bool {
+    lhs.zero == rhs.zero
+    && lhs.first == rhs.first
+    && lhs.second == rhs.second
+  }
+  var zero: FilterZero = .allAlbums
+  var first: FilterFirst = .allMedia
+  var second: FilterSecond = .all
+  var sort: SortType = .byDate
+}
+
+enum SelectedItems {
+  case selected, swiped, refreshed
 }

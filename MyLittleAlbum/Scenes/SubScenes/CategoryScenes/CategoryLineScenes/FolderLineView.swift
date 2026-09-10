@@ -22,7 +22,6 @@ struct FolderLineView: View {
                 Image(systemName: "folder.fill")
                     .imageScale(.large)
                     .frame(width: 20)
-                    .foregroundStyle(isSelected ? .orange : .black)
                 HStack(alignment:.lastTextBaseline, spacing: 2) {
                     Text(title)
                         .frame(height: 30)
@@ -43,22 +42,28 @@ struct FolderLineView: View {
                             .font(.caption)
                             .foregroundStyle(.gray)
                             .fontWeight(.light)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
+                            .transition(.move(edge: .leading)
+                                        .combined(with: .opacity))
                         }
                     }
                 }
                 Spacer()
                 if subImage != nil {
-                    imageScaledFit(systemName: subImage, width: 15, height: 15)
+                    imageScaledFit(systemName: subImage,
+                                   width: 15,
+                                   height: 15)
                         .font(.footnote)
                         .foregroundColor(.disabledColor)
                 }
                 if isCollectionMoveView && isSelected {
-                    imageScaledFit(systemName: "checkmark", width: 20, height: 20)
+                    imageScaledFit(systemName: "checkmark",
+                                   width: 20,
+                                   height: 20)
                     .fontWeight(.bold)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.blue)
                 }
             }
+            .foregroundStyle(isSelected ? .blue : .black)
         }
     }
 }

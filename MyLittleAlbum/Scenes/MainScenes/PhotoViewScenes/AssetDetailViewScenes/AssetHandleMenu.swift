@@ -9,199 +9,287 @@ import SwiftUI
 import Photos
 
 struct AssetHandleMenu: View {
-    @EnvironmentObject var photoData: MLPhotoData
-    var albumType: AlbumType = .album
-    let assetCollection: PHAssetCollection!
-    let isHiddenAssets: Bool
-    let asset: MLAsset
-    @Binding var reLoadingType: ReLoadingType
-    @Binding var selectedItems: [MLAsset]
-    @Binding var copyDone: Bool
-    
-    var body: some View {
-        Group {
-            if let album = albumType == .album
-                ? photoData.albums[assetCollection.localIdentifier]
-                : (albumType == .smartAlbum
-                   ? photoData.smartAlbums[assetCollection.localIdentifier]
-                   : photoData.homeAlbum) {
-                HStack(spacing: 3) {
-                    // 0. 삭제 버튼
-                    assetHandleButton(imageName: iconDelete, imageColor: Color.color1) {
-                        album.deleteAssetFromDevice(albumType: albumType,
-                                                    assets: [asset],
-                                                    isHiddenAsset: isHiddenAssets,
-                                                    isDetailView: true) { bool in
-                            if bool {
-                                DispatchQueue.main.async {
-                                    NotificationCenter.default
-                                        .post(name: .innerFetchChange, object: album.id)
-                                    NotificationCenter.default
-                                        .post(name: .innerFetchChange, object: "myPhotos")
-                                }
-                            }
-                        }
-                    }
-                    separator
-                    if albumType == .home || albumType == .smartAlbum {
-                        // 1-1. 앨범에 추가 버튼
-                        assetHandleButton(imageName: iconInsertToAlbum) {
-                            dispatchAnimation {
-                                let moveAssetObject = MoveAssetObject(
-                                    albumType: self.albumType,
-                                    currentAlbum: assetCollection,
-                                    selectedItems: [asset],
-                                    isHidden: isHiddenAssets)
-                                NotificationCenter.default
-                                    .post(name: .showMoveAssetSheetInDetailView,
-                                          object: moveAssetObject)
-                            }
-                        }
-                    } else if albumType == .album {
-                        // 1-2-1. 앨범에서 빼기 버튼
-                        assetHandleButton(imageName: "rectangle.stack.badge.minus") {
-                            let alertObject = AlertObject(alertCase: .mediaTakeFromAlbum,
-                                                          album: assetCollection,
-                                                          folder: nil,
-                                                          selectedItems: [asset],
-                                                          isDetailView: true
-                                                          
-                            )
-                            NotificationCenter.default
-                                .post(name: .showAlertInDetailView, object: alertObject)
-                        }
-                        separator
-                        // 1-2-2. 앨범 이동 버튼
-                        assetHandleButton(isImage: false, titleName: "이동") {
-                            let moveAssetObject = MoveAssetObject(
-                                albumType: self.albumType,
-                                currentAlbum: assetCollection,
-                                selectedItems: [asset],
-                                isHidden: isHiddenAssets,
-                                isDetailView: true)
-                            NotificationCenter.default
-                                .post(name: .showMoveAssetSheetInDetailView,
-                                      object: moveAssetObject)
-                        }
-                    }
-                    Spacer()
-                    // 즐겨찾기 버튼
-                    assetHandleButton(
-                        imageName: asset.isFavorite ? iconFavorite : iconNotFavorite,
-                        imageColor: asset.isFavorite ? .color2 : .gray) {
-                            asset.favoriteAsset(bool: !asset.isFavorite) { bool in
-                                if bool {
-                                    //                            dispatchAnimation {
-                                    //                                let object = ChangedItem(asset: [asset])
-                                    //                                NotificationCenter.default
-                                    //                                    .post(name: .assetChanged, object: object)
-                                    //                            }
-                                }
-                            }
-                        }
-                    
-                    separator
-                    if !isHiddenAssets {
-                        // 2-1. 가리기 버튼
-                        assetHandleButton(imageName: iconHide, imageColor: .gray) {
-                            guard let album = photoData.albums[assetCollection?.localIdentifier ?? ""] else { return }
-                            album.hideOrUnhideAsset(assets: [asset],
-                                                    toHide: !asset.isFavorite,
-                                                    isDetailView: true) { bool in
-                                if bool {
-                                    DispatchQueue.main.async {
-                                        NotificationCenter.default
-                                            .post(name: .innerFetchChange, object: album.id)
-                                        NotificationCenter.default
-                                            .post(name: .innerFetchChange, object: "myPhotos")
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // 2-2. 가리기 해제 버튼
-                        assetHandleButton(imageName: iconUnhide, imageColor: .gray) {
-                            let alertObject = AlertObject(alertCase: .mediaUnhide,
-                                                          album: assetCollection,
-                                                          folder: nil,
-                                                          selectedItems: [asset],
-                                                          isHiddenAsset: isHiddenAssets,
-                                                          isDetailView: true)
-                            NotificationCenter.default.post(name: .showAlertInDetailView,
-                                                            object: alertObject)
-                        }
-                        //                }
-                    }
-                    separator
-                    // 이미지 복사 버튼
-                    
-                    assetHandleButton(imageName: "document.on.document", imageColor: .gray) {
-                        let imageManager = PHImageManager()
-                        imageManager.requestImage(for: asset.phAsset, targetSize: CGSize(width: .max, height: .max), contentMode: .aspectFit, options: nil) { image, _ in
-                            UIPasteboard.general.image = image
-                            dispatchAnimation {
-                                copyDone = true
-                            }
-                        }
-                    }
-                    // 3. 공유 버튼
-                    //            separator
-                    //                .opacity(0.2)
-                    //            assetHandleButton(imageName: "square.and.arrow.up", imageColor: .gray) {
-                    //            }
+  @EnvironmentObject var photoData: MLPhotoData
+  let media: UIImage?
+  var albumType: AlbumType = .album
+  let localID: String
+  let isHiddenAssets: Bool
+  let isPad: Bool
+  let backGroundColor = Color.black.opacity(0.5)
+  @ObservedObject var asset: MLAsset
+  @Binding var playStatus: VideoState
+  @Binding var copyDone: Bool
+  @Binding var assetAlert: AssetAlert!
+  @Binding var moveAssetObject: MoveAssetObject!
+  @Binding var isShowingMoveAssetSheet: Bool
+  @Binding var workState: WorkState
+  
+  let removeAsset: () -> Void
+  let reloadAssets: (MLAsset) -> Void
+  
+  var body: some View {
+    Group {
+      if let album = albumType == .album
+          ? photoData.albums[localID]
+          : (albumType == .share
+             ? photoData.smartAlbums[localID]
+             : photoData.homeAlbum) {
+        ZStack {
+          RoundedRectangle(cornerRadius: 10)
+            .availabeGlassEffect(cornerR: 10,
+                                 foreground: backGroundColor) { view in
+              view
+            }
+          HStack(spacing: 3 * (isPad ? 2 : 1)) {
+            // 0. 삭제 버튼
+            assetHandleButton(imageName: iconDelete,
+                              imageColor: Color.color1,
+                              workState: .delete) { completion in
+              album.deleteAssetFromDevice(albumType: albumType,
+                                          assets: [asset],
+                                          isHiddenAsset: isHiddenAssets,
+                                          isDetailView: true) { bool in
+                if bool {
+                  removeAsset()
                 }
-                .foregroundStyle(.gray)
-                .background {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(.black)
-                        .frame(height: vcHeight)
+                completion()
+              }
+            }
+            separator
+            if albumType == .home || albumType == .share {
+              // 1-1. 앨범에 추가 버튼
+              assetHandleButton(imageName: iconInsertToAlbum,
+                                workState: .addSubtrack) {  completion in
+                let moveAssetObject = MoveAssetObject(
+                  albumType: self.albumType,
+                  currentAlbumID: localID,
+                  selectedItems: [asset],
+                  isHidden: isHiddenAssets)
+                dispatchAnimation {
+                  self.moveAssetObject = moveAssetObject
+                  self.isShowingMoveAssetSheet = true
+                }
+                completion()
+              }
+            } else if albumType == .album {
+              // 1-2-1. 앨범에서 빼기 버튼
+              assetHandleButton(imageName: iconSubtract,
+                                workState: .addSubtrack) {  completion in
+                showAlert(alertCase: .subtract)
+              }
+              separator
+              // 1-2-2. 앨범 이동 버튼
+              assetHandleButton(isImage: false,
+                                titleName: "이동",
+                                workState: .move) {  completion in
+                if playStatus == .play {
+                  DispatchQueue.main.async {
+                    playStatus = .processPause
+                  }
+                }
+                let moveAssetObject = MoveAssetObject(
+                  albumType: self.albumType,
+                  currentAlbumID: localID,
+                  selectedItems: [asset],
+                  isHidden: isHiddenAssets)
+                dispatchAnimation {
+                  self.moveAssetObject = moveAssetObject
+                  self.isShowingMoveAssetSheet = true
+                }
+                completion()
+              }
+            }
+            Spacer()
+            // 즐겨찾기 버튼
+            assetHandleButton(
+              custom: asset.isFavorite,
+              imageName: asset.isFavorite ? "CrayonRed" : iconNotFavorite,
+              imageColor: asset.isFavorite ? .heart : .white,
+              workState: .favorite) { completion in
+                asset.favoriteAsset(toFavorite: !asset.isFavorite) { bool in
+                  if bool {
+                    reloadAssets(asset)
+                  }
+                  completion()
+                }
+              }
+              .contentTransition(.interpolate)
+            separator
+            if !isHiddenAssets {
+              // 2-1. 가리기 버튼
+              assetHandleButton(imageName: iconHide,
+                                workState: .hide) { completion in
+                guard let album = photoData.albums[localID]
+                else { return }
+                album.hideOrUnhideAsset(
+                  assets: [asset],
+                  toHide: !asset.isFavorite) { bool in
+                    if bool {
+                      removeAsset()
+                    }
+                    completion()
+                  }
+              }
+            } else {
+              // 2-2. 가리기 해제 버튼
+              assetHandleButton(imageName: iconUnhide,
+                                workState: .hide) { completion in
+                showAlert(alertCase: .unHide)
+                completion()
+              }
+            }
+            separator
+            // 이미지 복사 버튼
+            assetHandleButton(imageName: "document.on.document",
+                              workState: .copy) { completion in
+              
+//              let imageManager = PHImageManager()
+////              if asset.mediaType == .image {
+//              imageManager.requestImage(
+//                for: asset.phAsset,
+//                targetSize: CGSize(width: .max, height: .max),
+//                contentMode: .aspectFit,
+//                options: nil) { image, _ in
+//              guard let image = media else { return }
+//              UIPasteboard.general.image = image
+//                  UIPasteboard.general.image = image
+//                  dispatchAnimation {
+//                    copyDone = true
+//                  }
+//                  DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+//                    withAnimation {
+//                      self.copyDone = false
+//                    }
+//                  }
+//                  completion()
+//                }
+//              } else {
+//                imageManager.requestAVAsset(forVideo: asset.phAsset,
+//                                            options: nil) { (avAsset, audioMix, info) in
+//                  print("step 1")
+//                    guard let urlAsset = avAsset as? AVURLAsset else {
+//                      print("no urlAsset")
+//                      return }
+//                    do {
+//                      print("step 2")
+//                      let videoData = try Data(contentsOf: urlAsset.url)
+//                      // Proceed to copy to clipboard
+//                      print("step 3")
+//                      UIPasteboard.general
+//                        .setData(videoData,
+//                                 forPasteboardType: UTType.mpeg4Movie.identifier)
+//                      dispatchAnimation {
+//                        copyDone = true
+//                      }
+//                      DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+//                        withAnimation {
+//                          self.copyDone = false
+//                        }
+//                      }
+//                      completion()
+//                    } catch {
+//                      print("Error loading video data: \(error.localizedDescription)")
+//                      completion()
+//                    }
+//                  }
+//              }
+            }
+            // 3. 공유 버튼
+            //            separator
+            //                .opacity(0.2)
+            //            assetHandleButton(imageName: "square.and.arrow.up", imageColor: .gray) {
+            //            }
+          }
+          .foregroundStyle(.gray)
+          .padding(.horizontal, isPad ? 10 : 5)
+        }
+      } else {
+        EmptyView()
+      }
+    }
+  }
+  var separator: some View {
+    Text("|")
+      .foregroundStyle(.gray)
+  }
+  func assetHandleButton(isImage: Bool = true,
+                         custom: Bool = false,
+                         imageName: String = "",
+                         titleName: String = "",
+                         buttonColor: Color! = nil,
+                         imageColor: Color! = .white,
+                         workState: WorkState,
+                         action: @escaping (@escaping () -> Void) -> Void) -> some View {
+    Button {
+      dispatchAnimation {
+        self.workState = workState
+      }
+      action {
+        dispatchAnimation {
+          self.workState = .none
+        }
+      }
+    } label: {
+      Group {
+        if self.workState == workState {
+          ProgressView()
+            .progressViewStyle(.circular)
+            .tint(.blue)
+        } else {
+          Group {
+            if !custom {
+              Label(titleName, systemImage: imageName)
+                .modify { view in
+                  if isImage {
+                    view.labelStyle(.iconOnly)
+                  } else {
+                    view.labelStyle(.titleOnly)
+                  }
                 }
             } else {
-                EmptyView()
-            }
-        }
-    }
-    var separator: some View {
-        Text("|")
-            .foregroundStyle(.white)
-            .opacity(0.4)
-    }
-    func assetHandleButton(isImage: Bool = true,
-                           imageName: String = "",
-                           titleName: String = "",
-                           buttonColor: Color! = nil,
-                           imageColor: Color! = .white,
-                           action: @escaping () -> Void) -> some View {
-        Button {
-            action()
-        } label: {
-            RoundedRectangle(cornerRadius: 5)
-                .fill(.black)
-                .frame(width: 40, height: 30)
-                .overlay {
-                    if isImage {
-                        Image(systemName: imageName)
-                            .foregroundStyle(imageColor)
-                            .imageScale(.medium)
-                    } else {
-                        Text(titleName)
-                    }
+              Image(imageName)
+                .resizable()
+                .mask {
+                  Image(systemName: "star.fill")
                 }
+            }
+          }
+          .foregroundStyle(imageColor)
         }
+      }
+      .frame(width: isPad ? 50 : 40, height: isPad ? 50 : 30)
     }
-    
+  }
+  
+  func showAlert(alertCase: AssetAlertCase) {
+    guard let album = photoData.albums[localID] else { return }
+    let alertObject = AssetAlert(alertCase: alertCase,
+                                 assets: [asset],
+                                 album: album,
+                                 isHiddenAsset: isHiddenAssets)
+    dispatchAnimation {
+      self.assetAlert = alertObject
+    }
+  }
 }
 #Preview {
-    AssetHandleMenu(assetCollection: nil,
-                    isHiddenAssets: false,
-                    asset: MLAsset(phAsset: PHAsset()),
-                    reLoadingType: .constant(.none),
-                    selectedItems: .constant([]),
-                    copyDone: .constant(false))
+  AssetHandleMenu(media: nil,
+                  localID: "",
+                  isHiddenAssets: false,
+                  isPad: false,
+                  asset: MLAsset(phAsset: PHAsset()),
+                  playStatus: .constant(.pause),
+                  copyDone: .constant(false),
+                  assetAlert: .constant(nil),
+                  moveAssetObject: .constant(nil),
+                  isShowingMoveAssetSheet: .constant(true),
+                  workState: .constant(.none),
+                  removeAsset: { },
+                  reloadAssets: { _ in })
 }
 
 
 struct ChangedItem {
-    let assets: [MLAsset]
-    let albumType: AlbumType
+  let assets: [MLAsset]
+  let albumType: AlbumType
 }

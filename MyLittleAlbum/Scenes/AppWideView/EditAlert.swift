@@ -9,45 +9,60 @@ import Foundation
 import SwiftUI
 import Photos
 
-enum AlertCase {
-    // 1. before Action
-        // - needs textfield
-    case addAlbumToFolder
-    case addFolderToFolder
-    case albumNameChange
-    case folderNameChange
-        // - only message
-    case mediaTakeFromAlbum
-    case mediaUnhide
-    // 2. after Action
-    case mediaMoved
-    case none
-    // 3. ios 자체 수행
+// CollectionAlert & AssetAlert Enum
+
+enum CollectionAlertCase {
+// 1. before Action
+// 1-1. needs textField
+  case addAlbumToFolder
+  case addFolderToFolder
+  case albumNameChange
+  case folderNameChange
+// 1-2. no Needs textFiled
+  case delShareCategory
+// 2. ios 자체 수행
 //    case mediaDelete
 //    case mediaHide
 }
 
-struct EditAlert {
-    let alertCase: AlertCase
-    let title: String
-    let message: String
-    var needsTextField: Bool = false
-    let placeHolder: String
-    let buttonDonetitle: String
-    let album: MLAlbum!
-    let folder: MLFolder!
-    var isHiddenAsset: Bool! = false
-    var selectedItems: [MLAsset] = []
-    var isDetailView: Bool = false
+struct EditAlert: Equatable {
+  let alertCase: CollectionAlertCase
+  let title: String
+  let message: String
+  let placeHolder: String
+  let buttonDonetitle: String
+  var album: MLAlbum! = nil
+  var folder: MLFolder! = nil
+  var parent: String = ""
 }
 
-struct AlertObject {
-    let alertCase: AlertCase
-    var albumType: AlbumType!
-    let album: PHAssetCollection!
-    let folder: PHCollectionList!
-    var selectedItems: [MLAsset] = []
-    var needsTextField: Bool! = false
-    var isHiddenAsset: Bool! = false
-    var isDetailView: Bool! = false
+struct AlertObject: Equatable {
+  let alertCase: CollectionAlertCase
+  var folderType: FolderType = .userFolder
+  var albumType: AlbumType!
+  let albumID: String!
+  let folderID: String!
+  var title: String = ""
+  var parent: String = ""
+}
+
+enum AssetAlertCase {
+  case unHide, subtract
+//  case hide, delete            // (device self-alert)
+//  case favorite, unFavorite    // (non alert)
+}
+
+struct AssetAlert {
+  let alertCase: AssetAlertCase
+  let assets: [MLAsset]
+  let album: MLAlbum
+  let isHiddenAsset: Bool
+  
+  static func title(alert: Self!) -> String {
+    switch alert?.alertCase {
+    case .unHide: "선택한 항목의 가리기를 해제합니다."
+    case .subtract: "선택한 항목을 이 앨범에서 제거합니다."
+    default: "unknown"
+    }
+  }
 }

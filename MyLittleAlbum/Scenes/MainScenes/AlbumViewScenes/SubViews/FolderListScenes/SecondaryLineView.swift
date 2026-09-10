@@ -10,414 +10,435 @@ import Photos
 import LottieUI
 
 struct SecondaryLineView: View {
-    @EnvironmentObject var photoData: MLPhotoData
-    @ObservedObject var pageFolder: MLFolder
-    let phCollectionList: PHCollectionList
-    let isHome: Bool
-    let index: Int
-    let screenWidth: CGFloat
-    let secondaryWidth: CGFloat
-    let lineHeight: CGFloat
-    let isFolded: Bool
-    
-    @Binding var isPhotosView: Int
-    let nameSpace: Namespace.ID
-    let albumViewNameSpace: Namespace.ID
-
-    let isEditingMode: Bool
-    @State var processingCollection: PHCollection!
-
-    @Environment(\.scenePhase) var scenePhase
-    @State var isSetted: Bool = false
-    
-    var body: some View {
-        let spacing = (screenWidth - 20 - secondaryWidth * ( CGFloat(listCount + 1))) / CGFloat(listCount)
-        return HStack(spacing: 0) {
-            if photoData.uiMode != .classic {
-                Color.fancyBackground
-                    .frame(width: 10 + secondaryWidth * 0.3)
-                    .zIndex(1)
+  @EnvironmentObject var photoData: MLPhotoData
+  @ObservedObject var pageFolder: MLFolder
+  let subFolder: SubCollection
+  let isHome: Bool
+  let index: Int
+  let screenWidth: CGFloat
+  let secondaryWidth: CGFloat
+  let lineHeight: CGFloat
+  let isFolded: Bool
+  
+  @Binding var isPhotosView: Int
+  let nameSpace: Namespace.ID
+  let albumViewNameSpace: Namespace.ID
+  
+  let isEditingMode: Bool
+  @State var processingCollection: SubCollection!
+  
+  @Environment(\.scenePhase) var scenePhase
+  @State var isSetted: Bool = false
+  
+  var body: some View {
+    return HStack(spacing: 0) {
+      if photoData.uiMode != .classic {
+        leadingPaddingView
+      }
+      scrollViewWidthReader(.horizontal,
+                            scrollDisalble: !isFolded) { proxy in
+        if isSetted {
+          settedSecondaryViewList(width: secondaryWidth,
+                                  proxy: proxy,
+                                  onAppear: {
+            if isHome && photoData.loadingState == .doneSecondaryLines {
+              loadNextStep()
             }
-            ScrollViewReader { scrollProxy in
-                ScrollView(.horizontal, showsIndicators: false) {
-                    if isSetted {
-                        let column = Array(
-                            repeating: GridItem(.fixed(secondaryWidth), spacing: isFolded ? 7 : spacing),
-                            count: isFolded
-                                    ? (pageFolder.fetchResult.count) + 1
-                                    : listCount + 1
-                        )
-                        LazyVGrid(columns: column)  {
-                            fetchSecondaryDepth(width: secondaryWidth,
-                                                proxy: scrollProxy)
-                        }
-                        .padding(.leading,
-                                 10 + (photoData.uiMode == .classic
-                                       ? 0 : secondaryWidth * 0.3)
-                        )
-                        .transition(.slide)
-                        .onAppear {
-                            if isHome && photoData.loadingState == .doneSecondaryLines {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    photoData.loadingState = .loadAllAlbums
-                                }
-                            }
-                        }
-                    } else {
-                        let padding: CGFloat = (secondaryWidth * 0.6) - 10
-                        lottieLoadingView(lottie: "secondaryLoadingJson",
-                                          size: CGSize(width: screenWidth - padding,
-                                                       height: lineHeight),
-                                          leadingPadding:padding)
-                        .onAppear {
-                            if photoData.folders[phCollectionList.localIdentifier] != nil {
-                                dispatchAnimation {
-                                    isSetted = true
-                                }
-                            }
-                        }
-                    }
-                }
-                .scrollDisabled(!isFolded)
-                .onChange(of: photoData.loadingState) { newValue in
-                    if isHome && (newValue == .doneSecondaryLines
-                                  || newValue == .loadingComplete) {
-                        DispatchQueue.main.async {
-                            withAnimation {
-                                isSetted = true
-                            }
-                        }
-                    }
-                }
-                .onChange(of: pageFolder.albumsArray.count,
-                          perform: { [oldValue = pageFolder.albumsArray.count] newValue in
-                    if newValue > oldValue {
-                        withAnimation {
-                            scrollProxy
-                                .scrollTo(pageFolder.albumsArray.last?.localIdentifier,
-                                          anchor: .trailing)
-                        }
-                    }
-                })
-                .onChange(of: pageFolder.foldersArray.count,
-                          perform: { [oldValue = pageFolder.foldersArray.count] newValue in
-                    if newValue > oldValue {
-                        withAnimation {
-                            scrollProxy
-                                .scrollTo(pageFolder.foldersArray.last?.localIdentifier)
-                        }
-                    }
-                })
+          })
+        } else {
+          let padding: CGFloat = (secondaryWidth * 0.6) - 10
+          lottieLoadingView(lottie: "secondaryLoadingJson",
+                            size: CGSize(
+                                  width: screenWidth - padding,
+                                  height: lineHeight),
+                            leadingPadding: padding)
+          .onAppear {
+            if photoData.mlFolder(type: pageFolder.folderType,
+                                  subFolder.id) != nil {
+              dispatchAnimation {
+                isSetted = true
+              }
             }
+          }
         }
+      }
+      .onChange(of: photoData.loadingState) { newValue in
+        if isHome && (newValue == .doneSecondaryLines
+                      || newValue == .loadingComplete) {
+          dispatchAnimation {
+            isSetted = true
+          }
+        }
+      }
     }
+  }
 }
 
 // load photodata
 extension SecondaryLineView {
-    func fetchSecondaryDepth(width: CGFloat, proxy: ScrollViewProxy) -> some View {
+  func settedSecondaryViewList(width: CGFloat,
+                               proxy: ScrollViewProxy,
+                               onAppear: @escaping () -> Void) -> some View {
+    let secondaryItems = fetchSecondaryDepth(width: width, proxy: proxy)
+    return Group {
+      if photoData.uiMode != .classic {
+        HStack(alignment: .bottom, spacing: 7)  {
+          secondaryItems
+        }
+        .padding(.leading, 10 + (secondaryWidth * 0.3))
+        .padding(.trailing, 10)
+        .transition(.slide)
+      } else {
+        let spacing = (screenWidth - 20 - secondaryWidth * ( CGFloat(listCount + 1))) / CGFloat(listCount)
+        let column = Array(
+          repeating: GridItem(.fixed(secondaryWidth),
+                              spacing: isFolded ? 7 : spacing),
+          count: isFolded
+          ? (pageFolder.foldersArray.count + pageFolder.albumsArray.count)
+          : listCount + 1
+        )
+        LazyVGrid(columns: column)  {
+          secondaryItems
+        }
+        .padding(.horizontal, 10)
+        .transition(.move(edge: .top))
+      }
+    }
+    .onAppear { onAppear() }
+  }
+  func fetchSecondaryDepth(width: CGFloat, proxy: ScrollViewProxy) -> some View {
+    Group {
+      ForEach(pageFolder.foldersArray, id: \.self) { subFolder in
+        let secondaryIndex = pageFolder.foldersArray.firstIndex(of: subFolder) ?? 0
+        folderListView(subFolder: subFolder,
+                       index: index + ((secondaryIndex + 1) * 4),
+                       width: width)
+        .id(subFolder.id)
+        .matchedGeometryEffect(id: subFolder.id,
+                               in: albumViewNameSpace)
+        .buttonStyle(ClickScaleEffect())
+        .transition(.scale)
+        .contextMenu{
+          EditCollectionMenuView(
+            pageFolder: pageFolder,
+            processing: $processingCollection,
+            isEditMode: .constant(false),
+            subCollection: subFolder,
+            isSecondary: true,
+            index: index,
+            nameSpace: nameSpace) { subCollection in
+              deleteFolderInSecDepth(subFolder: subCollection)
+            }
+        }
+      }
+      ForEach(pageFolder.albumsArray, id: \.self) { subAlbum in
+        let secondaryIndex = pageFolder.albumsArray.firstIndex(of: subAlbum) ?? 0
+        albumListView(subAlbum: subAlbum,
+                      index: index + secondaryIndex,
+                      width: width)
+        .id(subAlbum.id)
+        .matchedGeometryEffect(id: subAlbum.id,
+                               in: albumViewNameSpace)
+        .buttonStyle(ClickScaleEffect())
+        .transition(.scale)
+        .contextMenu {
+          EditCollectionMenuView(
+            pageFolder: pageFolder,
+            processing: $processingCollection,
+            isEditMode: .constant(false),
+            subCollection: subAlbum,
+            isSecondary: true,
+            index: index,
+            nameSpace: nameSpace) { subCollection in
+              deleteAlbumInSecDepth(subAlbum: subCollection)
+            }
+        }
+      }
+    }
+    .padding(.vertical, 6)
+    .onChange(of: pageFolder.foldersArray.count,
+              perform: { [oldValue = pageFolder.foldersArray.count] newValue in
+      if newValue > oldValue {
+        scrollToNewitems(item: .folder, scrollProxy: proxy)
+      }
+    })
+    .onChange(of: pageFolder.albumsArray.count,
+              perform: { [oldValue = pageFolder.albumsArray.count] newValue in
+      if newValue > oldValue {
+        scrollToNewitems(item: .album, scrollProxy: proxy)
+      }
+    })
+  }
+  // MARK: - FolderCoverView
+  func folderListView(subFolder: SubCollection,
+                      index: Int,
+                      width: CGFloat!) -> some View {
+    NavigationLink {
+      if let nextFolder = photoData.mlFolder(type: pageFolder.folderType, subFolder.id) {
+        AlbumView(pageFolder: nextFolder,
+                  isPhotosView: $isPhotosView,
+                  pageIndex: index,
+//                  isShowingSettingView: .constant(false),
+                  isShowingMessageView: .constant(false),
+                  tutorialOn: .constant(false),
+                  nameSpace: albumViewNameSpace)
+      }
+    } label: {
+      CellView(uiMode: photoData.uiMode,
+               cellType: .folder,
+               index: 0,
+               width: width) { uiMode,  size, cellNameSpace in
         Group {
-            ForEach(pageFolder.foldersArray, id: \.self) { folder in
-                let secondaryIndex = pageFolder.foldersArray.firstIndex(of: folder) ?? 0
-                folderListView(collectionList: folder,
-                               index: index + ((secondaryIndex + 1) * 4),
-                               width: width)
-                    .matchedGeometryEffect(id: folder.localIdentifier,
-                                           in: albumViewNameSpace)
-                    .buttonStyle(ClickScaleEffect())
-                    .transition(.scale)
-                    .id(folder.localIdentifier)
+          if #available(iOS 26.0, *) {
+            let innerHeight = size.height * (uiMode == .classic ? 0.8 : 0.75)
+            ZStack(alignment: uiMode == .classic ? .topLeading : .bottomTrailing) {
+              folderTitleView(subFolder: subFolder,
+                              uiMode: uiMode)
+              .matchedGeometryEffect(id: "title", in: cellNameSpace)
+              .frame(width: width, height: innerHeight,
+                     alignment: uiMode != .classic
+                     ? .topLeading : .bottom)
+              folderCountView(uiMode: uiMode,
+                              subFolder: subFolder,
+                              size: CGSize(width: size.width,
+                                           height: innerHeight),
+                              cellNameSpace: cellNameSpace)
             }
-            ForEach(pageFolder.albumsArray, id: \.self) { album in
-                let secondaryIndex = pageFolder.albumsArray.firstIndex(of: album) ?? 0
-                albumListView(assetCollection: album,
-                              index: index + secondaryIndex,
-                              width: width)
-                    .matchedGeometryEffect(id: album.localIdentifier,
-                                           in: albumViewNameSpace)
-                    .buttonStyle(ClickScaleEffect())
-                    .transition(.scale)
-                    .id(album.localIdentifier)
+            .contentTransition(.numericText())
+            .matchedGeometryEffect(id: subFolder.id,
+                                   in: cellNameSpace)
+          } else {
+            Group {
+              if let nextFolder = photoData.mlFolder(type: pageFolder.folderType, subFolder.id) {
+                FolderCoverView(folder: nextFolder,
+                                subFolder: subFolder,
+                                uiMode: photoData.uiMode,
+                                size: size,
+                                cellNameSpace: cellNameSpace)
+              } else {
+                TempCoverView(title: subFolder.title,
+                              nameSpace: cellNameSpace,
+                              size: size,
+                              cellType: .folder)
+              }
             }
+            .matchedGeometryEffect(id: subFolder.id,
+                                   in: cellNameSpace)
+            
+          }
         }
-        .padding(.vertical, 6)
+      }
     }
+    .buttonStyle(ClickScaleEffect())
+    .disabled(isEditingMode)
+    .overlay(alignment: .topLeading) {
+      btnDelete(subCollection: subFolder)
+        .offset(x: -1, y: -1)
+    }
+  }
+  // MARK: - AlbumCoverView
+  func albumListView(subAlbum: SubCollection,
+                     index: Int = 0, width: CGFloat!) -> some View {
+    return NavigationLink {
+      let albumID = subAlbum.id
+      if let album = photoData
+        .mlAlbum(type: pageFolder.folderType, albumID) {
+        AllPhotosView(mlAlbum: album,
+                      isHiddenAsset: false,
+                      nameSpace: albumViewNameSpace,
+                      isPhotosView: $isPhotosView) { _ in }
+      }
+    } label: {
+      VStack(spacing: 0) {
+        Spacer(minLength: 0)
+        CellView(uiMode: photoData.uiMode,
+                 cellType: .miniAlbum,
+                 index: index,
+                 width: width) { uiMode, size, cellNameSpace in
+          Group {
+            if let album = photoData
+              .mlAlbum(type: pageFolder.folderType, subAlbum.id) {
+              AlbumCoverView(album: album,
+                             uiMode: photoData.uiMode,
+                             cellType: .miniAlbum,
+                             size: size,
+                             colorIndex: index,
+                             albumCell: cellNameSpace,
+                             isEditingMode: isEditingMode)
+              .matchedGeometryEffect(id: subAlbum.id,
+                                     in: cellNameSpace)
+            } else {
+              TempCoverView(title: subAlbum.title,
+                            nameSpace: cellNameSpace,
+                            size: size,
+                            cellType: .miniAlbum)
+            }
+          }
+        }
+      }
+    }
+    .buttonStyle(ClickScaleEffect())
+    .disabled(isEditingMode)
+    .overlay(alignment: .topLeading) {
+      btnDelete(subCollection: subAlbum)
+        .offset(x: -1, y: photoData.uiMode != .fancy ? -1 : 10)
+    }
+  }
+}
 
-    func folderListView(collectionList: PHCollectionList,
-                        index: Int, width: CGFloat!) -> some View {
-        NavigationLink {
-            if let nextFolder = photoData.folders[collectionList.localIdentifier] {
-                AlbumView(pageFolder: nextFolder,
-                          phCollectionList: collectionList,
-                          pageIndex: index,
-                          isPhotosView: $isPhotosView,
-                          nameSpace: nameSpace,
-                          isShowingSettingView: .constant(false))
-            }
-        } label: {
-            CellView(uiMode: photoData.uiMode,
-                     cellType: .folder,
-                     index: 0,
-                     width: width) { size, cellNameSpace in
-                Group {
-                    if let nextFolder = photoData.folders[collectionList.localIdentifier] {
-                        FolderCoverView(folder: nextFolder,
-                                        phCollectionList: collectionList,
-                                        uiMode: photoData.uiMode,
-                                        size: size,
-                                        cellNameSpace: cellNameSpace)
-                    } else {
-                        TempCoverView(title: collectionList.localizedTitle ?? "Loading...",
-                                      nameSpace: cellNameSpace,
-                                      size: size,
-                                      cellType: .folder)
-                    }
-                }
-                .matchedGeometryEffect(id: collectionList.localIdentifier,
-                                       in: cellNameSpace)
-                
-            }
-        }
-        .buttonStyle(ClickScaleEffect())
-        .disabled(isEditingMode)
-        .contextMenu{ editFolderMenu(folder: collectionList) }
-        .overlay(alignment: .topLeading) {
-            btnDelete(collection: collectionList as PHCollection)
-                .offset(x: -1, y: -1)
-        }
+extension SecondaryLineView {
+  func folderTitleView(subFolder: SubCollection, uiMode: UIMode) -> some View {
+    Group {
+      if let nextFolder = photoData.mlFolder(type: pageFolder.folderType, subFolder.id) {
+        titleText(nextFolder.title,
+                  font: .footnote,
+                  color: uiMode == .classic ? .orange : .fancyBackground)
+        .lineLimit(uiMode == .classic ? 1 : .max)
+      } else {
+        titleText(subFolder.title,
+                  font: .footnote,
+                  color: photoData.uiMode == .classic
+                  ? .orange : .fancyBackground)
+      }
     }
-    
-    func albumListView(assetCollection: PHAssetCollection,
-                       index: Int = 0, width: CGFloat!) -> some View {
-        return NavigationLink {
-            AllPhotosView(assetCollection: assetCollection,
-                          isHiddenAsset: false,
-                          isPhotosView: $isPhotosView,
-                          nameSpace: nameSpace)
-        } label: {
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                CellView(uiMode: photoData.uiMode,
-                         cellType: .miniAlbum,
-                         index: index,
-                         width: width) { size, cellNameSpace in
-                    Group {
-                        if let album = photoData.albums[assetCollection.localIdentifier] {
-                            AlbumCoverView(album: album,
-                                           assetCollection: assetCollection,
-                                           uiMode: photoData.uiMode,
-                                           cellType: .miniAlbum,
-                                           size: size,
-                                           colorIndex: index,
-                                           albumCell: cellNameSpace,
-                                           isEditingMode: isEditingMode)
-                            .matchedGeometryEffect(id: assetCollection.localIdentifier,
-                                                   in: cellNameSpace)
-                        } else {
-                            TempCoverView(title: assetCollection.localizedTitle ?? "Loading...",
-                                          nameSpace: cellNameSpace,
-                                          size: size,
-                                          cellType: .miniAlbum)
-                        }
-                    }
-                }
-                 .contextMenu{
-                     editAlbumMenu(assetCollection: assetCollection, index: index)
-                 }
-            }
+    .lineLimit(.max)
+    .multilineTextAlignment(.leading)
+    .padding([.horizontal, .top], 7)
+  }
+  func folderCountView(uiMode: UIMode,
+                       subFolder: SubCollection,
+                       size: CGSize,
+                       cellNameSpace: Namespace.ID) -> some View {
+    Group {
+      if let nextFolder = photoData.mlFolder(type: pageFolder.folderType, subFolder.id) {
+        let count = "\(nextFolder.foldersArray.count) / \(nextFolder.albumsArray.count)"
+        titleText(count, font: .caption, color: .fancyBackground.opacity(0.5))
+          .lineLimit(1)
+          .matchedGeometryEffect(id: "count", in: cellNameSpace)
+          .background {
+            Rectangle()
+              .foregroundStyle(uiMode == .classic
+                               ? Color.orange : Color.folder)
+          }
+          .padding(7)
+      } else {
+        VStack(spacing: 0) {
+          ProgressView()
+            .progressViewStyle(.circular)
+            .controlSize(.mini)
+            .foregroundStyle(.white)
+            .matchedGeometryEffect(id: "count", in: cellNameSpace)
+          if uiMode == .classic {
+            Text(" ")
+          }
         }
-        .buttonStyle(ClickScaleEffect())
-        .disabled(isEditingMode)
-        .overlay(alignment: .topLeading) {
-            btnDelete(collection: assetCollection as PHCollection)
-                .offset(x: -1, y: photoData.uiMode != .fancy ? -1 : 10)
-        }
+        .frame(width: size.width, height: size.height, alignment: .center)
+      }
     }
+  }
 }
 
 // edit funcs (1/2) 폴더
 extension SecondaryLineView {
-    
-    func editFolderMenu(folder: PHCollectionList) -> some View {
-        VStack {
-            Button {
-                let alertObject = AlertObject(
-                    alertCase: .addFolderToFolder,
-                    album: nil,
-                    folder: folder,
-                    needsTextField: true)
-                DispatchQueue.main.async {
-                    NotificationCenter.default
-                        .post(name: .showAlert,
-                              object: alertObject)
-                }
-            } label: {
-                let folderIcon = "folder.fill.badge.plus"
-                ContextMenuItem(title: "폴더 안에 폴더 추가하기", image: folderIcon)
-            }
-            Button {
-                let alertObject = AlertObject(
-                    alertCase: .addAlbumToFolder,
-                    album: nil,
-                    folder: folder,
-                    needsTextField: true)
-                DispatchQueue.main.async {
-                    NotificationCenter.default
-                        .post(name: .showAlert,
-                              object: alertObject)
-                }
-            } label: {
-                let albumIcon = "rectangle.stack.fill.badge.plus"
-                ContextMenuItem(title: "폴더 안에 앨범 추가하기", image: albumIcon)
-            }
-            Divider()
-            Button {
-                let alertObject = AlertObject(alertCase: .folderNameChange,
-                                              album: nil,
-                                              folder: folder,
-                                              needsTextField: true)
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: .showAlert,
-                                                    object: alertObject)
-                }
-            } label: {
-                ContextMenuItem(title: "폴더 이름 변경하기", image: "pencil")
-            }
-            Button {
-                let moveObject = MoveCollectionObject(
-                    currentParent: pageFolder,
-                    objectCellType: .folder,
-                    objectFolder: folder,
-                    objectAlbum: nil,
-                    objectColorIndex: index,
-                    objectIdentifier: folder.localIdentifier,
-                    nameSpace: nameSpace)
-                NotificationCenter.default
-                    .post(name: .showMoveCollectionSheet, object: moveObject)
-            } label: {
-                ContextMenuItem(title: "다른 폴더로 이동하기", image: "rectangle.portrait.and.arrow.forward.fill")
-            }
-            Divider()
-            Button(role: .destructive) {
-                deleteFolderInSecDepth(folder: folder)
-            } label: {
-                ContextMenuItem(title: "이 폴더 삭제하기", image: "trash")
-            }
-            
+  var leadingPaddingView: some View {
+    Color.fancyBackground
+      .frame(width: 10 + secondaryWidth * 0.3)
+      .zIndex(1)
+  }
+
+  func btnDelete(subCollection: SubCollection) -> some View {
+    Button {
+      if let _ = photoData.folders[subCollection.id] {
+        processingCollection = subCollection
+        deleteFolderInSecDepth(subFolder: subCollection)
+      } else {
+        if let _ = photoData.albums[subCollection.id] {
+          deleteAlbumInSecDepth(subAlbum: subCollection)
         }
+      }
+    } label: {
+      RemoveButtonLabel(shapeType: .circle,
+                        isProcessing: processingCollection == subCollection)
     }
-    func btnDelete(collection: PHCollection) -> some View {
-        Button {
-            processingCollection = collection
-            if let folder = collection as? PHCollectionList {
-                deleteFolderInSecDepth(folder: folder)
-            } else {
-                if let album = collection as? PHAssetCollection {
-                    deleteAlbumInSecDepth(album: album)
-                }
-            }
-        } label: {
-            RemoveButtonLabel(shapeType: .circle,
-                              isProcessing: processingCollection == collection)
-        }
-        .opacity(isEditingMode ? 1:0)
-        .scaleEffect(isEditingMode ? 1:0.1, anchor: .center)
-        .buttonStyle(ClickScaleEffect())
-    }
+    .opacity(isEditingMode ? 1:0)
+    .scaleEffect(isEditingMode ? 1:0.1, anchor: .center)
+    .buttonStyle(ClickScaleEffect())
+  }
 }
 // edit funcs (2/2) 앨범
 extension SecondaryLineView {
-    
-    func editAlbumMenu(assetCollection: PHAssetCollection,
-                       index: Int) -> some View {
-        VStack {
-            // 앨범에 미디어 추가
-            Button {
-                guard let album = photoData.albums[assetCollection.localIdentifier] else { return }
-                let object = PickerObject(editToAlbum: album.id,
-                                          imageManager: PHCachingImageManager())
-                DispatchQueue.main.async {
-                    NotificationCenter.default
-                        .post(name: .showPhotosPicker, object: object)
-                }
-            } label: {
-                let addPhotoIcon = "person.crop.rectangle.badge.plus.fill"
-                ContextMenuItem(title: "앨범에 미디어 추가하기", image: addPhotoIcon)
+  // 앨범 삭제
+  func deleteFolderInSecDepth(subFolder: SubCollection) {
+    guard let folder = photoData.mlFolder(type: pageFolder.folderType, subFolder.id)
+    else { return }
+    if folder.folderType == .userFolder {
+      pageFolder.deleteFolder(
+        folder: folder.phCollectionList) { bool in
+        if bool {
+          dispatchAnimation {
+            photoData
+              .removeFolderValue(folder: folder.phCollectionList) {
+              NotificationCenter.default
+                .post(name: .outsideFetchChange, object: "myPhotos")
             }
-            Divider()
-            // 앨범 이름 변경
-            Button {
-                guard let album = photoData.albums[assetCollection.localIdentifier]
-                else { return }
-                let alertObject = AlertObject(alertCase: .albumNameChange,
-                                              album: album.phAssetCollection,
-                                              folder: nil,
-                                              needsTextField: true)
-                NotificationCenter.default.post(name: .showAlert,
-                                                object: alertObject)
-            } label: {
-                ContextMenuItem(title: "앨범 이름 변경하기", image: "pencil")
-            }
-            // 다른 폴더로 이동
-            Button {
-                let moveObject = MoveCollectionObject(
-                    currentParent: pageFolder,
-                    objectCellType: .miniAlbum,
-                    objectFolder: nil,
-                    objectAlbum: assetCollection,
-                    objectColorIndex: index,
-                    objectIdentifier: assetCollection.localIdentifier,
-                    nameSpace: nameSpace)
-                NotificationCenter.default
-                    .post(name: .showMoveCollectionSheet,
-                          object: moveObject)
-            } label: {
-                ContextMenuItem(title: "다른 폴더로 이동하기", image: "rectangle.portrait.and.arrow.forward.fill")
-            }
-            Divider()
-            Button(role: .destructive) {
-                deleteAlbumInSecDepth(album: assetCollection)
-            } label: {
-                ContextMenuItem(title: "이 앨범 삭제하기", image: "trash")
-            }
-            
+          }
         }
-    }
-    // 앨범 삭제
-    func deleteFolderInSecDepth(folder: PHCollectionList) {
-        pageFolder.deleteFolder(folder: folder) { bool in
-            if bool {
-                dispatchAnimation {
-                    photoData.removeFolderValue(folder: folder) {
-                        NotificationCenter.default
-                            .post(name: .outsideFetchChange, object: "myPhotos")
-                    }
-                }
-            }
-            dispatchAnimation {
-                processingCollection = nil 
-            }
+        dispatchAnimation {
+          processingCollection = nil
         }
+      }
+    } else {
+      let object = AlertObject(
+        alertCase: .delShareCategory,
+        folderType: .shareCategory,
+        albumID: nil,
+        folderID: folder.id,
+        title: subFolder.title,
+        parent: pageFolder.id)
+      NotificationCenter.default
+        .post(name: .showAlert, object: object)
     }
-    func deleteAlbumInSecDepth(album: PHAssetCollection)  {
-        pageFolder.deleteAlbum(album: album) { bool in
-            if bool {
-                dispatchAnimation {
-                    photoData.removeAlbumValue(album: album) {
-                        NotificationCenter.default
-                            .post(name: .outsideFetchChange, object: "myPhotos")
-                    }
-                }
+  }
+  func deleteAlbumInSecDepth(subAlbum: SubCollection) {
+    if let album = photoData.albums[subAlbum.id] {
+      pageFolder.deleteAlbum(album: album.phAssetCollection) { bool in
+        if bool {
+          dispatchAnimation {
+            photoData
+              .removeAlbumValue(album: album.phAssetCollection) {
+              NotificationCenter.default
+                .post(name: .outsideFetchChange, object: "myPhotos")
             }
-            dispatchAnimation {
-                processingCollection = nil
-            }
+          }
         }
+        dispatchAnimation {
+          processingCollection = nil
+        }
+      }
     }
+  }
+  func loadNextStep() {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+      if photoData.startView == .album {
+        photoData.loadingState = .loadAllAlbums
+      } else {
+        photoData.loadingState = .doneAllAlbums
+      }
+    }
+  }
+  func scrollToNewitems(item: CellType,
+                        scrollProxy: ScrollViewProxy) {
+    let newItem = item == .folder
+    ? pageFolder.foldersArray.last?.id
+    : pageFolder.albumsArray.last?.id
+    withAnimation {
+      scrollProxy.scrollTo(newItem, anchor: .center)
+    }
+  }
 }
 
 enum SecondarySeetType {
-    case moveCollection, photosPicker
+  case moveCollection, photosPicker
 }
 
 //struct FancyFolderLineView_Previews: PreviewProvider {

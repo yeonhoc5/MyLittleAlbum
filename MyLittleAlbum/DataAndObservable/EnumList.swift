@@ -61,9 +61,9 @@ enum SampleCase: Int {
 enum Tabs: String, CaseIterable, Identifiable {
     var id: Self { self }
     
-    case photo = "나의 포토"
+//    case photo = "나의 포토"
     case album = "나의 앨범"
-    case other = "사진 관리"
+//    case other = "사진 관리"
     case share = "공유 앨범"
 }
 
@@ -106,7 +106,7 @@ enum ImageSize {
 
 
 enum AlbumType {
-    case home, album, smartAlbum, picker
+    case home, album, share, picker
 }
 
 enum SmartType {
@@ -114,7 +114,7 @@ enum SmartType {
 }
 
 enum EdgeToScroll {
-    case top, bottom, none
+    case top, bottom, none, number
 }
 
 enum NewToScroll {

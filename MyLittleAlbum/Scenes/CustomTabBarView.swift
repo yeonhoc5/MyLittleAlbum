@@ -6,158 +6,241 @@
 //
 
 import SwiftUI
+import Photos
 
 // MARK: - 1. Tabbar View
-struct CustomTabBarView: View {
-    @Binding var selectedTab: Tabs
-    // 애니메이션 재실행 프라퍼티
-    @StateObject var launchScreenManager: LaunchScreenManager
-    @Binding var isOpen: Bool
-    @Binding var maskingScale: CGFloat
-    @Binding var albumTabTapped: Bool
-    var isPhotosView: Int
-    var actionTab1: () -> Void
-    var actionTab2: () -> Void
-    var actionTab3: () -> Void
-    var actionTab4: () -> Void
-    @Namespace var nameSpace
-    
-    var body: some View {
-        GeometryReader { geoProxy in
-            let width = geoProxy.size.width
-            HStack {
-                if device != .phone && isPhotosView == 0 {
-                    Rectangle().fill(.clear)
-                        .frame(width: width / 5)
-                }
-                ZStack {
-                    // 기기별 백그라운드
-                    tabbarBackground(device: device)
-                    // 탭버튼 3개
-                    HStack {
-                        Spacer()
-                        customTabItem(tab: .photo, title: "나의 포토") {
-                            actionTab1()
-                        }
-                        Spacer()
-                        customTabItem(tab: .album, title: "나의 앨범") {
-                            actionTab2()
-                        }
-                        Spacer()
-//                        customTabItem(tab: .share, title: "공유 앨범") {
-//                            actionTab3()
-//                        }
-//                        Spacer()
-                        customTabItem(tab: .other, title: "사진 관리") {
-                            actionTab4()
-                        }
-                        Spacer()
-                    }
-                    .padding(.bottom, device == .phone ? 20 : 0)
-                    .padding(.top, 5)
-                }
-                if device != .phone {
-                    Rectangle()
-                        .fill(.clear)
-                        .frame(width: isPhotosView == 0
-                                        ? width / 5 : (width / 3) * 2)
-                }
-            }
+struct CustomTabBarView<V: View>: View {
+  @EnvironmentObject var photoData: MLPhotoData
+  @Binding var selectedTab: Tabs
+  // 애니메이션 재실행 프라퍼티
+  @ObservedObject var launchScreenManager: LaunchScreenManager
+  let width: CGFloat
+  let spacing: CGFloat
+  @Binding var isOpen: Bool
+  @Binding var maskingScale: CGFloat
+  @Binding var albumTabTapped: Bool
+  var isPhotosView: Int
+  let nameSpace: Namespace.ID
+  
+  let actionTab1: () -> Void
+  let actionTab2: () -> Void
+  let actionTab3: () -> Void
+  let actionTab4: () -> Void
+  
+  @Binding var isShowingHome: Bool
+  @Binding var animationEnded: Bool
+  let photosView: () -> V
+  let closePhtosView: () -> Void
+  
+  var body: some View {
+    return ZStack(alignment: .bottom) {
+      let cornerRadius: CGFloat = 25
+      if isShowingHome {
+        // "사진함"
+        Group {
+          availableGlassCardView(cornerR: cornerRadius)
+          photosView()
+            .clipShape(cardShape(cornerR: 38))
+            .padding(1)
         }
-        .frame(height: tabbarHeight)
-        .padding(device == .pad ? (safeAraBottom ?? 0) + 5 : 0)
+        .matchedGeometryEffect(id: "homeBack", in: nameSpace)
+      }
+      // "사진함" 버튼 + 앨범2개 탭버튼
+      HStack(spacing: 10) {
+        btnPhotos(cornerR: cornerRadius)
+        tabButtons(cornerR: cornerRadius)
+      }
+      .frame(maxWidth: width > 600 ? width / 2 : width)
+      .tabBarLayout(height: tabbarHeight,
+                    screenWidth: width,
+                    isPhotosView: isPhotosView > 0,
+                    padEdge: .leading)
     }
+  }
 }
 
 // MARK: - 2. subViews
 extension CustomTabBarView {
-    func tabbarBackground(device: UIUserInterfaceIdiom) -> some View {
-        let color = device == .phone
-                    ? Color.fancyBackground
-                    : Color.white.opacity(0.9)
-        return Group {
-            switch device {
-            case .phone: Rectangle()
-            default:
-                RoundedRectangle(cornerRadius: 10)
-                    .clipped()
-                    .shadow(color: .fancyBackground.opacity(0.5),
-                            radius: 2, x: 0, y: 0)
-            }
-        }
-        .foregroundStyle(color)
-    }
-    func customTabItem(tab: Tabs,
-                       title: String,
-                       actionOnLongPress: @escaping () -> Void) -> some View {
-        let icon: String = switch tab {
-        case .photo: selectedTab == .photo
-            ? "photo.on.rectangle.angled" : "photo.on.rectangle"
-        case .album: selectedTab == .album
-            ? "film.stack" : "film"
-        case .share: selectedTab == .share
-            ? "icloud.fill" : "icloud"
-        case .other: selectedTab == .other
-            ? "list.star" : "list.bullet"
-        }
-        return VStack(spacing: 4) {
-            imageWithScale(systemName: icon, scale: .large)
-                .frame(width: 30, height: 20)
-                .transition(.opacity)
-//                .modify {
-//                    if #available(iOS 17.0, *) {
-//                        $0.contentTransition(
-//                            .symbolEffect(.replace)
-//                        )
-//                    } else {
-//                        $0.contentTransition(.interpolate)
-//                    }
-//                }
-            Text(title).font(
-                .system(
-                    size: 9,weight: .semibold, design: .rounded
-                )
-            )
-        }
-        .frame(width: 50)
-        .scaleEffect(selectedTab == tab ? 1.2 : 1)
-        .foregroundColor(selectedTab == tab
-                            ? (device == .phone ? .white : .black)
-                            : .gray)
-        .onTapGesture {
-            withAnimation(.snappy()) {
-                if selectedTab != tab {
-                    selectedTab = tab
-                } else if selectedTab == .album {
-                    self.albumTabTapped = true
+  func tabButtons(cornerR: CGFloat) -> some View {
+    GeometryReader { geometry in
+      ZStack {
+        Button {
+          if isShowingHome {
+            closePhtosView()
+          }
+        } label: {
+          ZStack {
+            cardShapeView(foreground: Color.fancyBackground,
+                          cornerR: cornerR)
+            Group {
+              if isShowingHome {
+                Text("닫 기")
+              } else {
+                HStack {
+                  customTabItem(tab: .album, title: "나의 앨범") {
+                    actionTab2()
+                  }
+                  customTabItem(tab: .share, title: "공유 앨범") {
+                      actionTab3()
+                  }
                 }
+              }
             }
+            .transition(.scale)
+          }
         }
-        .onLongPressGesture(minimumDuration: 2) {
-            actionOnLongPress()
-        }
+        .disabled(!isShowingHome)
+        .buttonStyle(ClickScaleEffect(scale: 0.9))
+      }
+      .simultaneousGesture(
+        SpatialTapGesture(count: 1, coordinateSpace: .local)
+          .onEnded({ translation in
+            let locate = translation.location
+            if !isShowingHome {
+              if locate.x < (geometry.size.width/2) {
+                withAnimation {
+                  selectedTab = .album
+                }
+              } else {
+                withAnimation {
+                  selectedTab = .share
+                }
+              }
+            }
+          })
+      )
     }
+  }
+  func btnPhotos(cornerR: CGFloat) -> some View {
+    Button {
+      if !isShowingHome {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+          withAnimation(Animation.bouncy(duration: 0.2)) {
+              isShowingHome = true
+            } completion: {
+              withAnimation(.easeInOut(duration: 0.2)) {
+                animationEnded = true
+              }
+            }
+          }
+      }
+    } label: {
+      ZStack {
+        if !isShowingHome {
+          cardShapeView(foreground: .thinMaterial,
+                        cornerR: cornerR)
+            .matchedGeometryEffect(id: "homeBack", in: nameSpace)
+            .frame(width: tabbarHeight, height: tabbarHeight)
+        }
+        VStack(spacing: 4) {
+          Group {
+            if photoData.isReadyHomeView {
+              imageWithScale(systemName: iconPhotosSelected,
+                             scale: .large)
+                .frame(width: 80, height: 20)
+            } else {
+              ProgressView()
+                .progressViewStyle(.circular)
+                .tint(.white)
+                .frame(width: 80, height: 20)
+            }
+          }
+          .transition(.scale)
+          Text("사진함")
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
+        }
+        .scaleEffect(isShowingHome ? 1.3 : 1)
+        .foregroundColor(isShowingHome ? .white : .gray)
+      }
+    }
+    .buttonStyle(ClickScaleEffect(scale: 0.9))
+  }
+  func tabbarBackground(device: UIUserInterfaceIdiom) -> some View {
+    let isPad = device == .pad
+    return Group {
+      if #available(iOS 26, *) {
+        Group {
+          if isPad {
+            RoundedRectangle(cornerRadius: 15)
+              .foregroundStyle(Color.fancyBackground.opacity(0.5))
+              .glassEffect(in: RoundedRectangle(cornerRadius: 15))
+          } else {
+            ContainerRelativeShape()
+              .foregroundStyle(Color.fancyBackground.opacity(0.5))
+              .glassEffect(in: ContainerRelativeShape())
+          }
+        }
+      } else {
+        RoundedRectangle(cornerRadius: isPad ? 10 : 0)
+          .foregroundStyle(isPad ? Color.white : Color.fancyBackground)
+      }
+    }
+  }
+  func customTabItem(tab: Tabs,
+                     title: String,
+                     actionOnLongPress: @escaping () -> Void) -> some View {
+    let selected = (selectedTab == tab && !isShowingHome)
+    let icon: String = switch tab {
+    case .album: selectedTab == .album ? iconAlbumSelected : iconAlbum
+    case .share: selectedTab == .share ? "person.2.fill" : "person.2"
+    }
+    return VStack(spacing: 4) {
+      imageWithScale(systemName: icon, scale: .large)
+        .frame(width: 50, height: 20)
+        .transition(.opacity)
+      Text(title)
+        .font(.system(size: 9, weight: .semibold, design: .rounded))
+    }
+    .scaleEffect(selected ? 1.3 : 1)
+    .modify({ view in
+      if device == .pad, #available(iOS 26, *) {
+        view.foregroundColor(selected ? .white : .gray)
+      } else if device == .phone {
+        view.foregroundColor(selected ? .white : .gray)
+      } else {
+        view.foregroundColor(selected ? .fancyBackground : .gray)
+      }
+    })
+    .frame(width: 80, height: tabbarHeight-10)
+    .onLongPressGesture(minimumDuration: 2) {
+      actionOnLongPress()
+    }
+  }
+  func cardShapeView<S: ShapeStyle>(foreground: S, cornerR: CGFloat, autoCornerRadius: Bool = false) -> some View {
+    RoundedRectangle(cornerRadius: cornerR)
+      .availabeGlassEffect(
+        cornerR: cornerR,
+        foreground: foreground.opacity(0.85)) { view in
+          view
+      }
+  }
 }
 
 
 struct CustomTabBarView_Previews: PreviewProvider {
-    static var previews: some View {
-        VStack(spacing: 0, content: {
-            CustomTabBarView(selectedTab: .constant(.album),
-                             launchScreenManager: LaunchScreenManager(),
-                             isOpen: .constant(true),
-                             maskingScale: .constant(4),
-                             albumTabTapped: .constant(false),
-                             isPhotosView: 0) {
-                print("action 1")
-            } actionTab2: {
-                print("action 2")
-            } actionTab3: {
-                print("action 3")
-            } actionTab4: {
-                print("action 4")
-            }
-        })
-        .ignoresSafeArea(edges: .bottom)
+  static var previews: some View {
+    GeometryReader { geometry in
+      VStack(spacing: 0, content: {
+        CustomTabBarView(selectedTab: .constant(.album),
+                         launchScreenManager: LaunchScreenManager(),
+                         width: geometry.size.width,
+                         spacing: 40,
+                         isOpen: .constant(true),
+                         maskingScale: .constant(4),
+                         albumTabTapped: .constant(false),
+                         isPhotosView: 0,
+                         nameSpace: Namespace().wrappedValue,
+                         actionTab1: { print("action 1") },
+                         actionTab2: { print("action 2") },
+                         actionTab3: { print("action 3") },
+                         actionTab4: { print("action 4") },
+                         isShowingHome: .constant(false),
+                         animationEnded: .constant(false),
+                         photosView: { EmptyView() },
+                         closePhtosView: { }
+        )
+      })
     }
+    .ignoresSafeArea(edges: .bottom)
+  }
 }

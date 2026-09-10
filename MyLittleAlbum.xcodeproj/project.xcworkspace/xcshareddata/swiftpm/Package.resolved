@@ -1,5 +1,5 @@
 {
-  "originHash" : "67116c4a1e37d61058ce11b114b9e230b818f9379622764ab907ee3928227d9e",
+  "originHash" : "406c5f906506a1843c03ee4c54a3715ba75e155786fe78437f54d1004145e893",
   "pins" : [
     {
       "identity" : "lottie-spm",
@@ -20,12 +20,12 @@
       }
     },
     {
-      "identity" : "zoomable",
+      "identity" : "variableblur",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ryohey/Zoomable.git",
+      "location" : "https://github.com/nikstar/VariableBlur",
       "state" : {
         "branch" : "main",
-        "revision" : "525c0e1784825261b84d21c5cd5a159245a40ea6"
+        "revision" : "5073a0d9080e488a2d317e04859c001a57fbb3e8"
       }
     }
   ],

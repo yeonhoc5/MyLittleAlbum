@@ -6,7 +6,6 @@
 //
 
 import UIKit
-import SwiftUI
 import LocalAuthentication
 
 var device: UIUserInterfaceIdiom {
@@ -19,25 +18,16 @@ var screenSize: CGSize {
         return size
     }
 }
-//var screenWidth: CGFloat {
-//    return device == .phone
-//    ? min(screenSize.width, screenSize.height)
-//    : screenSize.width
-//}
+var screenWidth: CGFloat {
+    return device == .phone
+    ? min(screenSize.width, screenSize.height)
+    : screenSize.width
+}
 
 
 var scale: CGFloat = {
-    guard let scale = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first?.screen.scale else { return .zero }
-    return scale
+    return UITraitCollection.current.displayScale
 }()
-
-
-let colorSet: [Color] = [.color1, .color2, .color3, .color4, .color5,
-                         .color6, .color7, .color8, .color9, .color10,
-                         .color11, .color12, .color13, .color14, .color15,
-                         .color16, .color17, .color18, .color19, .color20,
-                         .color21, .color22, .color23, .color24, .color25,
-                         .color26, .color27, .color28]
 
 let emptyLabel: [String] = ["텅", "휘이잉~", "Zero", "조용...", "비움",
                             "깨끗", "nothing", "또르르", "empty", "없을 무",
@@ -54,40 +44,81 @@ let transitionRange: [Int] = [
 ]
 
 enum UserDefaultsKey: String {
-    case startView
-    case uimode
-    case useOpeningAni
-    case useKnock
-    case transitionIndex
-    case digitalShowRandom
-    case userReadDone
-    case recentAlbums
-    case recentFolders
+  case existingUser
+  case startView
+  case uimode
+  case useOpeningAni
+  case useKnock
+  case transitionIndex
+  case digitalShowRandom
+  case userReadDone
+  case recentAlbums
+  case recentFolders
+  case recentCategoris
 }
 
 let tabbarHeight: CGFloat = 80.0
 let tabbarTopPadding: CGFloat = 10.0
-let tabbarBottomPadding: CGFloat = device == .phone ? 0 : 30.0
+var tabbarBottomPadding: CGFloat {
+    get {
+        if device == .pad {
+            return 16.5 + 10
+        } else {
+            if #available(iOS 26.0, *) {
+                return 16.5
+            } else {
+                return 0
+            }
+        }
+    }
+}
 
-let statusBarHeight: CGFloat = (UIApplication.shared.connectedScenes.first as? UIWindowScene)
-    .flatMap { $0.statusBarManager }
-    .flatMap { $0.statusBarFrame.height }!
-
-var safeAraBottom: CGFloat? = {
-    (UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        .flatMap { $0.windows.first }
-        .flatMap { $0.safeAreaInsets.bottom }
-}()
+extension UIApplication {
+  static var safeAreaInsets: UIEdgeInsets {
+    let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+    return scene?.windows.first?.safeAreaInsets ?? .zero
+  }
+}
+//var safeAreaBottom : CGFloat = {
+//  return UIApplication.safeAreaInsets.bottom
+//}()
+let ipadBottomPadding: CGFloat = 20.0
 
 var navigationbarHeight: CGFloat = {
     let controller = UINavigationController()
     return controller.navigationBar.frame.height
 }()
+var statusBarHeight: CGFloat = {
+  return (UIApplication.shared.connectedScenes.first as? UIWindowScene)
+      .flatMap { $0.statusBarManager }
+      .flatMap { $0.statusBarFrame.height }!
+}()
+//let statusBarHeight: CGFloat = (UIApplication.shared.connectedScenes.first as? UIWindowScene)
+//    .flatMap { $0.statusBarManager }
+//    .flatMap { $0.statusBarFrame.height }!
+var safeAreaTopPadding: CGFloat = {
+  return navigationbarHeight + statusBarHeight
+}()
 
 let widthLimit: CGFloat = 600
 
 
+func operatedArray(array: [MLAsset],
+                   setOperation: SetOpertation,
+                   assets: [MLAsset]) -> [MLAsset] {
+  var set = Set(array)
+  switch setOperation {
+  case .union: set = set.union(Set(assets))
+  case .intersection: set = set.intersection(Set(assets))
+  case .subtraction: set = set.subtracting(Set(assets))
+  }
+  return Array(set)
+}
+
 // 앨범 / 폴더 컨텐츠 레이아웃
+
+let normalPadding: CGFloat = 7
+let miniPadding: CGFloat = 5
 var listCount: Int {
     return device == .phone 
     ? 3 : (screenSize.width > screenSize.height ? 9 : 6)
@@ -125,25 +156,39 @@ func cellHeight(width: CGFloat, uiMode: UIMode, cellType: CellType) -> CGFloat {
     }
     return width * ratio
 }
+func creteriaResult(screenSize: CGSize, size: CGSize) -> Creteria {
+  let assetRatio = size.height / size.width
+  let screenRatio = screenSize.height / screenSize.width
+  return assetRatio <= screenRatio ? .width : .height
+}
 
 
 // MARK: - 디테일뷰
 let detailViewContentSize = screenSize.height - statusBarHeight
 // VideoController
-let vcHeight: CGFloat = 40
+let vcHeight: CGFloat = device == .pad ? 60 : 45
 let vcHorisontalPadding: CGFloat = 15
-let vcBottomPadding: CGFloat = 30
+let vcBottomPadding: CGFloat = 35
 
-
+let adsRegionSpacing: CGFloat = 110
 
 // MARK: - 아이콘
+// 0. tabbar
+let iconPhotos = "photo.on.rectangle"
+let iconAlbum = "character.book.closed"
+let iconSmart = "list.bullet"
+let iconPhotosSelected = "photo.on.rectangle.angled"
+let iconAlbumSelected = "book.fill"
+let iconSmartSelected = "list.star"
+
+// 1. asset
 let iconHide = "eye.slash.fill"
 let iconUnhide = "eye.fill"
-
-let iconFavorite = "heart.fill"
-let iconNotFavorite = "heart"
-let iconUnfavorite = "heart.slash.fill"
-
+let iconFavorite = "star.fill"
+let iconNotFavorite = "star"
+let iconUnfavorite = "star.slash.fill"
+let iconSubtract = "rectangle.stack.badge.minus"
+    
 let iconLocked = "lock.fill"
 let iconUnLocked = "lock.open.fill"
 
@@ -157,3 +202,21 @@ let iconInsertToAlbum = "rectangle.stack.badge.plus"
 
 let iconImage = "photo.fill"
 let iconVideo = "video.fill"
+
+let iconTrash = "trash"
+
+let iconModify = "square.and.pencil"
+let iconAddFolder = "folder.fill.badge.plus"
+let iconAddAlbum = "rectangle.stack.fill.badge.plus"
+let iconReorder = "arrow.up.arrow.down"
+let iconMoveToOtherFolder = "rectangle.portrait.and.arrow.forward.fill"
+let iconEraser = if #available(iOS 26.0, *) {
+  "eraser.badge.xmark.fill"
+} else {
+  "eraser.fill"
+}
+let syncSymbol: String = if #available(iOS 18, *) {
+  "arrow.trianglehead.2.clockwise.rotate.90"
+} else {
+  "arrow.triangle.2.circlepath"
+}

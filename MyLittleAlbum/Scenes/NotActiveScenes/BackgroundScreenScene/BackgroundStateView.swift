@@ -8,27 +8,27 @@
 import SwiftUI
 
 struct BackgroudStateView: View {
-    @Namespace var nameSpace
-    
-    var body: some View {
-//        let height = device == .phone ? 0.16 : 0.2
-        return ZStack {
-            Color("LaunchBackColor")
-                .ignoresSafeArea()
-            Image("LaunchCenterImage")
-                .resizable()
-                .scaledToFit()
-                .frame(width: screenSize.height * 0.16)
-                .position(x: screenSize.width / 2,
-                          y: screenSize.height * 0.8 / 2)
-                .transition(.scale)
-        }
+  let size: CGSize
+  @Namespace var nameSpace
+  
+  var body: some View {
+    return ZStack {
+      Color("LaunchBackColor")
         .ignoresSafeArea()
+      Image("LaunchCenterImage")
+        .resizable()
+        .scaledToFit()
+        .frame(width: size.height * 0.16)
+        .offset(y: -size.height * 0.025)
     }
+    .ignoresSafeArea()
+  }
 }
 
 struct BackgroudStateView_Previews: PreviewProvider {
-    static var previews: some View {
-        BackgroudStateView()
+  static var previews: some View {
+    GeometryReader { geoproxy in
+      BackgroudStateView(size: geoproxy.size)
     }
+  }
 }

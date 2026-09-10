@@ -60,7 +60,7 @@ struct UnfoldableListLayout<Content: View>: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         withAnimation(.interactiveSpring()) {
                             proxy.scrollTo(
-                                pageFolder?.albumsArray.last?.localIdentifier ?? "albumViewEdge",
+                                pageFolder?.albumsArray.last?.id ?? "albumViewEdge",
                                 anchor: .bottomTrailing)
                         }
                     }

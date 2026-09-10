@@ -10,7 +10,7 @@ import SwiftUI
 struct ImageVolumeView: View {
     @EnvironmentObject var photoData: MLPhotoData
     var body: some View {
-        let assets = (photoData.homeAlbum?.frObject(isHiddenAsset: false) ?? [])
+        let assets = (photoData.homeAlbum?.frObject(isHidden: false) ?? [])
             .sorted(by: { $0.creationDate > $1.creationDate })
 //            .sorted(by: { $0.volume > $1.volume }) ?? []
         List(0..<10) { index in

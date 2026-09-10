@@ -176,7 +176,7 @@ extension Album {
                                 setAllAlbumsPhotos: Set<PHAsset>){
         let setAllPhotos = Set(allPhotos.objects(at: IndexSet(integersIn: 0..<allPhotos.count)))
         let resultSet = setAllPhotos.subtracting(setAllAlbumsPhotos)
-        self.photosArray = Array(resultSet).sorted(by: {$0.creationDate! < $1.creationDate!})
+        self.photosArray = Array(resultSet)
         self.count = self.photosArray.count
         self.countOfImage = self.photosArray.filter{$0.mediaType == .image}.count
         self.countOfVidoe = self.photosArray.filter{$0.mediaType == .video}.count
@@ -298,7 +298,7 @@ extension Album {
                    isDetailView: Bool = false) {
         var assetArray: [PHAsset] = []
         switch self.filteringType {
-        case .all: assetArray = self.photosArray
+        case .all, .byVolume: assetArray = self.photosArray
         case .image: assetArray = self.photosArray.filter({$0.mediaType == .image})
         case .video: assetArray = self.photosArray.filter({$0.mediaType == .video})
         case .favorite: assetArray = self.photosArray.filter({ $0.isFavorite })
@@ -436,7 +436,7 @@ extension Album {
     func generatingBackgroundPhotos() {
         let set = self.generateAllAlbumPhotos(allAlbumPhotosArray: self.arrayFetchResultOfAllAlbums)
         if self.belongingType == .album {
-            self.photosArray = Array(set).sorted(by: {$0.creationDate! < $1.creationDate!})
+            self.photosArray = Array(set)
             self.count = self.photosArray.count
             self.countOfImage = self.photosArray.filter{$0.mediaType == .image}.count
             self.countOfVidoe = self.photosArray.filter{$0.mediaType == .video}.count

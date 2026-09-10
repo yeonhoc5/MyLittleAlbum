@@ -101,7 +101,7 @@ struct PhotoThumbnailView: View {
         var uiimage: UIImage?
         let requestOptions = PHImageRequestOptions()
         requestOptions.deliveryMode = .fastFormat
-        requestOptions.resizeMode = .fast
+        requestOptions.resizeMode = .exact
 //        requestOptions.deliveryMode = .opportunistic
         requestOptions.isSynchronous = true
         requestOptions.isNetworkAccessAllowed = true

@@ -431,11 +431,13 @@ extension PhotosGridView {
         requestOptions.resizeMode = .exact
         requestOptions.isSynchronous = true
         requestOptions.isNetworkAccessAllowed = true
-            imageManager.requestImage(for: asset, targetSize: thumbNailSize, contentMode: .aspectFill, options: requestOptions) { assetImage, _ in
-                if let assetImage = assetImage {
-                    image = assetImage
-                }
+        
+        imageManager.requestImage(for: asset, targetSize: thumbNailSize, contentMode: .aspectFill, options: requestOptions) { assetImage, _ in
+            if let assetImage = assetImage {
+                image = assetImage
             }
+        }
+        
         return image
     }
     

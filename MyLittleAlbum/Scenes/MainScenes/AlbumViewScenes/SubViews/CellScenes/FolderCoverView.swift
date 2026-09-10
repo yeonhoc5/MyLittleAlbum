@@ -9,74 +9,100 @@ import SwiftUI
 import Photos
 
 struct FolderCoverView: View {
-    @ObservedObject var folder: MLFolder
-    let phCollectionList: PHCollectionList!
-    let uiMode: UIMode
-    let size: CGSize
-    let cellNameSpace: Namespace.ID
-    
-    var body: some View {
-        let strCount = count(folder: folder)
-        switch uiMode {
-        case .classic:
-            classicFolderCover(count: strCount)
-        case .modern, .fancy:
-            fancyFolderCover(count: strCount)
-        }
+  @StateObject var folder: MLFolder
+  let subFolder: SubCollection!
+  let uiMode: UIMode
+  let size: CGSize
+  let cellNameSpace: Namespace.ID
+  
+  var body: some View {
+    let strCount = count(folder: folder)
+    switch uiMode {
+    case .classic: classicFolderCover(count: strCount)
+    case .modern, .fancy:
+      if #available(iOS 26.0, *) {
+        fancyFolderCover26(count: strCount)
+      } else {
+        fancyFolderCover(count: strCount)
+      }
     }
+  }
 }
 
 extension FolderCoverView {
-    
-    func count(folder: MLFolder) -> String {
-        return "\(folder.foldersArray.count) / \(folder.albumsArray.count)"
+  func count(folder: MLFolder) -> String {
+    return "\(folder.foldersArray.count) / \(folder.albumsArray.count)"
+  }
+  func classicFolderCover(count: String) -> some View {
+    VStack(spacing: 5) {
+      GeometryReader { geoProxy in
+        Text(count)
+          .font(.caption)
+          .foregroundColor(.white)
+          .contentTransition(.numericText())
+          .padding(.bottom, 5)
+          .frame(width: geoProxy.size.width - 10,
+                 height: geoProxy.size.height,
+                 alignment: .bottomTrailing)
+        
+      }
+      titleText(folder.title, font: .caption, color: .orange, inline: true)
+        .bold()
+        .lineLimit(1)
+        .contentTransition(.numericText())
+        .matchedGeometryEffect(id: "title", in: cellNameSpace)
     }
-    func classicFolderCover(count: String) -> some View {
-        VStack(spacing: 5) {
-            GeometryReader { geoProxy in
-                Text(count)
-                    .font(.caption)
-                    .foregroundColor(.white)
-                    .contentTransition(.numericText())
-                    .padding(.bottom, 5)
-                    .frame(width: geoProxy.size.width - 10,
-                           height: geoProxy.size.height,
-                           alignment: .bottomTrailing)
-                
-            }
-            titleText(folder.title, font: .caption, color: .orange, inline: true)
-            .bold()
-            .lineLimit(1)
-            .contentTransition(.numericText())
-            .matchedGeometryEffect(id: "title", in: cellNameSpace)
-        }
-    }
-    func fancyFolderCover(count: String) -> some View {
-        let spacing: CGFloat = 10
-        return VStack(alignment: .leading,
-                      spacing: spacing,
-                      content: {
-            titleText(count, font: .caption,
-                      color: .fancyBackground.opacity(0.5))
-                    .matchedGeometryEffect(id: "count", in: cellNameSpace)
-                    .lineLimit(1)
-                    .contentTransition(.numericText())
-                    .frame(width: size.width - 10,
-                           height: (size.height - spacing) * 0.33,
-                           alignment: .bottomLeading)
-            titleText(folder.title, font: .footnote,
-                      color: .fancyBackground)
-                    .matchedGeometryEffect(id: "title", in: cellNameSpace)
-                    .lineLimit(.max)
-                    .multilineTextAlignment(.leading)
-                    .contentTransition(.numericText())
-                    .frame(width: size.width - 10,
-                           height: (size.height - spacing) * 0.67,
-                           alignment: .topLeading)
-        })
-        .frame(width: size.width, height: size.height)
-    }
-
+  }
+  func fancyFolderCover(count: String) -> some View {
+    let spacing: CGFloat = 10
+    return VStack(alignment: .leading,
+                  spacing: spacing,
+                  content: {
+      titleText(count, font: .caption,
+                color: .fancyBackground.opacity(0.5))
+      .matchedGeometryEffect(id: "count", in: cellNameSpace)
+      .lineLimit(1)
+      .contentTransition(.numericText())
+      .frame(width: size.width - 10,
+             height: (size.height - spacing) * 0.33,
+             alignment: .bottomLeading)
+      titleText(folder.title, font: .footnote,
+                color: .fancyBackground)
+      .matchedGeometryEffect(id: "title", in: cellNameSpace)
+      .lineLimit(.max)
+      .multilineTextAlignment(.leading)
+      .contentTransition(.numericText())
+      .frame(width: size.width - 10,
+             height: (size.height - spacing) * 0.67,
+             alignment: .topLeading)
+    })
+    .frame(width: size.width, height: size.height)
+  }
+  func fancyFolderCover26(count: String) -> some View {
+    let padding: CGFloat = 10
+    return VStack(alignment: .leading,
+                  spacing: 0,
+                  content: {
+      Spacer(minLength: (size.height - padding) * 0.3)
+      titleText(folder.title, font: .footnote, color: .fancyBackground)
+        .matchedGeometryEffect(id: "title", in: cellNameSpace)
+        .lineLimit(.max)
+        .multilineTextAlignment(.leading)
+        .contentTransition(.numericText())
+        .frame(width: size.width - 10,
+               height: (size.height - padding) * 0.55,
+               alignment: .topLeading)
+      titleText(count, font: .caption, color: .fancyBackground.opacity(0.5))
+        .matchedGeometryEffect(id: "count", in: cellNameSpace)
+        .lineLimit(1)
+        .contentTransition(.numericText())
+        .frame(width: size.width - 10,
+               height: (size.height - padding) * 0.15,
+               alignment: .trailing)
+    })
+    .padding(padding)
+    .frame(width: size.width, height: size.height)
+  }
 }
 
 //#Preview {

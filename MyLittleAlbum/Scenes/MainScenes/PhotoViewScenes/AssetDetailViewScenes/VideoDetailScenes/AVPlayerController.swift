@@ -9,7 +9,6 @@ import SwiftUI
 import AVKit
 
 struct AVPlayerController : UIViewControllerRepresentable {
-    
     let player: AVPlayer!
     
     func makeUIViewController(context: Context) -> some UIViewController {
@@ -23,6 +22,9 @@ struct AVPlayerController : UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIViewControllerType, context: Context) {
-        
+//        switch isLandScape {
+//        default:
+//          uiViewController.setNeedsUpdateOfSupportedInterfaceOrientations()
+//        }
     }
 }

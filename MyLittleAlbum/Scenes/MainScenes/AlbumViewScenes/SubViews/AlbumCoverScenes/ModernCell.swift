@@ -164,7 +164,7 @@ extension ModernCell {
         requestOptions.isSynchronous = true
         requestOptions.deliveryMode = .opportunistic
         requestOptions.isNetworkAccessAllowed = true
-        requestOptions.resizeMode = .fast
+        requestOptions.resizeMode = .exact
         var image: UIImage!
         imageManager.requestImage(for: asset, targetSize: thumbNailSize, contentMode: .default, options: requestOptions) { assetImage, _ in
                 if let assetImage = assetImage {
